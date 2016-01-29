@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -64,9 +64,11 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LibraryPath>$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v7.1A\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)..\external\Lua 5.3.2;$(SolutionDir)..\external\libmspack\mspack;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LibraryPath>$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v7.1A\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)..\external\Lua 5.3.2;$(SolutionDir)..\external\libmspack\mspack;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -96,7 +98,8 @@
       </Command>
     </PostBuildEvent>
     <PreLinkEvent>
-      <Command></Command>
+      <Command>
+      </Command>
     </PreLinkEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
@@ -108,7 +111,6 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
       <Inputs>$(TargetFileName)</Inputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
-
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
@@ -139,17 +141,120 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
       </Command>
     </PostBuildEvent>
     <PreLinkEvent>
-      <Command></Command>
+      <Command>
+      </Command>
     </PreLinkEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Classes\AppDelegate.cpp" />
     <ClCompile Include="..\Classes\HelloWorldScene.cpp" />
+    <ClCompile Include="..\external\libmspack\mspack\cabc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\cabd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\chmc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\chmd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\crc32.c" />
+    <ClCompile Include="..\external\libmspack\mspack\debug.c" />
+    <ClCompile Include="..\external\libmspack\mspack\hlpc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\hlpd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\kwajc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\kwajd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\litc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\litd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\lzssd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\lzxc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\lzxd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\mszipc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\mszipd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\oabc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\oabd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\qtmc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\qtmd.c" />
+    <ClCompile Include="..\external\libmspack\mspack\system.c" />
+    <ClCompile Include="..\external\libmspack\mspack\szddc.c" />
+    <ClCompile Include="..\external\libmspack\mspack\szddd.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lapi.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lauxlib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lbaselib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lbitlib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lcode.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lcorolib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lctype.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ldblib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ldebug.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ldo.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ldump.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lfunc.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lgc.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\linit.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\liolib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\llex.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lmathlib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lmem.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\loadlib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lobject.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lopcodes.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\loslib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lparser.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lstate.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lstring.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lstrlib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ltable.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ltablib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\ltm.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lundump.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lutf8lib.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lvm.c" />
+    <ClCompile Include="..\external\Lua 5.3.2\lzio.c" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Classes\AppDelegate.h" />
     <ClInclude Include="..\Classes\HelloWorldScene.h" />
+    <ClInclude Include="..\external\libmspack\mspack\cab.h" />
+    <ClInclude Include="..\external\libmspack\mspack\chm.h" />
+    <ClInclude Include="..\external\libmspack\mspack\config.h" />
+    <ClInclude Include="..\external\libmspack\mspack\crc32.h" />
+    <ClInclude Include="..\external\libmspack\mspack\des.h" />
+    <ClInclude Include="..\external\libmspack\mspack\hlp.h" />
+    <ClInclude Include="..\external\libmspack\mspack\kwaj.h" />
+    <ClInclude Include="..\external\libmspack\mspack\lit.h" />
+    <ClInclude Include="..\external\libmspack\mspack\lzss.h" />
+    <ClInclude Include="..\external\libmspack\mspack\lzx.h" />
+    <ClInclude Include="..\external\libmspack\mspack\mspack.h" />
+    <ClInclude Include="..\external\libmspack\mspack\mszip.h" />
+    <ClInclude Include="..\external\libmspack\mspack\oab.h" />
+    <ClInclude Include="..\external\libmspack\mspack\qtm.h" />
+    <ClInclude Include="..\external\libmspack\mspack\readbits.h" />
+    <ClInclude Include="..\external\libmspack\mspack\readhuff.h" />
+    <ClInclude Include="..\external\libmspack\mspack\sha.h" />
+    <ClInclude Include="..\external\libmspack\mspack\system.h" />
+    <ClInclude Include="..\external\libmspack\mspack\szdd.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lapi.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lauxlib.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lcode.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lctype.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\ldebug.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\ldo.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lfunc.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lgc.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\llex.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\llimits.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lmem.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lobject.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lopcodes.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lparser.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lprefix.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lstate.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lstring.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\ltable.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\ltm.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lua.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lua.hpp" />
+    <ClInclude Include="..\external\Lua 5.3.2\luaconf.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lualib.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lundump.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lvm.h" />
+    <ClInclude Include="..\external\Lua 5.3.2\lzio.h" />
     <ClInclude Include="main.h" />
   </ItemGroup>
   <ItemGroup>
