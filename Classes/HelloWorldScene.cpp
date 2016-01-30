@@ -1,4 +1,5 @@
 #include "HelloWorldScene.h"
+#include "UndertaleResources.h"
 
 USING_NS_CC;
 
@@ -26,7 +27,7 @@ bool HelloWorld::init()
     {
         return false;
     }
-    
+	auto test = UndertaleResources::getInstance();
     Size visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 

@@ -198,6 +198,21 @@
     <ClCompile Include="..\external\libmspack\mspack\szddd.c">
       <Filter>libmspack</Filter>
     </ClCompile>
+    <ClCompile Include="..\Classes\LuaEngineInternal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\LuaEngine.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\CabExtract.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\UndertaleResources.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\TextWriter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -343,6 +358,18 @@
     </ClInclude>
     <ClInclude Include="..\external\libmspack\mspack\szdd.h">
       <Filter>libmspack</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\binaryReader.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\UndertaleResources.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\LuaEngine.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\TextWriter.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

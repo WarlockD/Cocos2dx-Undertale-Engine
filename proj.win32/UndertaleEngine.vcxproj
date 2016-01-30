@@ -147,7 +147,12 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Classes\AppDelegate.cpp" />
+    <ClCompile Include="..\Classes\CabExtract.cpp" />
     <ClCompile Include="..\Classes\HelloWorldScene.cpp" />
+    <ClCompile Include="..\Classes\LuaEngine.cpp" />
+    <ClCompile Include="..\Classes\LuaEngineInternal.cpp" />
+    <ClCompile Include="..\Classes\TextWriter.cpp" />
+    <ClCompile Include="..\Classes\UndertaleResources.cpp" />
     <ClCompile Include="..\external\libmspack\mspack\cabc.c" />
     <ClCompile Include="..\external\libmspack\mspack\cabd.c" />
     <ClCompile Include="..\external\libmspack\mspack\chmc.c" />
@@ -209,7 +214,11 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Classes\AppDelegate.h" />
+    <ClInclude Include="..\Classes\binaryReader.h" />
     <ClInclude Include="..\Classes\HelloWorldScene.h" />
+    <ClInclude Include="..\Classes\LuaEngine.h" />
+    <ClInclude Include="..\Classes\TextWriter.h" />
+    <ClInclude Include="..\Classes\UndertaleResources.h" />
     <ClInclude Include="..\external\libmspack\mspack\cab.h" />
     <ClInclude Include="..\external\libmspack\mspack\chm.h" />
     <ClInclude Include="..\external\libmspack\mspack\config.h" />
