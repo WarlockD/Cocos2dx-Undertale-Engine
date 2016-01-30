@@ -1,8 +1,125 @@
 #include "UndertaleResources.h"
 #include "binaryReader.h"
 USING_NS_CC;
+/*
+
+BinaryReader(const std::string& filename) {
+	std::fstream* fs = new std::fstream();
+	fs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
+	try {
+		fs->open(filename, std::ios::binary | std::ios::in);
+		fs->seekg(0, std::ios::end);
+		_length = fs->tellg();
+		fs->seekg(0, std::ios::beg);
+		s = std::unique_ptr<std::istream>(static_cast<std::istream*>(fs));
+	}
+	catch (std::ifstream::failure e) {
+		CCLOGERROR("BinaryReader::open: %s file %s", e.what(), filename);
+		delete fs;
+		throw e; // throw it back
+	}
+}
+*/
 
 
+
+
+static std::vector<uint32_t> getOffsetEntries(BinaryReader& r) {
+	std::vector<uint32_t> entries;
+	uint32_t count = r.read<uint32_t>();
+	while (count > 0) {
+		uint32_t offset = r.read<uint32_t>();
+		entries.emplace_back(offset);
+		count--;
+	}
+	return entries;
+
+}
+static std::vector<uint32_t> getOffsetEntries(BinaryReader& r, uint32_t start) {
+	r.push(start);
+	std::vector<uint32_t> vec(std::move(getOffsetEntries(r)));
+	r.pop();
+	return vec;
+}
+
+/*
+
+	// STRING DATA
+private:
+	// On strings, some of the data uses the offset to the string thats located while others use the index
+	// in how the strings are read.  We keep both
+	std::vector<istring> _stringIndex;
+	std::unordered_map<uint32_t, istring> _stringOffsetMap;
+
+	void doStringss(BinaryReader& r) {
+		r.seek(_chunks["STRG"].begin());
+		std::vector<char> stringBuffer;
+		stringBuffer.resize(200);
+		//ChunkEntries entries(r, _chunks["STRG"]);
+		for (uint32_t offset : getOffsetEntries()) {
+			r.seek(offset);
+			int stringSize = r.readInt();
+			stringBuffer.resize(stringSize);
+			r.read(stringBuffer.data(), stringSize);
+			stringBuffer.push_back(0); // just on the safe size, but it should be in the file
+									   //std::string nstring(stringBuffer.data(), stringSize);
+			istring nstring(stringBuffer.data());
+			_stringIndex.push_back(nstring);
+			_stringOffsetMap[offset + 4] = nstring;
+		}
+	}
+public:
+	istring stringByIndex(uint32_t i) const {
+		if (i < _stringIndex.size()) return _stringIndex[i];
+		else return istring();
+	}
+	istring stringByOffset(uint32_t i) const {
+		auto it = _stringOffsetMap.find(i);
+		if (it != _stringOffsetMap.end()) return it->second;
+		else return istring();
+	}
+
+private: /// TEXTURES
+	std::vector<istring> textureFiles;
+	// textures
+	
+	}
+private: // SPRITE POS DATA
+#pragma pack( push )
+#pragma pack( 1 )
+	struct SpriteInfo {
+		short x, y, width, height, renderX, renderY, width0, height0, width1, height1, texture_id;
+	};
+#pragma pack( pop )
+	std::vector<SpriteInfo> _spriteInfo;
+	uint32_t _spritInfoOffset;
+	void doTPANG() { // bulk load of the sprite data
+		const Chunk& tpagChunk = _chunks["TPAG"];
+		r.seek(tpagChunk.begin());
+		uint32_t count = r.readInt();
+		_spritInfoOffset = r.tell() + count*sizeof(int);
+		r.seek(_spritInfoOffset);
+
+		//auto tpagOffsets = getOffsetEntries(); // we don't really need these 
+
+		_spriteInfo.resize(count);
+		r.read(_spriteInfo.data(), _spriteInfo.size()); // This works only because I am 100% sure all this data is in tpang
+	}
+	const SpriteInfo& lookupSpriteInfo(uint32_t fileOffset) const {
+		fileOffset -= _spritInfoOffset;
+		fileOffset /= sizeof(SpriteInfo);
+		assert(fileOffset % sizeof(SpriteInfo));
+		return _spriteInfo[fileOffset];
+	}
+public:
+	ChunkReader(const std::string& filename) : r(filename) {
+		readChunks();
+	}
+	void readChunks() {
+	
+
+};
+*/
 void GetFrames(ValueMap& dictionary, const std::string& sprite_name, Texture2D *texture, Vector<SpriteFrame*>& frames) {
 	ValueMap& framesDict = dictionary["newframes"].asValueMap();
 	int format = 0;
@@ -126,45 +243,128 @@ bool UndertaleResources::loadSpriteFrames(ValueVector & list, cocos2d::Vector<co
 }
 bool UndertaleResources::init()
 {
-
-	findUndertaleData();
-	ChunkReader r(_data_win_path);
-	//if (!findUndertaleData()) return false;
-	std::string filename("undertale_sprites.plist");
-	std::string fullPath = FileUtils::getInstance()->fullPathForFilename(filename);
-	if (fullPath.size() == 0)
-	{
-		CCLOGERROR("cocos2d: UndertaleResources: can not find %s", filename.c_str());	// return if plist file doesn't exist
+	if (!findUndertaleData() || !r.open(_data_win_path)) {
+		CCLOGERROR("cocos2d: UndertaleResources::init() can not open %s", _data_win_path.c_str());	// return if plist file doesn't exist
 		return false;
 	}
-	ValueMap dict = FileUtils::getInstance()->getValueMapFromFile(fullPath);
-	if (dict.find("textures") == dict.end()) {
-		CCLOGERROR("cocos2d: UndertaleResources: can not find the texture list");	// return if plist file doesn't exist
-		return false;
-	}
-	if (dict.find("sprites") == dict.end()) {
-		CCLOGERROR("cocos2d: UndertaleResources: can not find the sprite list");	// return if plist file doesn't exist
-		return false;
-	}
-	if (!loadTextures(dict["textures"].asValueVector())) return false;
-	ValueMap& sprites = dict["sprites"].asValueMap();
-	SpriteFrameCache* cache = SpriteFrameCache::getInstance();
-	for (auto iter = sprites.begin(); iter != sprites.end(); ++iter)
-	{
-		const std::string& spriteName = iter->first;
-		cocos2d::Vector<cocos2d::SpriteFrame*> frames; // Hopefuly this std::moves
-		if (!loadSpriteFrames(iter->second.asValueVector(), frames)) return false;
-		if (!loadSpriteFrames(iter->second.asValueVector(), frames)) {
-			CCLOGERROR("cocos2d: UndertaleResources: can not load sprite %s", spriteName);	// return if plist file doesn't exist
-			return false;
-		}
-		_frameMap[spriteName] = frames;
-		for (int i = 0; i < frames.size(); i++) {
-			std::string frameName = spriteName + std::to_string(i);
-			cache->addSpriteFrame(frames.at(i), frameName);
-		}
-	}
+	readAllChunks();
+	readAllTextures();
+	readAllSprites();
 	return true;
+}
+void UndertaleResources::readAllTextures()
+{
+		_textures.clear();
+		const Chunk& txrtChunk = _chunks["TXTR"];
+		r.seek(txrtChunk.begin());
+		auto textureOffsets = getOffsetEntries(r);
+		std::vector<char> fileBuffer;
+		fileBuffer.resize(100000);
+		for (uint32_t i = 0; i < textureOffsets.size(); i++) {
+			uint32_t offset = textureOffsets[i];
+			uint32_t next_offset = (i + 1) < textureOffsets.size() ? textureOffsets[i + 1] : txrtChunk.end();
+			uint32_t size = next_offset = offset;
+			r.seek(offset);
+			int dummy = r.readInt(); // always a 1
+			uint32_t new_offset = r.readInt();
+			r.seek(new_offset);
+		//	std::string path = cocos2d::FileUtils::getInstance()->getWritablePath();
+		//	path += "UndertaleTexture_" + std::to_string(textureFiles.size()) + ".png";
+			fileBuffer.resize(size);
+			r.read(fileBuffer.data(), size);
+			Image* image = new Image;
+			image->autorelease();
+			image->initWithImageData((uint8_t*)fileBuffer.data(), size);
+			std::string image_key = "UndertaleTexture_" + std::to_string(i);
+			Texture2D* texture = TextureCache::getInstance()->addImage(image, image_key);
+			_textures.pushBack(texture);
+		}
+}
+void UndertaleResources::readAllChunks()
+{
+	r.seek(0); // got to start
+	std::streamsize full_size = r.length();
+	while (r.tell() < full_size) {
+		char chunkNameBuffer[5]; r.read(chunkNameBuffer, 4); chunkNameBuffer[4] = 0;
+		istring chunkName = chunkNameBuffer;
+		uint32_t chunkSize = r.read<uint32_t>();
+		uint32_t chunkStart = r.tell();
+		_chunks.emplace(std::make_pair(chunkName, Chunk(chunkName, chunkStart, chunkSize)));
+		if (chunkName == "FORM") full_size = chunkSize; // special case
+		else r.seek(chunkStart + chunkSize);
+	}
+	r.seek(0); // got to start
+}
+#pragma pack(push,1)
+struct GM_SpriteHeader {
+	uint32_t width;
+	uint32_t height;
+	uint32_t flags;
+	uint32_t width0;
+	uint32_t height0;
+	uint32_t another;
+	uint32_t extra[7];
+};
+struct GM_RawSpriteFrame {
+	short x;
+	short y;
+	short width;
+	short height;
+	short renderX;
+	short renderY;
+	short width0;
+	short height0;
+	short width1;
+	short height1;
+	short texture_id;
+};
+struct GM_SpriteFrame {
+	cocos2d::Rect frame;
+	cocos2d::Point render;
+	cocos2d::Size size0;
+	cocos2d::Size size1;
+	uint16_t texture_id;
+	GM_SpriteFrame(uint16_t raw[9]) : frame(raw[0], raw[1], raw[2], raw[3]), size0(raw[4], raw[5]), size1(raw[6], raw[7]), texture_id(raw[8]) {}
+};
+#pragma pack(pop)
+void UndertaleResources::readAllSprites()
+{
+	GM_SpriteHeader header;
+	_spriteFrameLookup.clear();
+	const Chunk& spriteChunk = _chunks["SPRT"];
+	GM_RawSpriteFrame rawFrame;
+	r.seek(spriteChunk.begin());
+	auto spriteOffsets = getOffsetEntries(r);
+	for (uint32_t offset : spriteOffsets) {
+		r.seek(offset);
+		istring name = r.readStringAtOffset(r.readInt());
+		r.read(header);
+		r.push();
+		cocos2d::Vector<SpriteFrame*> frames;
+		auto frameOffsets = getOffsetEntries(r);
+		for (uint32_t foffset : frameOffsets) {
+			r.seek(foffset);
+			r.read(rawFrame);
+			if (rawFrame.texture_id > _textures.size()) {
+				CCLOG("Texture id invalid for sprite %sd", name.c_str());
+				continue;
+			}
+			Texture2D* texture = _textures.at(rawFrame.texture_id);
+			SpriteFrame* frame = SpriteFrame::createWithTexture(texture, Rect(rawFrame.x, rawFrame.y, rawFrame.width, rawFrame.height));
+			frames.pushBack(frame);
+		}
+		r.pop();
+		if(frames.size() > 0) _spriteFrameLookup.emplace(std::make_pair(name, std::move(frames)));
+		// read mask stuff
+		int haveMask = r.readInt();
+		if (haveMask) { // have mask?
+			std::vector<uint8_t> mask;
+			uint32_t stride = (header.width % 8) != 0 ? header.width + 1 : header.width;
+			mask.resize(stride * header.height);
+			r.read(mask.data(),mask.size());
+			_spriteMaskLookup.emplace(std::make_pair(name, std::move(mask)));
+		}
+	}
 }
 UndertaleResources * UndertaleResources::getInstance()
 {
@@ -180,3 +380,6 @@ UndertaleResources * UndertaleResources::getInstance()
 	}
 	return s_undertailResources;
 }
+
+
+

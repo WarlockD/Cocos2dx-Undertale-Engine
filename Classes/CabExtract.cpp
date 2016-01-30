@@ -232,7 +232,10 @@ bool UndertaleResources::findUndertaleData() {
 	bool failed = true;
 	while (true) { 
 		fullPath = cocos2d::FileUtils::getInstance()->fullPathForFilename(UndertaleFilnameDataWin);
-		if (fullPath.size() != 0) break;
+		if (fullPath.size() != 0) {
+			failed = false;
+			break;
+		}
 		fullPath = cocos2d::FileUtils::getInstance()->fullPathForFilename(UndertaleFilenameEXE);
 		TEST_PTR(fullPath.size() != 0, "Cannot find data.win or UNDERTALE.EXE");
 
@@ -261,5 +264,5 @@ bool UndertaleResources::findUndertaleData() {
 	_data_win_path = fullPath;
 	if (cab) cabd->close(cabd, cab);
 	if (cabd) { mspack_destroy_cab_decompressor(cabd); cabd = nullptr; }
-	return failed;
+	return !failed;
 }

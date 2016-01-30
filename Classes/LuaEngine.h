@@ -2,21 +2,30 @@
 #include "cocos2d.h"
 
 
-// Simple,stupid string class that uses cocos2d lua engine to intern strings
-// the const char* returned by this are always valid and the same thoughout 
-// Also, side note, while we have TSTring here from the lua structure
-// its ALWAYS going to be a short string.  We will throw something if you try to put something
-// longer than 
+// Originaly we kept TString from lua in here, till I realized that you hardly use it AT ALL
+// outside of this class unless, by chance, your using the "hash" or "length" function.
+// This is mainly for equality and comapring small strings anyway
 class istring  {
-	const struct TString* _internal;
+	//const struct TString* _internal;
+	const char* _internal;
 public:
 	typedef const char* const_iterator;
-public: // constructors and moves
+public: 
+	// rule of 5
 	istring();
+	istring(const istring& s) : _internal(s._internal) {}
+	istring(istring&& s) : _internal(s._internal) {  } // side note, we don't want _internal ever to be null
+	istring& operator=(istring&& s) { *this = istring(std::move(s)); return *this; }
+	istring& operator=(const istring& s) { *this = istring(s); return *this; }
+
 	istring(const char* str);
 	istring(const std::string& str);
+	istring& operator=(const char*s) { *this = istring(s); return *this; }
+	istring& operator=(const std::string& s) { *this = istring(s); return *this; }
 
-	const char* c_str() const;
+	inline const char* c_str() const { return _internal; }
+
+
 	size_t length() const;
 	size_t hash() const;
 
@@ -33,10 +42,13 @@ public: // constructors and moves
 	inline bool operator==(const char* str) const { return  *this == istring(str); }
 	inline bool operator!=(const char* str) const { return  *this != istring(str); }
 
-	inline bool isEmpty() const { return c_str()[0] == 0; } // hackery, but true
+	inline bool isEmpty() const { return c_str()[0] == 0; } // hackery, but true since _internal is never null, or shouldn't be?
 };
 
 // hash function for istring
 namespace std {
 	template <> struct hash<istring> { std::size_t operator()(const istring& k) const { return k.hash(); } };
 }
+//inline bool operator==(const istring& l, const istring& r)  { return l.c_str() == r.c_str(); }
+//inline bool operator!=(const istring& l, const istring& r) { return l.c_str() != r.c_str(); }
+

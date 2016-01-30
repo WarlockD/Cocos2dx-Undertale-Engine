@@ -27,7 +27,6 @@ bool HelloWorld::init()
     {
         return false;
     }
-	auto test = UndertaleResources::getInstance();
     Size visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
@@ -64,15 +63,29 @@ bool HelloWorld::init()
     // add the label as a child to this layer
     this->addChild(label, 1);
 
+
     // add "HelloWorld" splash screen"
-    auto sprite = Sprite::create("HelloWorld.png");
+  ///  auto sprite = Sprite::create("HelloWorld.png");
 
-    // position the sprite on the center of the screen
-    sprite->setPosition(Vec2(visibleSize.width/2 + origin.x, visibleSize.height/2 + origin.y));
-
-    // add the sprite as a child to this layer
-    this->addChild(sprite, 0);
+  
     
+	
+	// sprite
+	UndertaleResources* res = UndertaleResources::getInstance();
+	const Vector<SpriteFrame*>& frames = res->getSpriteFrames("spr_doglick");
+	Animation* animation = Animation::createWithSpriteFrames(frames, 0.15f);
+	Animate* animate = Animate::create(animation);
+
+	auto sprite = Sprite::createWithSpriteFrame(frames.at(4));
+
+
+	// position the sprite on the center of the screen
+	sprite->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
+
+	// add the sprite as a child to this layer
+	sprite->runAction(animate);
+	this->addChild(sprite, 0);
+
     return true;
 }
 
