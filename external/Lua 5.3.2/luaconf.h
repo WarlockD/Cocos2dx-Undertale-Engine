@@ -758,9 +758,14 @@
 ** Local configuration. You can use this space to add your redefinitions
 ** without modifying the main part of the file.
 */
-
-
-
+// stuff from lauxlib, abstracted them to LuaEngine.cpp so we dont' have to include cocos2d.h
+/* print a string */
+void LuaEngine_lua_writestring(const char* s, size_t l);
+void LuaEngine_lua_writeline();
+void LuaEngine_lua_writestringerror(const char* fmt,...);
+#define lua_writestring(s,l) LuaEngine_lua_writestring((s), (l));
+#define lua_writeline() LuaEngine_lua_writeline();
+#define lua_writestringerror(s,p) LuaEngine_lua_writestringerror((s),(p))
 
 
 #endif

@@ -7,7 +7,7 @@
 
 class UndertaleResources {
 protected:
-
+	static cocos2d::Vector<cocos2d::Texture2D*> emptyList;
 	class Chunk {
 		istring _name; // there are ALOT of text here here, so we want fast equals, searches and save memory
 		size_t _begin;
@@ -53,13 +53,14 @@ public:
 		if (it == _spriteFrameLookup.cend()) return nullptr;
 		else return it->second.at(0);
 	}
-	cocos2d::Sprite* createSprite(istring name) const {
-		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(name));
+	cocos2d::Sprite* createSprite(istring name,uint32_t frame=0) const {
+		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(name, frame));
 	}
 	
-	cocos2d::Vector<cocos2d::SpriteFrame*>& getSpriteFrames(istring name) {
+	const cocos2d::Vector<cocos2d::SpriteFrame*>* getSpriteFrames(istring name) {
 		auto it = _spriteFrameLookup.find(name);
-		return it->second;
+		if (it == _spriteFrameLookup.cend()) return nullptr;
+		return &it->second;
 	}
 
 	static UndertaleResources* getInstance();

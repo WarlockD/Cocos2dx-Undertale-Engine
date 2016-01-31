@@ -152,6 +152,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClCompile Include="..\Classes\HelloWorldScene.cpp" />
     <ClCompile Include="..\Classes\LuaEngine.cpp" />
     <ClCompile Include="..\Classes\LuaEngineInternal.cpp" />
+    <ClCompile Include="..\Classes\LuaSprite.cpp" />
     <ClCompile Include="..\Classes\TextWriter.cpp" />
     <ClCompile Include="..\Classes\UndertaleResources.cpp" />
     <ClCompile Include="..\external\libmspack\mspack\cabc.c" />
@@ -218,6 +219,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClInclude Include="..\Classes\binaryReader.h" />
     <ClInclude Include="..\Classes\HelloWorldScene.h" />
     <ClInclude Include="..\Classes\LuaEngine.h" />
+    <ClInclude Include="..\Classes\LuaSprite.h" />
     <ClInclude Include="..\Classes\TextWriter.h" />
     <ClInclude Include="..\Classes\UndertaleResources.h" />
     <ClInclude Include="..\external\libmspack\mspack\cab.h" />
@@ -281,6 +283,12 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="game.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\luascripts\startup.lua">
+      <DeploymentContent>true</DeploymentContent>
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

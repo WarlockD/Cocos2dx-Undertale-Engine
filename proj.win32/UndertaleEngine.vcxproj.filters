@@ -16,6 +16,9 @@
     <Filter Include="libmspack">
       <UniqueIdentifier>{cae37e06-7917-458a-89b0-3ec6bfd4647f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Lua Scripts">
+      <UniqueIdentifier>{adac7365-1332-4edd-8560-07904e4aaad9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -216,6 +219,9 @@
     <ClCompile Include="..\Classes\BinaryReader.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\Classes\LuaSprite.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -374,10 +380,18 @@
     <ClInclude Include="..\Classes\TextWriter.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\Classes\LuaSprite.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="game.rc">
       <Filter>resource</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\luascripts\startup.lua">
+      <Filter>Lua Scripts</Filter>
+    </None>
   </ItemGroup>
 </Project>

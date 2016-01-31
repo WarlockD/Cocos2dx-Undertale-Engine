@@ -1,6 +1,6 @@
 #pragma once
 #include "cocos2d.h"
-
+#include "lua.hpp"
 
 // Originaly we kept TString from lua in here, till I realized that you hardly use it AT ALL
 // outside of this class unless, by chance, your using the "hash" or "length" function.
@@ -52,3 +52,39 @@ namespace std {
 //inline bool operator==(const istring& l, const istring& r)  { return l.c_str() == r.c_str(); }
 //inline bool operator!=(const istring& l, const istring& r) { return l.c_str() != r.c_str(); }
 
+
+
+// loving constexpr
+namespace LuaEngineMetaTableNames {
+	template<typename T> constexpr const char* metaTableName() { throw std::runtime_error("No metatable is defined!"); }
+	template<> constexpr const char* metaTableName<cocos2d::Vec2>() { return "Vec2MT"; }
+}
+
+class LuaEngine {
+public:
+	template<typename T> static  T* newUserData(lua_State*L, const char* metaname) {
+		T* obj = static_cast<T*>(lua_newuserdata(L, sizeof(T)));
+		luaL_getmetatable(L, metaname);
+		lua_setmetatable(L, -2);
+		return obj;
+	}
+	template<typename T> static  T* newUserData(lua_State*L) {
+		return newUserData(L, LuaEngineMetaTableNames::metaTableName<T>());
+	}
+
+	template<typename T>static  T** newUserData(lua_State*L, T* ptr, const char* metaname) {
+		T** obj = static_cast<T**>(lua_newuserdata(L, sizeof(T*)));
+		luaL_getmetatable(L, metaname);
+		lua_setmetatable(L, -2);
+		*obj = ptr;
+		return obj;
+	}
+	template<typename T> static T** newUserData(lua_State*L, T* ptr) {
+		return newUserData(L, ptr, LuaEngineMetaTableNames::metaTableName<T>());
+	}
+	static lua_State* getLuaState();
+	static void  setLuaScene(cocos2d::Node* scene);// The scene that all your lua nodes go into
+	static cocos2d::Node*  getLuaScene();// The scene that all your lua nodes go into
+	static bool RunGlobalUpdate(const char* global_name, float dt);
+	static bool DoFile(const char* filename);
+};
