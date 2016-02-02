@@ -2,8 +2,13 @@
 
 #include "cocos2d.h"
 #include "LuaEngine.h"
+#include "LuaSprite.h"
 #include "binaryReader.h"
 #include <fstream>
+
+// We are copying the label class.  Because undertale has very flexable labels we have to reimplment it ourseves to get that
+// fine, fine letter control
+
 
 class UndertaleResources {
 protected:
@@ -26,14 +31,14 @@ protected:
 	
 	std::unordered_map<istring, Chunk> _chunks;
 	std::unordered_map<istring, cocos2d::Vector<cocos2d::SpriteFrame*>> _spriteFrameLookup;
-	std::unordered_map<istring, std::vector<uint8_t>> _spriteMaskLookup;
-
+	std::unordered_map<istring, cocos2d::Vector<cocos2d::FontAtlas*>> _fontAtlasLookup;
 	
 
 
 	void readAllTextures();
 	void readAllChunks();
 	void readAllSprites();
+	void readAllFonts();
 protected:
 	std::string _data_win_path;
 	
@@ -47,13 +52,13 @@ protected:
 	cocos2d::Vector<cocos2d::Texture2D*> _textures;
 
 public:
-	inline cocos2d::Texture2D* getTexture(uint32_t i) const { return i < _textures.size() ? _textures.at(i) : nullptr;}
-	cocos2d::SpriteFrame* getSpriteFrame(istring name, int frame = 0)const {
+	inline cocos2d::Texture2D* getTexture(size_t i) const { return (i < _textures.size()) ? _textures.at(i) : nullptr;}
+	cocos2d::SpriteFrame* getSpriteFrame(istring name, size_t frame = 0)const {
 		auto it = _spriteFrameLookup.find(name);
 		if (it == _spriteFrameLookup.cend()) return nullptr;
 		else return it->second.at(0);
 	}
-	cocos2d::Sprite* createSprite(istring name,uint32_t frame=0) const {
+	cocos2d::Sprite* createSprite(istring name, size_t frame=0) const {
 		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(name, frame));
 	}
 	

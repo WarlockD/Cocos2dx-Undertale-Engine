@@ -62,26 +62,27 @@ namespace LuaEngineMetaTableNames {
 
 class LuaEngine {
 public:
-	template<typename T> static  T* newUserData(lua_State*L, const char* metaname) {
+	template<typename T> inline static  T* newUserData(lua_State*L, const char* metaname) {
 		T* obj = static_cast<T*>(lua_newuserdata(L, sizeof(T)));
 		luaL_getmetatable(L, metaname);
 		lua_setmetatable(L, -2);
 		return obj;
 	}
-	template<typename T> static  T* newUserData(lua_State*L) {
-		return newUserData(L, LuaEngineMetaTableNames::metaTableName<T>());
+	template<typename T>  inline static  T* newUserData(lua_State*L) {
+		return newUserData<T>(L, LuaEngineMetaTableNames::metaTableName<T>());
 	}
 
-	template<typename T>static  T** newUserData(lua_State*L, T* ptr, const char* metaname) {
+	template<typename T>  inline static  T** newUserData(lua_State*L, T* ptr, const char* metaname) {
 		T** obj = static_cast<T**>(lua_newuserdata(L, sizeof(T*)));
 		luaL_getmetatable(L, metaname);
 		lua_setmetatable(L, -2);
 		*obj = ptr;
 		return obj;
 	}
-	template<typename T> static T** newUserData(lua_State*L, T* ptr) {
-		return newUserData(L, ptr, LuaEngineMetaTableNames::metaTableName<T>());
+	template<typename T>  inline  static T** newUserData(lua_State*L, T* ptr) {
+		return newUserData<T>(L, ptr, LuaEngineMetaTableNames::metaTableName<T>());
 	}
+	
 	static lua_State* getLuaState();
 	static void  setLuaScene(cocos2d::Node* scene);// The scene that all your lua nodes go into
 	static cocos2d::Node*  getLuaScene();// The scene that all your lua nodes go into

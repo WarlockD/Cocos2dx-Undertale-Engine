@@ -154,6 +154,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClCompile Include="..\Classes\LuaEngineInternal.cpp" />
     <ClCompile Include="..\Classes\LuaSprite.cpp" />
     <ClCompile Include="..\Classes\TextWriter.cpp" />
+    <ClCompile Include="..\Classes\UndertaleLabel.cpp" />
     <ClCompile Include="..\Classes\UndertaleResources.cpp" />
     <ClCompile Include="..\external\libmspack\mspack\cabc.c" />
     <ClCompile Include="..\external\libmspack\mspack\cabd.c" />
@@ -221,6 +222,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClInclude Include="..\Classes\LuaEngine.h" />
     <ClInclude Include="..\Classes\LuaSprite.h" />
     <ClInclude Include="..\Classes\TextWriter.h" />
+    <ClInclude Include="..\Classes\UndertaleLabel.h" />
     <ClInclude Include="..\Classes\UndertaleResources.h" />
     <ClInclude Include="..\external\libmspack\mspack\cab.h" />
     <ClInclude Include="..\external\libmspack\mspack\chm.h" />

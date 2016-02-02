@@ -6,6 +6,7 @@
 #include "LuaEngine.h"
 #include <cstdarg>
 #include <csignal>
+#include <new>
 
 extern "C" {    // another way
 	#include "lua.h"
@@ -318,7 +319,9 @@ static int Vec2__new(lua_State* L) {
 		x = luaL_checknumber(L, 1);
 		y = luaL_checknumber(L, 2);
 	}
-	Vec2* vec2 = new (L, VEC2_METATABLENAME) Vec2(x, y);
+	Vec2* vec = LuaEngine::newUserData<cocos2d::Vec2>(L);
+
+	Vec2* vec2 = new ((void*)vec) Vec2;
 	return 1;
 }
 void lua_RegesterVec2(lua_State* L) {

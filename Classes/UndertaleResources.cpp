@@ -310,29 +310,100 @@ struct GM_RawSpriteFrame {
 	short y;
 	short width;
 	short height;
-	short renderX;
-	short renderY;
-	short width0;
-	short height0;
-	short width1;
-	short height1;
+	short offsetX;
+	short offsetY;
+	short cropWidth;
+	short cropHeight;
+	short originalWidth;
+	short originalHeight;
 	short texture_id;
 };
-struct GM_SpriteFrame {
-	cocos2d::Rect frame;
-	cocos2d::Point render;
-	cocos2d::Size size0;
-	cocos2d::Size size1;
-	uint16_t texture_id;
-	GM_SpriteFrame(uint16_t raw[9]) : frame(raw[0], raw[1], raw[2], raw[3]), size0(raw[4], raw[5]), size1(raw[6], raw[7]), texture_id(raw[8]) {}
-};
 #pragma pack(pop)
+class GM_SpriteFrame {
+	
+public:
+	cocos2d::Rect rect;
+	cocos2d::Point offset;
+	cocos2d::Size crop;
+	cocos2d::Size original;
+	uint16_t texture_id;
+	void setFromRaw(const GM_RawSpriteFrame& raw) {
+		rect.setRect(raw.x, raw.y, raw.width, raw.height);
+		offset.setPoint(raw.offsetX, raw.offsetY);
+		crop.setSize(raw.cropWidth, raw.cropHeight);
+		original.setSize(raw.originalWidth, raw.originalHeight);
+		texture_id = texture_id;
+	}
+	void setFromReader(BinaryReader& r, uint32_t offset) {
+		r.push(offset);
+		setFromReader(r);
+		r.pop();
+	}
+	void setFromReader(BinaryReader& r) {
+		GM_RawSpriteFrame raw;
+		r.read(raw);
+		setFromRaw(raw);
+	}
+};
+void UndertaleResources::readAllFonts() {
+	_fontAtlasLookup.clear();
+	const Chunk& fontChunk = _chunks["FONT"];
+	GM_RawSpriteFrame rawFrame;
+	r.seek(fontChunk.begin());
+	auto fontOFfsets = getOffsetEntries(r);
+	GM_SpriteFrame fontFrame;
+	for (uint32_t offset : fontOFfsets) {
+		r.seek(offset);
+		istring name = r.readStringAtOffset(r.readInt());
+		istring description = r.readStringAtOffset(r.readInt());
+		int font_size = r.readInt();
+		bool bold = r.readBool();
+		bool italic = r.readBool();
+		int flag = r.readInt();
+		int first_char = flag & 0xFFFF;
+		int charSet = (flag >> 16) & 0xFF;
+		bool antiAlias = (flag >> 24) & 0xFF;
+		int last_char = r.readInt();
+		int frameOffset = r.readInt();
+		fontFrame.setFromReader(r, frameOffset);
+		float scaleW = r.readSingle();
+		float scaleH = r.readSingle();
+		auto glyphEntries = getOffsetEntries(r);
+		FontAtlas* atlas = new FontAtlas();
+		atlas->autorelease();
+		atlas->addTexture(_textures[fontFrame.texture_id], fontFrame.texture_id);
+		for (uint32_t goffset : glyphEntries) {
+			r.seek(goffset);
+			FontLetterDefinition letter;
+			short ch = r.readShort();
+			letter.U = r.readShort() + fontFrame.rect.origin.x;
+			letter.V = r.readShort() + fontFrame.rect.origin.Y;
+			letter.width = r.readShort();
+			letter.height = r.readShort();
+			short shift = r.readShort();
+			short offset = r.readShort();
+		//	letter.offsetX = r.offset;
+		//	letter.offsetY = 0;
+			letter.validDefinition = true;
+			letter.textureID = fontFrame.texture_id;
+			letter.xAdvance = offset;
+			int kerningCount = r.readShort(); // humm
+			while (kerningCount) {
+				short other = r.readShort();
+				short amount = r.readShort();
+			}
+			atlas->addLetterDefinition(ch, letter);
+		}
+
+	}
+}
 void UndertaleResources::readAllSprites()
 {
 	GM_SpriteHeader header;
 	_spriteFrameLookup.clear();
 	const Chunk& spriteChunk = _chunks["SPRT"];
 	GM_RawSpriteFrame rawFrame;
+	GM_SpriteFrame frameData;
 	r.seek(spriteChunk.begin());
 	auto spriteOffsets = getOffsetEntries(r);
 	for (uint32_t offset : spriteOffsets) {
@@ -349,20 +420,21 @@ void UndertaleResources::readAllSprites()
 				CCLOG("Texture id invalid for sprite %sd", name.c_str());
 				continue;
 			}
-			Texture2D* texture = _textures.at(rawFrame.texture_id);
-			SpriteFrame* frame = SpriteFrame::createWithTexture(texture, Rect(rawFrame.x, rawFrame.y, rawFrame.width, rawFrame.height));
+			frameData.setFromRaw(rawFrame);
+			Texture2D* texture = _textures.at(frameData.texture_id);
+			SpriteFrame* frame = SpriteFrame::createWithTexture(texture, frameData.rect, false, frameData.offset, frameData.original);
 			frames.pushBack(frame);
 		}
 		r.pop();
-		if(frames.size() > 0) _spriteFrameLookup.emplace(std::make_pair(name, std::move(frames)));
+		if (frames.size() > 0) _spriteFrameLookup.emplace(std::make_pair(name, std::move(frames)));
 		// read mask stuff
 		int haveMask = r.readInt();
 		if (haveMask) { // have mask?
-			std::vector<uint8_t> mask;
 			uint32_t stride = (header.width % 8) != 0 ? header.width + 1 : header.width;
-			mask.resize(stride * header.height);
-			r.read(mask.data(),mask.size());
-			_spriteMaskLookup.emplace(std::make_pair(name, std::move(mask)));
+			std::vector<uint8_t>* mask = new std::vector<uint8_t>();
+			mask->resize(stride * header.height);
+			r.read(mask->data(), mask->size());
+			_spriteMaskLookup.emplace(std::make_pair(name, mask));
 		}
 	}
 }

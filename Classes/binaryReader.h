@@ -65,7 +65,12 @@ public:
 	}
 	inline int readInt() const { return read<int32_t>(); }
 	inline short readShort() const { return read<int16_t>(); }
-	
+	inline bool readBool() const {
+		int b = readInt();
+		assert(b == 0 || b == 1);
+		return b != 0;
+	}
+	inline float readSingle() const { return read<float>(); }
 	inline void seek(std::streamoff pos) { s->seekg(pos); }
 	inline std::streamoff tell() const { return s->tellg(); }
 	inline bool eof() const { return s->bad() || s->eof(); }
@@ -74,9 +79,9 @@ public:
 	template<typename T> inline void foreward(size_t count) { s->seekg(sizeof(T)*count, std::ios::cur); }
 	inline void foreward(size_t count) { s->seekg(count, std::ios::cur); }
 
-	template<typename T> inline void backward() { s->seekg(-sizeof(T), std::ios::cur); }
-	template<typename T> inline void backward(size_t count) { s->seekg(-(sizeof(T)*count), std::ios::cur); }
-	inline void backward(size_t count) { s->seekg(-count, std::ios::cur); }
+	template<typename T> inline void backward() { s->seekg(-((std::streamoff)sizeof(T)), std::ios::cur); }
+	template<typename T> inline void backward(size_t count) { s->seekg(sizeof(T)*(-((std::streamoff)count)), std::ios::cur); }
+	inline void backward(size_t count) { s->seekg(-((std::streamoff)count), std::ios::cur); }
 };
 
 class BinaryFileReader : public BinaryReader {	
