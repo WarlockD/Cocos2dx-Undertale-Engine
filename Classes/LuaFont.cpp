@@ -2,7 +2,7 @@
 #include "LuaEngine.h"
 #include "UndertaleResourcesInternal.h"
 #include "AudioEngine.h"
-
+#include "SimpleAudioEngine.h"
 #include "2d/CCFontAtlasCache.h"
 
 USING_NS_CC;
@@ -313,39 +313,34 @@ void UndertaleResources::readAllFonts() {
 		//LuaFontConfiguration::_fontConfigs[fontConfig->font_name] = fontConfig;
 	}
 }
+// sigh, can't get away from tokenizing this whole thing, unless we want to do it
+// live in the update function.  While that IS an option, its also slow as fuck and
+
 
 class LuaLabelSprite : public Sprite {
 	static const  float _updateTime;
-	
 	bool _hide;
 	Vec2 _shakeSavePos;
 	float _currentTime;
 	CC_SYNTHESIZE(float, _shake, Shake);
-	CC_SYNTHESIZE(char16_t, _ch, Char);
-	CC_SYNTHESIZE(float, _textSpeed, TextSpeed);
-	CC_SYNTHESIZE(int, _halt, Halt);
-	LuaLabelSprite() :_ch(0), _shake(0.0f), _halt(0), _hide(true), _shakeSavePos(0, 0), _currentTime(0), Sprite() {}
+	LuaLabelSprite() : _shake(0.0f), _hide(false), _shakeSavePos(0, 0), _currentTime(0), Sprite() {}
 public:
 	static LuaLabelSprite* create() {
 		LuaLabelSprite* sprite = new LuaLabelSprite();
 		if (sprite && sprite->init()) {
 			sprite->autorelease();
+			sprite->hideLetter();
 			return sprite;
 		}
 		CC_SAFE_DELETE(sprite);
 		return nullptr;
 	}
 	// Just need to override this as 
-	void setPosition(float x, float y) override {
-		if(_hide)_shakeSavePos = Vec2(x, y);
-		
-		Sprite::setPosition(x, y);
-	}
 	void showLetter() { if (_hide) { _shakeSavePos = getPosition();  _hide = false; setScale(1.0f);  _currentTime = _updateTime; scheduleUpdate(); } }
 	void hideLetter() { if (!_hide) { _hide = true; setScale(0.0f); unscheduleUpdate(); } }
 
 	void update(float dt) override {
-		if (!_hide) {
+		if (!_hide && _shake > FLT_EPSILON) {
 			if ((_currentTime -= dt) < 0.0f) {
 				_currentTime = _updateTime;
 				Vec2 pos = _shakeSavePos;
@@ -360,37 +355,51 @@ const  float LuaLabelSprite::_updateTime = 1.0 / 30.0f;
 
 void LuaLabel::setTypingSound(istring soundFile)
 {
-	if(_typesound > -1) AudioEngine::stop(_typesound);
-	AudioEngine::preload(soundFile.c_str());
+	auto audio = CocosDenshion::SimpleAudioEngine::getInstance();
+	if (_typesound != 0) { _typesound = 0;  audio->stopEffect(_typesound); }
+	audio->preloadEffect(soundFile.c_str());
 	_typingSound = soundFile;
 }
 
-void LuaLabel::setString(const std::string & text)
+void LuaLabel::setString(const std::string & text, bool startTyping)
 {
-	_originalString = text;
-	_utf16Text.clear();
-	StringUtils::UTF8ToUTF16(text,_utf16Text);
-	_atlas->prepareLetterDefinitions(_utf16Text);
-	_utf16Text.clear();
+	if (_originalString != text) {
+		_originalString = text;
+		_utf16Text.clear();
+		StringUtils::UTF8ToUTF16(text, _utf16Text);
+		_atlas->prepareLetterDefinitions(_utf16Text);
+		_utf16Text.clear();
+		_needsUpdate = true;
+	}
+	updateContent(true);
+	if (startTyping) restartTyping();
+}
+void LuaLabel::updateContent(bool hideLetters)
+{
+	if (!_needsUpdate || _originalString.empty()) return;
+	const auto& text = _originalString;
 	// Very annoying.  We have to pars
-//	global.msg[0] = "\\E2* If you truly wish to&  leave the RUINS.../* I will not stop you./\\E2* However^1, when you&  leave.../\\E1* Please do not come&  back./\\E2* I hope you understand./%%"
+	//	global.msg[0] = "\\E2* If you truly wish to&  leave the RUINS.../* I will not stop you./\\E2* However^1, when you&  leave.../\\E1* Please do not come&  back./\\E2* I hope you understand./%%"
 	Texture2D* letterTexture = _atlas->getTexture(0);
 	if (text.size() > _letterCache.size()) {
 		for (int i = _letterCache.size(); i < text.size(); i++) {
 			LuaLabelSprite* letter = LuaLabelSprite::create();
-			addChild(letter);
+			Rect uvRect(730, 4, 16, 22); // filler
+			letter->setTextureRect(uvRect);
+			letter->setTexture(letterTexture);
 			_letterCache.pushBack(letter);
+			addChild(letter, 1);
 		}
 	}
-	float speed = _textSpeed;
 	Sprite* s;
 	Color3B color = Color3B::WHITE;
 
-	int halt = 0;
+	HaltType halt = HaltType::Typing;
 	Point pos;
 	int l = 0;
 	FontLetterDefinition letterDef;
-	auto getNextLetter = [this, &l, letterTexture,&letterDef](char16_t c) {
+	Size contentSize;
+	auto getNextLetter = [this, &l, letterTexture, &letterDef](char16_t c) {
 		LuaLabelSprite* sprite = this->_letterCache.at(l++);
 		if (!_atlas->getLetterDefinitionForChar(c, letterDef)) throw std::exception("ugh");
 		//auto textureID = letterDef.textureID;
@@ -399,19 +408,23 @@ void LuaLabel::setString(const std::string & text)
 		uvRect.size.width = letterDef.width;
 		uvRect.origin.x = letterDef.U;
 		uvRect.origin.y = letterDef.V;
-		
+
 		sprite->setTextureRect(uvRect);
 		sprite->setTexture(letterTexture);
 		return sprite;
 	};
-	Vector<LuaLabelSprite*> line;
-	for (int i = 0; i < text.length();i++) {
+	std::vector<LabelToken> line;
+	for (int i = 0; i < text.length(); i++) {
 		char16_t c, n;
 		c = text[i];
 		switch (c) {
 		case '^':
-			speed = (('0'-text[++i]) * 10) / 30.0f;// speed is 30 frames a second...hopefuly
+		{
+			n = text[++i];
+			uint32_t speed = n - '0';
+			line.emplace_back(speed);
 			continue;
+		}
 		case '&': // inline return
 			c = '\n';
 			break;
@@ -424,83 +437,78 @@ void LuaLabel::setString(const std::string & text)
 			case 'X':color = Color3B::BLACK; break;
 			case 'B':color = Color3B::BLUE; break;
 			case 'C': break;// choise not implmented
-			case 'E': break; // facemotion not implmented;
-			case 'F': break; // face Chioe not implmented
+			case 'E': {
+				n = text[++i];
+				int face = n - '0';
+				line.emplace_back((void*)(face), &_facemotion_event);
+				continue;
+			}
+			case 'F':
+			{
+				n = text[++i];
+				int face = n - '0';
+				line.emplace_back((void*)(face), &_facemovement_event);
+				continue;
+			}
 			case 'T': ++i; break; // TextType, need to figure that out
 			}
 			continue;
 		case '/': // Halt commands
 			n = text[i + 1]; // wierd
-			halt = 1;
-			if (n == '%') { i++; halt = 2; }
-			else if (n == '^') { i++; halt = 4; }
-			c = ' '; // HACK here, but it fixes
-			break;
+			halt = HaltType::WaitingOnKeyPress;
+			if (n == '%') { i++; halt = HaltType::DoneTyping; }
+			else if (n == '^') { i++; halt = HaltType::DoneTyping; } // this means self destory, not implmented
+			line.emplace_back(halt);
+			pos = Vec2::ZERO;
+			color = Color3B::WHITE; // color resets on the line apperntly
+			_letters.push_back(std::move(line));
+			line = std::vector<LabelToken>();
+			continue;
 		}
 		if (c == '\n') {
+			if (contentSize.width < pos.x) contentSize.width = pos.x;
 			pos.y -= _atlas->getLineHeight();
+			if (contentSize.height < pos.y) contentSize.width = pos.y;
 			pos.x = 0;
 			continue;
 		}
+		if (c == '%') break;
 		LuaLabelSprite* sprite = getNextLetter(c);
-		sprite->setHalt(halt);
-		sprite->setTextSpeed(speed);
 		sprite->setColor(color);
 		sprite->setShake(_shake);
-		sprite->setChar(c);
-		sprite->hideLetter();
+		if (hideLetters) sprite->hideLetter(); else sprite->showLetter();
 		auto px = pos.x + letterDef.width / 2;
 		auto py = pos.y - letterDef.height / 2;
 		sprite->setPosition(px, py);
-		
-		line.pushBack(sprite);
+		line.emplace_back(c, sprite);
 		_utf16Text.push_back(c);
-		if (halt != 0) {
-			pos = Vec2::ZERO;
-			_letters.push_back(std::move(line));
-			line = Vector<LuaLabelSprite*>();
-		}
 		pos.x += letterDef.xAdvance;
-		speed = _textSpeed;
-		halt = 0;
-		if (c == '%') break;
+		halt = HaltType::Typing;
 	}
-	if(line.size() > 0) _letters.push_back(std::move(line));
-	_currentTextPos = 0;
-	_currentTime = _textSpeed;
-	_currentLine = 0;
-	_halt = 0;
-	_needsUpdate = true;
-	updateContent(false);
-	this->scheduleUpdate();
-}
-void LuaLabel::updateContent(bool hideLetters)
-{
+	if (line.size() > 0) {
+		line.emplace_back(HaltType::DoneTyping); // we make sure we have a halt at the end
+		_letters.push_back(std::move(line));
+
+	}
 	_needsUpdate = false;
 }
 
-void LuaLabel::nextLine()
-{
-	auto& line = _letters[_currentLine++];
-	for (int i = 0; i < line.size(); i++) line.at(i)->hideLetter();
-	_currentLine++;
-	_currentTextPos = 0;
-	_halt = 0;
-	_currentTime = _textSpeed;//->getTextSpeed(); // get the new text speed if it exisits
-}
 
-LuaLabel * LuaLabel::create(istring font, float speed)
+LuaLabel::LuaLabel() :_atlas(nullptr), _typesound(0), _keyboardListener(nullptr), _currentTextPos(0), _currentLine(0), _textSpeed(0), _currentTime(0), _shakeTimer(0),
+_facemotion_event("facemotionEvent"), _facemovement_event("facemovementEvent"), _halt(HaltType::DoneTyping), _needsUpdate(false) ,_shake(0.0f) {}
+
+LuaLabel * LuaLabel::create(istring font, uint32_t speed, float shake)
 {
 	LuaLabel* label = new LuaLabel();
 	if (label && label->init()) {
 		label->_atlas = FontAtlasCache::getFontAtlasFNT(font.c_str());
+		CC_SAFE_RETAIN(label->_atlas);
 		label->_textSpeed = speed;
-		label->_shake = 0.0f;
-		label->_shakeTimer = 1.0f / 30.0f;
-		label->_halt = 0;
+		label->_shake = shake;
+		label->_halt = HaltType::DoneTyping;
 		auto keyboardListener = EventListenerKeyboard::create();
 		keyboardListener->onKeyPressed = [label](EventKeyboard::KeyCode key, Event* event) {
-			if (label->_halt == 1 && key == EventKeyboard::KeyCode::KEY_RETURN || key == EventKeyboard::KeyCode::KEY_ENTER) label->nextLine();
+			if (label->isWaitingOnKeyPress() && key == EventKeyboard::KeyCode::KEY_RETURN || key == EventKeyboard::KeyCode::KEY_ENTER) label->nextLine();
 		};
 		label->getEventDispatcher()->addEventListenerWithSceneGraphPriority(keyboardListener, label);
 		return label;
@@ -508,25 +516,100 @@ LuaLabel * LuaLabel::create(istring font, float speed)
 	CC_SAFE_DELETE(label);
 	return nullptr;
 }
-void LuaLabel::setTypingSpeed(float speed) { _textSpeed = speed; setString(_originalString); }
+bool LuaLabel::init(istring font, cocos2d::Color3B color, float x, float y, float end_x, uint32_t shake, istring sound, uint32_t hspacing, uint32_t vspacing)
+{
+	CC_SAFE_RELEASE_NULL(_atlas);
+	_atlas = FontAtlasCache::getFontAtlasFNT(font.c_str());
+	setPosition(x, y);
+	_end_x = end_x;
+	_shake = shake;
+	setTypingSound(sound);
+	_hspacing = hspacing;
+	_vspacing = vspacing;
+	return true;
+}
+void LuaLabel::clear() {
+	setHalt(HaltType::DoneTyping);
+	_originalString.clear();
+	_letters.clear();
+}
+void LuaLabel::restartTyping()
+{
+	if (_letters.size() == 0) return;
+	updateContent(true);
+	for (auto& a : _letterCache) a->hideLetter();
+	_currentTextPos = 0;
+	_currentTime = _textSpeed;
+	_currentLine = 0;
+	setHalt(HaltType::Typing);
+}
+
+void LuaLabel::nextLine()
+{
+	if ( _halt == HaltType::WaitingOnKeyPress) {
+		if (_currentLine < _letters.size()) {
+			auto& line = _letters[_currentLine++];
+			for (auto& a : line) if (a.type() == TokenType::Sprite) a.getSprite()->hideLetter();
+			_currentTextPos = 0;
+			setHalt(HaltType::Typing);
+		}
+		else setHalt(HaltType::DoneTyping);
+	}
+}
+void LuaLabel::setTypingSpeed(uint32_t speed) { _textSpeed = speed;  updateContent(true); }
+void LuaLabel::setHalt(HaltType halt) {
+	updateContent(true);
+	switch (halt) {
+	case HaltType::Paused:
+	case HaltType::DoneTyping:
+	case HaltType::WaitingOnKeyPress:
+		this->unscheduleUpdate();
+		break;
+	case HaltType::Typing:
+		setCurrentTime(_textSpeed); // reset the time
+		this->scheduleUpdate();
+		break;
+	}
+	_halt = halt;
+}
 void LuaLabel::update(float dt)
 {
-	if (_halt == 1) return;
-	if ( _currentLine < _letters.size()) {
-		auto& line = _letters[_currentLine];
-		if (_currentTextPos >= line.size())  return;
-		if ((_currentTime -= dt) < 0) {
-			auto sprite = line.at(_currentTextPos);
-			_halt = sprite->getHalt();
-			_currentTime = sprite->getTextSpeed(); // get the new text speed if it exisits
-		//	assert(_halt == 1);
-			if (_halt != 0) return;
-			sprite->showLetter();// (1.0f); // cheap way to turn on visiual
-			if (!_typingSound.isEmpty()) {
-				if (_typesound > -1) AudioEngine::stop(_typesound);
-				_typesound = AudioEngine::play2d(_typingSound.c_str());
+	if (_halt == HaltType::Typing) {
+		if (_currentLine < _letters.size()) {
+			
+			auto& line = _letters[_currentLine];
+		//	if (_currentTextPos >= line.size()) { // because we got a bad string
+
+		//	}
+			if ((_currentTime -= dt) < 0) {
+				auto& token = line[_currentTextPos++];
+				switch (token.type()) {
+				case TokenType::Event:
+					token.dispatchEvent(this);
+					setCurrentTime(_textSpeed);
+					break;
+				case TokenType::Halt:
+					setHalt(token.getHalt());
+					break;
+				case TokenType::Speed:
+					setCurrentTime(token.getSpeed());
+					break;
+				case TokenType::Sprite:
+				{
+					LuaLabelSprite* sprite = token.getSprite();
+					sprite->showLetter();
+					if (!_typingSound.isEmpty()) {
+						auto audio = CocosDenshion::SimpleAudioEngine::getInstance();
+						if (_typesound != 0) AudioEngine::stop(_typesound);
+						audio->playEffect(_typingSound.c_str(), false);
+					}
+					setCurrentTime(_textSpeed);
+				}
+				break;
+				default:
+					throw std::runtime_error("Not supported yet");
+				}
 			}
-			_currentTextPos++;
 		}
 	}
 	Node::update(dt);

@@ -44,7 +44,7 @@ public:
 	// for sets and standard map
 	inline bool operator<(const istring& str) const { return  hash() < str.hash(); }
 
-	inline bool isEmpty() const; // hackery, but true since _internal is never null, or shouldn't be?
+	bool isEmpty() const; // hackery, but true since _internal is never null, or shouldn't be?
 };
 
 // hash function for istring

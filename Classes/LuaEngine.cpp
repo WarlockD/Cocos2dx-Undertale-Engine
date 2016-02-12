@@ -205,7 +205,7 @@ istring::istring(const std::string & str) : istring(str.c_str()) {}
 size_t istring::length() const { return tsslen((TString*)(_internal - sizeof(TString))); }
 size_t istring::hash() const { return ((TString*)(_internal - sizeof(TString)))->hash; }
 
-inline bool istring::isEmpty() const
+bool istring::isEmpty() const
 {
 	return _internal == internal_luaEngine::emptyString;
 }

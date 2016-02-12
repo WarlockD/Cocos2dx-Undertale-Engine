@@ -166,17 +166,30 @@ bool HelloWorld::init()
 	this->addChild(label, 1);
 	}
 	*/
-	auto label = LuaLabel::create("fnt_main.fnt", 0.1f);
-	label->setShake(0.5f);
+	auto label = LuaLabel::create("fnt_main.fnt", 2,0.5f);
+	
 	//this->addChild(label, 1);
 		//label->setString("Hello Undertale\nNextLine");
 		//label->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
 	const char* test_str = "\\E2* If you truly wish to&  leave the RUINS.../* I will not stop you./\\E2* However^1, when you&  leave.../\\E1* Please do not come&  back./\\E2* I hope you understand./%%";
-		label->setPosition(200, 200);
+	const char* test_str2 = "\XLa, la.^3 &Time to wake&up and\\R smell\\X &the^4 pain./* Though^2.^4.^6.^8.&It's still a&little shaky./* Though^2.^4.^6.^8.&It's still a&little shaky./fhuehfuehfuehfuheufhe / %";
+	
+	
+	label->setPosition(200, 200);
+		label->setTypingSound("snd_txtasr.wav");
 		// add the label as a child to this layer
 		this->addChild(label, 1);
-		label->setString(test_str);
+		label->setString(test_str2); // "facemotionEvent"), _facemovement_event("facemovementEvent")
+		EventListenerCustom* listener = EventListenerCustom::create("facemotionEvent", [=](EventCustom* event) {
+			CCLOG("FaceMotionEvent : %i", (int)(event->getUserData()));
+		});
 
+		_eventDispatcher->addEventListenerWithFixedPriority(listener, 1);
+		listener = EventListenerCustom::create("facemovementEvent", [=](EventCustom* event) {
+			CCLOG("FaceMovementEvent : %i", (int)(event->getUserData()));
+		});
+		_eventDispatcher->addEventListenerWithFixedPriority(listener, 1);
+		label->restartTyping();
 		//	global.msg[0] = "\\E2* If you truly wish to&  leave the RUINS.../"
 		//	global.msg[1] = "* I will not stop you./"
 		////	global.msg[2] = "\\E2* However^1, when you&  leave.../"
