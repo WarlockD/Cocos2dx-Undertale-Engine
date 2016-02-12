@@ -1,6 +1,26 @@
-#include "UndertaleResources.h"
-#include "binaryReader.h"
+#include "UndertaleResourcesInternal.h"
+
 USING_NS_CC;
+
+
+inline std::vector<uint32_t> getOffsetEntries(BinaryReader& r) {
+	std::vector<uint32_t> entries;
+	uint32_t count = r.read<uint32_t>();
+	while (count > 0) {
+		uint32_t offset = r.read<uint32_t>();
+		entries.emplace_back(offset);
+		count--;
+	}
+	return entries;
+
+}
+inline std::vector<uint32_t> getOffsetEntries(BinaryReader& r, uint32_t start) {
+	r.push(start);
+	std::vector<uint32_t> vec(std::move(getOffsetEntries(r)));
+	r.pop();
+	return vec;
+}
+
 /*
 
 BinaryReader(const std::string& filename) {
@@ -24,23 +44,7 @@ BinaryReader(const std::string& filename) {
 
 
 
-static std::vector<uint32_t> getOffsetEntries(BinaryReader& r) {
-	std::vector<uint32_t> entries;
-	uint32_t count = r.read<uint32_t>();
-	while (count > 0) {
-		uint32_t offset = r.read<uint32_t>();
-		entries.emplace_back(offset);
-		count--;
-	}
-	return entries;
 
-}
-static std::vector<uint32_t> getOffsetEntries(BinaryReader& r, uint32_t start) {
-	r.push(start);
-	std::vector<uint32_t> vec(std::move(getOffsetEntries(r)));
-	r.pop();
-	return vec;
-}
 
 /*
 
@@ -250,6 +254,7 @@ bool UndertaleResources::init()
 	readAllChunks();
 	readAllTextures();
 	readAllSprites();
+	readAllFonts();
 	return true;
 }
 void UndertaleResources::readAllTextures()
@@ -275,9 +280,16 @@ void UndertaleResources::readAllTextures()
 			Image* image = new Image;
 			image->autorelease();
 			image->initWithImageData((uint8_t*)fileBuffer.data(), size);
-			std::string image_key = "UndertaleTexture_" + std::to_string(i);
+			std::string image_key = "UndertaleTexture_" + std::to_string(i) + ".png";
 			Texture2D* texture = TextureCache::getInstance()->addImage(image, image_key);
 			_textures.pushBack(texture);
+			_textureFilenames.push_back(image_key);
+			// still need to save it though
+			std::fstream image_writer;
+			
+			image_writer.open(image_key, std::fstream::out | std::fstream::binary);
+			image_writer.write(fileBuffer.data(), size);
+			image_writer.close();
 		}
 }
 void UndertaleResources::readAllChunks()
@@ -295,108 +307,8 @@ void UndertaleResources::readAllChunks()
 	}
 	r.seek(0); // got to start
 }
-#pragma pack(push,1)
-struct GM_SpriteHeader {
-	uint32_t width;
-	uint32_t height;
-	uint32_t flags;
-	uint32_t width0;
-	uint32_t height0;
-	uint32_t another;
-	uint32_t extra[7];
-};
-struct GM_RawSpriteFrame {
-	short x;
-	short y;
-	short width;
-	short height;
-	short offsetX;
-	short offsetY;
-	short cropWidth;
-	short cropHeight;
-	short originalWidth;
-	short originalHeight;
-	short texture_id;
-};
-#pragma pack(pop)
-class GM_SpriteFrame {
-	
-public:
-	cocos2d::Rect rect;
-	cocos2d::Point offset;
-	cocos2d::Size crop;
-	cocos2d::Size original;
-	uint16_t texture_id;
-	void setFromRaw(const GM_RawSpriteFrame& raw) {
-		rect.setRect(raw.x, raw.y, raw.width, raw.height);
-		offset.setPoint(raw.offsetX, raw.offsetY);
-		crop.setSize(raw.cropWidth, raw.cropHeight);
-		original.setSize(raw.originalWidth, raw.originalHeight);
-		texture_id = texture_id;
-	}
-	void setFromReader(BinaryReader& r, uint32_t offset) {
-		r.push(offset);
-		setFromReader(r);
-		r.pop();
-	}
-	void setFromReader(BinaryReader& r) {
-		GM_RawSpriteFrame raw;
-		r.read(raw);
-		setFromRaw(raw);
-	}
-};
-void UndertaleResources::readAllFonts() {
-	_fontAtlasLookup.clear();
-	const Chunk& fontChunk = _chunks["FONT"];
-	GM_RawSpriteFrame rawFrame;
-	r.seek(fontChunk.begin());
-	auto fontOFfsets = getOffsetEntries(r);
-	GM_SpriteFrame fontFrame;
-	for (uint32_t offset : fontOFfsets) {
-		r.seek(offset);
-		istring name = r.readStringAtOffset(r.readInt());
-		istring description = r.readStringAtOffset(r.readInt());
-		int font_size = r.readInt();
-		bool bold = r.readBool();
-		bool italic = r.readBool();
-		int flag = r.readInt();
-		int first_char = flag & 0xFFFF;
-		int charSet = (flag >> 16) & 0xFF;
-		bool antiAlias = (flag >> 24) & 0xFF;
-		int last_char = r.readInt();
-		int frameOffset = r.readInt();
-		fontFrame.setFromReader(r, frameOffset);
-		float scaleW = r.readSingle();
-		float scaleH = r.readSingle();
-		auto glyphEntries = getOffsetEntries(r);
-		FontAtlas* atlas = new FontAtlas();
-		atlas->autorelease();
-		atlas->addTexture(_textures[fontFrame.texture_id], fontFrame.texture_id);
-		for (uint32_t goffset : glyphEntries) {
-			r.seek(goffset);
-			FontLetterDefinition letter;
-			short ch = r.readShort();
-			letter.U = r.readShort() + fontFrame.rect.origin.x;
-			letter.V = r.readShort() + fontFrame.rect.origin.Y;
-			letter.width = r.readShort();
-			letter.height = r.readShort();
-			short shift = r.readShort();
-			short offset = r.readShort();
-		//	letter.offsetX = r.offset;
-		//	letter.offsetY = 0;
-			letter.validDefinition = true;
-			letter.textureID = fontFrame.texture_id;
-			letter.xAdvance = offset;
-			int kerningCount = r.readShort(); // humm
-			while (kerningCount) {
-				short other = r.readShort();
-				short amount = r.readShort();
-			}
-			atlas->addLetterDefinition(ch, letter);
-		}
 
-	}
-}
+
 void UndertaleResources::readAllSprites()
 {
 	GM_SpriteHeader header;
@@ -431,10 +343,10 @@ void UndertaleResources::readAllSprites()
 		int haveMask = r.readInt();
 		if (haveMask) { // have mask?
 			uint32_t stride = (header.width % 8) != 0 ? header.width + 1 : header.width;
-			std::vector<uint8_t>* mask = new std::vector<uint8_t>();
-			mask->resize(stride * header.height);
-			r.read(mask->data(), mask->size());
-			_spriteMaskLookup.emplace(std::make_pair(name, mask));
+		//	std::vector<uint8_t>* mask = new std::vector<uint8_t>();
+		//	mask->resize(stride * header.height);
+		//	r.read(mask->data(), mask->size());
+		//	_spriteMaskLookup.emplace(std::make_pair(name, mask));
 		}
 	}
 }

@@ -19,6 +19,9 @@
     <Filter Include="Lua Scripts">
       <UniqueIdentifier>{adac7365-1332-4edd-8560-07904e4aaad9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Objects">
+      <UniqueIdentifier>{a61b78de-5092-4944-9598-438f3343fcf4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -223,6 +226,12 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\Classes\UndertaleLabel.cpp" />
+    <ClCompile Include="..\Classes\LuaFont.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\obj_gasterblaster.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -385,6 +394,15 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\Classes\UndertaleLabel.h" />
+    <ClInclude Include="..\Classes\LuaFont.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\UndertaleResourcesInternal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\obj_gasterblaster.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="game.rc">

@@ -58,6 +58,26 @@ public:
 	template<typename T> inline void read(T* num, size_t count) const {
 		s->read(reinterpret_cast<char*>(num), count*sizeof(T));
 	}
+	template<typename T> inline void readAtOffset(std::streamoff offset, T& value)  {
+		this->push(offset);
+		this->read(value);
+		this->pop();
+	}
+	template<typename T> inline void readAtOffset(std::streamoff offset, T* value)  {
+		this->push(offset);
+		this->read(value);
+		this->pop();
+	}
+	template<typename T> inline void readAtOffset(std::streamoff offset, T& value,size_t count)  {
+		this->push(offset);
+		this->read(value, count);
+		this->pop();
+	}
+	template<typename T> inline void readAtOffset(std::streamoff offset, T* value, size_t count)  {
+		push(offset);
+		this->read(value, count);
+		pop();
+	}
 	template<typename T> inline T read() const {
 		T num;
 		read(num);

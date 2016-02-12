@@ -3,25 +3,26 @@
 #include "UndertaleResources.h"
 USING_NS_CC;
 
-LuaSprite::LuaSprite(const cocos2d::Vector<cocos2d::SpriteFrame*>& frames) :_frames(frames)
+LuaSprite::LuaSprite() 
 {
 }
 
 LuaSprite::~LuaSprite()
 {
 }
-
-LuaSprite * LuaSprite::create(const cocos2d::Vector<cocos2d::SpriteFrame*>& frame)
+ bool LuaSprite::init(cocos2d::Vector<cocos2d::SpriteFrame*>* frame) {
+	 _frames = frame;
+	 _speed = 0.0f;
+	 _direction = 0.0f;
+	 _image_index = 0;
+	 _frameCount = frame->size();
+	 return initWithSpriteFrame(frame->at(0));
+}
+LuaSprite * LuaSprite::create(cocos2d::Vector<cocos2d::SpriteFrame*>* frame)
 {
-	LuaSprite* pSprite = new LuaSprite(frame);
-	if (pSprite && pSprite->initWithSpriteFrame(frame.at(0))) {
+	LuaSprite* pSprite = new LuaSprite();
+	if (pSprite && pSprite->init(frame)) {
 		pSprite->autorelease();
-		pSprite->initOptions();
-		pSprite->addEvents();
-		pSprite->_speed = 0.0f;
-		pSprite->_direction = 0.0f;
-		pSprite->_image_index = 0;
-		pSprite->_frameCount = frame.size();
 		return pSprite;
 	}
 	CC_SAFE_DELETE(pSprite);
@@ -29,17 +30,9 @@ LuaSprite * LuaSprite::create(const cocos2d::Vector<cocos2d::SpriteFrame*>& fram
 }
 
 
-void LuaSprite::initOptions()
-{
-
-}
-
-void LuaSprite::addEvents()
-{
-}
-
 void LuaSprite::update(float dt)
 {
+	if (stepBullet(dt)) return;
 	if (!_movementVector.isZero()) {
 		Vec2 current = this->getPosition();
 		current += _movementVector;
@@ -55,7 +48,7 @@ void LuaSprite::update(float dt)
 				if ((--_image_index) >= _frameCount) _image_index = _frameCount-1;
 			}
 			_current_image_time = 0.0f;
-			setSpriteFrame(_frames.at(_image_index));
+			setSpriteFrame(_frames->at(_image_index));
 		}
 	}
 }
@@ -122,7 +115,7 @@ static int LuaSprite__new(lua_State* L) {
 	auto frames = UndertaleResources::getInstance()->getSpriteFrames(spriteName);
 	if (!frames) return luaL_error(L, "Unkonwn sprite name '%s'",spriteName);
 
-	LuaSprite* sprite = LuaSprite::create(*frames);
+	LuaSprite* sprite = LuaSprite::create(frames);
 	if (!sprite) return luaL_error(L, "Could not create LuaSprite name '%s'", spriteName);
 	LuaEngine::getLuaScene()->addChild(sprite, 1);
 	sprite->scheduleUpdate();

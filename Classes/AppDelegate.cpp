@@ -1,6 +1,8 @@
 #include "AppDelegate.h"
 #include "HelloWorldScene.h"
-
+#include "SimpleAudioEngine.h"
+#include <AudioEngine.h>
+#include <vector>
 USING_NS_CC;
 
 static cocos2d::Size designResolutionSize = cocos2d::Size(640, 480);
@@ -56,6 +58,11 @@ bool AppDelegate::applicationDidFinishLaunching() {
     // Set the design resolution
     glview->setDesignResolutionSize(designResolutionSize.width, designResolutionSize.height, ResolutionPolicy::NO_BORDER);
     Size frameSize = glview->getFrameSize();
+	int i = 0;
+	CCFileUtils *fileUtils = CCFileUtils::sharedFileUtils();
+	auto searchPaths = fileUtils->getSearchPaths();
+	searchPaths.insert(searchPaths.begin() + i++, "..");
+	fileUtils->setSearchPaths(searchPaths);
 
 	/*
 

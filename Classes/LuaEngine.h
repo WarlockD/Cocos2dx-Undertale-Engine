@@ -13,10 +13,10 @@ public:
 public: 
 	// rule of 5
 	istring();
-	istring(const istring& s) : _internal(s._internal) {}
-	istring(istring&& s) : _internal(s._internal) {  } // side note, we don't want _internal ever to be null
-	istring& operator=(istring&& s) { *this = istring(std::move(s)); return *this; }
-	istring& operator=(const istring& s) { *this = istring(s); return *this; }
+	//istring(const istring& s) : _internal(s._internal) {}
+	//istring(istring&& s) : _internal(s._internal) {  } // side note, we don't want _internal ever to be null
+	//istring& operator=(istring&& s) { *this = istring(s); return *this; }
+	//istring& operator=(const istring& s) { *this = istring(s); return *this; }
 
 	istring(const char* str);
 	istring(const std::string& str);
@@ -41,8 +41,10 @@ public:
 	inline bool operator!=(const istring& str) const { return _internal != str._internal; }
 	inline bool operator==(const char* str) const { return  *this == istring(str); }
 	inline bool operator!=(const char* str) const { return  *this != istring(str); }
+	// for sets and standard map
+	inline bool operator<(const istring& str) const { return  hash() < str.hash(); }
 
-	inline bool isEmpty() const { return c_str()[0] == 0; } // hackery, but true since _internal is never null, or shouldn't be?
+	inline bool isEmpty() const; // hackery, but true since _internal is never null, or shouldn't be?
 };
 
 // hash function for istring
@@ -89,3 +91,5 @@ public:
 	static bool RunGlobalUpdate(const char* global_name, float dt);
 	static bool DoFile(const char* filename);
 };
+
+

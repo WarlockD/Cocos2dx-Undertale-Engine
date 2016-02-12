@@ -2,7 +2,6 @@
 
 #include "cocos2d.h"
 #include "LuaEngine.h"
-#include "LuaSprite.h"
 #include "binaryReader.h"
 #include <fstream>
 
@@ -31,7 +30,7 @@ protected:
 	
 	std::unordered_map<istring, Chunk> _chunks;
 	std::unordered_map<istring, cocos2d::Vector<cocos2d::SpriteFrame*>> _spriteFrameLookup;
-	std::unordered_map<istring, cocos2d::Vector<cocos2d::FontAtlas*>> _fontAtlasLookup;
+	std::unordered_map<istring, cocos2d::Vector<cocos2d::Font*>> _fontLookup;
 	
 
 
@@ -50,6 +49,7 @@ protected:
 	// This bit is in CabFile.cpp
 	bool findUndertaleData();
 	cocos2d::Vector<cocos2d::Texture2D*> _textures;
+	std::vector<std::string> _textureFilenames;
 
 public:
 	inline cocos2d::Texture2D* getTexture(size_t i) const { return (i < _textures.size()) ? _textures.at(i) : nullptr;}
@@ -62,7 +62,7 @@ public:
 		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(name, frame));
 	}
 	
-	const cocos2d::Vector<cocos2d::SpriteFrame*>* getSpriteFrames(istring name) {
+	cocos2d::Vector<cocos2d::SpriteFrame*>* getSpriteFrames(istring name) {
 		auto it = _spriteFrameLookup.find(name);
 		if (it == _spriteFrameLookup.cend()) return nullptr;
 		return &it->second;
@@ -71,3 +71,5 @@ public:
 	static UndertaleResources* getInstance();
 	//inline cocos2d::Vector<cocos2d::SpriteFrame*>& getFrames(const std::string& sprite) { return _frameMap[sprite]; }
 };
+
+
