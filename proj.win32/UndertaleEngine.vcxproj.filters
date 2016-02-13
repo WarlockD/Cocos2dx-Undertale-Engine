@@ -232,6 +232,9 @@
     <ClCompile Include="..\Classes\obj_gasterblaster.cpp">
       <Filter>src\Objects</Filter>
     </ClCompile>
+    <ClCompile Include="..\Classes\border.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -401,6 +404,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\Classes\obj_gasterblaster.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\border.h">
       <Filter>src\Objects</Filter>
     </ClInclude>
   </ItemGroup>

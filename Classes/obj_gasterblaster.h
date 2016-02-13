@@ -9,6 +9,7 @@ namespace Undertale {
 		int con;
 		cocos2d::DrawNode *blaster[3];
 		cocos2d::Vec2 ideal;
+		cocos2d::Vec2 _startPosition;
 		int alarm;
 		int p_beam;
 		int idealrot;
@@ -26,7 +27,8 @@ namespace Undertale {
 		//	519.self.p_power = 1
 			obj_gasterblaster();
 	public:
-		static obj_gasterblaster* create();
+		static obj_gasterblaster* create(float x, float y);
+		static obj_gasterblaster* create(const cocos2d::Vec2 pos = cocos2d::Vec2 ::ZERO);
 		virtual void  setupBullet(cocos2d::Vec2 pos) override;
 		virtual void fireBullet()  override { LuaSprite::fireBullet(); }
 		virtual bool stepBullet(float dt)  override;// this step is run at the start of update, on true return, update dosn't run this frame.

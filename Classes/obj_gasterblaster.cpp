@@ -25,13 +25,14 @@ namespace Undertale {
 		}
 
 	}
-	obj_gasterblaster * obj_gasterblaster::create()
+	obj_gasterblaster* obj_gasterblaster::create(float x, float y) { return create(Vec2(x, y)); }
+
+	obj_gasterblaster * obj_gasterblaster::create(Vec2 pos)
 	{
-		UndertaleResources* res = UndertaleResources::getInstance();
-		Vector<SpriteFrame*>* frames = res->getSpriteFrames("spr_gasterblaster");
 		obj_gasterblaster* obj = new obj_gasterblaster();
-		if (obj && obj->init(frames)) {
+		if (obj && obj->init("spr_gasterblaster",pos)) {
 			obj->autorelease();
+			obj->_startPosition = pos;
 			obj->setScale(1, 1);
 			return obj;
 		}

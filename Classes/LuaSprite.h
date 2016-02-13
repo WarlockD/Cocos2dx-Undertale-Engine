@@ -16,35 +16,42 @@ inline cocos2d::Vec2 CreateMovementVector(float direction, float speed) {
 }
 class LuaSprite : public cocos2d::Sprite {
 protected:
-	cocos2d::Vector<cocos2d::SpriteFrame*>* _frames;
+	const cocos2d::Vector<cocos2d::SpriteFrame*>* _frames;
+	istring _spriteName;
 	uint32_t _image_index = 0;
 	size_t _frameCount = 0;
 	cocos2d::Vec2 _movementVector;
-	float _image_speed;
+	int _image_speed;
 	float _current_image_time;
-	float _speed;
-	float _direction;
+	int _speed;
+	int _direction;
 	int _waitFrames;
 	inline void setMovementVector() {
-		float x = std::cosf(CC_DEGREES_TO_RADIANS(_direction)) * _speed;
-		float y = std::sinf(CC_DEGREES_TO_RADIANS(_direction)) * _speed;
-		_movementVector = cocos2d::Vec2(x, y);
+		if (_speed == 0) _movementVector = cocos2d::Vec2::ZERO;
+		else {
+			float x = std::cosf(CC_DEGREES_TO_RADIANS(_direction)) * _speed;
+			float y = std::sinf(CC_DEGREES_TO_RADIANS(_direction)) * _speed;
+			_movementVector = cocos2d::Vec2(x, y);
+		}
+		if(_image_speed == 0 && _speed == 0) unscheduleUpdate();  else scheduleUpdate();
 	}
+	virtual bool init(istring spriteName,  cocos2d::Vec2 pos);
+	void resetImageTime() { _current_image_time = _image_speed * (1.0f / 30.0f); }
 public:
 	LuaSprite();
 	~LuaSprite();
-	static LuaSprite* create(cocos2d::Vector<cocos2d::SpriteFrame*>* frame);
-	virtual bool init(cocos2d::Vector<cocos2d::SpriteFrame*>* frame);
+	static LuaSprite* create(istring spriteName, cocos2d::Vec2 pos = cocos2d::Vec2::ZERO);
+	static LuaSprite* create(istring spriteName, float x, float y);
 
 	inline void setImageIndex(uint32_t index) { if(index < _frameCount) setSpriteFrame(_frames->at(_image_index = index)); }
 	inline uint32_t getImageIndex() const { return _image_index;  }
-	inline void setZeroMovement() { _speed = _direction = 0; _movementVector = cocos2d::Vec2(); }
-	inline void setSpeed(float value) { _speed = value; setMovementVector(); }
-	inline void setDirection(float value) { _direction = value; setMovementVector(); }
-	inline float getSpeed() const { return _speed; }
-	inline float getDirection() const { return _direction; }
-	inline void setImageSpeed(float value) { if (_frameCount > 1) { _image_speed = value; _current_image_time = 0.0f; } }
-	inline float getImageSpeed() const { return _image_speed; }
+	inline void setZeroMovement() { _speed = _direction = 0; setMovementVector(); }
+	inline void setSpeed(int value) { _speed = value; setMovementVector(); }
+	inline void setDirection(int value) { _direction = value; setMovementVector(); }
+	inline int getSpeed() const { return _speed; }
+	inline int getDirection() const { return _direction; }
+	inline void setImageSpeed(int value) { if (_frameCount > 1) { _image_speed = value;  setMovementVector(); resetImageTime(); } }
+	inline int getImageSpeed() const { return _image_speed; }
 
 protected:
 	void update(float dt) override; 

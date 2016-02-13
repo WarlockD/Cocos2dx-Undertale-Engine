@@ -54,6 +54,7 @@ protected:
 		TokenType _type;
 	public:
 		LabelToken() : _value(), _type(TokenType::NotSet)  {}
+	
 		LabelToken(char16_t ch, LuaLabelSprite* sprite) : _value(ch, sprite), _type(TokenType::Sprite){}
 		LabelToken(HaltType halt) : _value(halt), _type(TokenType::Halt) {}
 		LabelToken(uint32_t speed) : _value(speed), _type(TokenType::Speed) {}
@@ -83,6 +84,7 @@ protected:
 	float _currentShakeTimer;
 	cocos2d::EventCustom _facemotion_event;
 	cocos2d::EventCustom _facemovement_event;
+	cocos2d::EventListenerKeyboard* _onKeyPressEvent;
 	HaltType _halt;
 	uint32_t _typesound;
 	istring _typingSound;
@@ -100,8 +102,10 @@ protected:
 public:
 	CC_SYNTHESIZE(float, _shake, Shake);
 public:
+	virtual ~LuaLabel();
 	static LuaLabel* create(istring font, uint32_t speed, float shake);
 	void clear();
+	virtual bool init() { return Node::init(); }
 	virtual bool init(istring font, cocos2d::Color3B color, float x, float y, float end_x, uint32_t shake, istring sound, uint32_t hspacing, uint32_t vspacing);
 	inline virtual bool isPasued() const { return  HaltType::WaitingOnKeyPress == _halt || HaltType::Paused == _halt; }
 	inline virtual bool isWaitingOnKeyPress() const { 

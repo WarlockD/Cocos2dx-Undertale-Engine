@@ -4,7 +4,7 @@
 #include "lua.hpp"
 #include "LuaFont.h"
 #include "AudioEngine.h"
-
+#include "border.h"
 #include "obj_gasterblaster.h"
 
 USING_NS_CC;
@@ -101,18 +101,19 @@ bool HelloWorld::init()
 	//	auto musicID = AudioEngine::play2d("music\\mus_zz_megalovania.ogg", true);
 		//AudioEngine::setVolume(musicID, 0.25f);
 	}
+	LuaSprite* test2 = LuaSprite::create("spr_border", 200, 200);
+	addChild(test2, 1);
 
-	// sprite
-	Undertale::obj_gasterblaster* test = Undertale::obj_gasterblaster::create();
-	testSprite = test;
-	test->setupBullet(Vec2(300, 300));
-
+	const int dialogueBox[4] = { 32,602,250,385 };
+	auto box = Undertale::Border::create(dialogueBox);
+	box->setPosition(0, 100);
+	addChild(box,1);
 //	auto closeItem = MenuItemImage::create("CloseNormal.png","CloseSelected.png", [](Ref* r) {  Director::getInstance()->end(); });
-	auto muteItem = MenuItemImage::create("CloseNormal.png", "CloseSelected.png", [this](Ref* r) {
+	auto muteItem = MenuItemImage::create("CloseNormal.png", "CloseSelected.png", [this,test2](Ref* r) {
 	//	AudioEngine::setVolume(musicID, mute ? 0.0f : 1.0f);
 	//	mute = !mute;
-		Undertale::obj_gasterblaster* test = dynamic_cast<Undertale::obj_gasterblaster*>(testSprite);
-		test->fireBullet();
+		//Undertale::obj_gasterblaster* test = dynamic_cast<Undertale::obj_gasterblaster*>(testSprite);
+		test2->setSpeed(test2->getSpeed()+1);
 	});
 	
 	//closeItem->setPosition(Vec2(origin.x + visibleSize.width - closeItem->getContentSize().width/2 ,  origin.y + closeItem->getContentSize().height/2));
@@ -133,14 +134,14 @@ bool HelloWorld::init()
   ///  auto sprite = Sprite::create("HelloWorld.png");
 
   
+//	
+
+
 
 	
 
 
 	
-
-
-	addChild(testSprite, 1);
 
 	/*
 
@@ -190,18 +191,7 @@ bool HelloWorld::init()
 		});
 		_eventDispatcher->addEventListenerWithFixedPriority(listener, 1);
 		label->restartTyping();
-		//	global.msg[0] = "\\E2* If you truly wish to&  leave the RUINS.../"
-		//	global.msg[1] = "* I will not stop you./"
-		////	global.msg[2] = "\\E2* However^1, when you&  leave.../"
 
-	// add a label shows "Hello World"
-	// create and initialize a label
-
-	//auto label = Label::createWithTTF("Hello Undertale", "fonts/Marker Felt.ttf", 24);
-
-	// position the label on the center of the screen
-	//label->setPosition(100, 100); // Vec2(origin.x + visibleSize.width / 2, origin.y + visibleSize.height - label->getContentSize().height));
-	
 
 	LuaEngine::setLuaScene(this);
 	lua_State* L = LuaEngine::getLuaState();

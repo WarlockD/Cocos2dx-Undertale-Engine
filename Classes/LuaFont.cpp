@@ -496,7 +496,11 @@ void LuaLabel::updateContent(bool hideLetters)
 
 LuaLabel::LuaLabel() :_atlas(nullptr), _typesound(0), _keyboardListener(nullptr), _currentTextPos(0), _currentLine(0), _textSpeed(0), _currentTime(0), _shakeTimer(0),
 _facemotion_event("facemotionEvent"), _facemovement_event("facemovementEvent"), _halt(HaltType::DoneTyping), _needsUpdate(false) ,_shake(0.0f) {}
-
+LuaLabel::~LuaLabel() {
+	_letters.clear();
+	_letterCache.clear();
+	getEventDispatcher()->removeEventListener(_keyboardListener);
+}
 LuaLabel * LuaLabel::create(istring font, uint32_t speed, float shake)
 {
 	LuaLabel* label = new LuaLabel();
@@ -526,6 +530,14 @@ bool LuaLabel::init(istring font, cocos2d::Color3B color, float x, float y, floa
 	setTypingSound(sound);
 	_hspacing = hspacing;
 	_vspacing = vspacing;
+	_keyboardListener = EventListenerKeyboard::create();
+	_keyboardListener->onKeyPressed = [this](EventKeyboard::KeyCode key, Event* event) {
+		if (isWaitingOnKeyPress() && key == EventKeyboard::KeyCode::KEY_RETURN || key == EventKeyboard::KeyCode::KEY_ENTER) nextLine();
+	};
+	getEventDispatcher()->addEventListenerWithSceneGraphPriority(_keyboardListener, this);
+
+	// events
+
 	return true;
 }
 void LuaLabel::clear() {
@@ -614,4 +626,5 @@ void LuaLabel::update(float dt)
 	}
 	Node::update(dt);
 }
+
 

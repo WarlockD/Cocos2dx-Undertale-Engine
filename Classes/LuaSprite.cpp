@@ -9,24 +9,35 @@ LuaSprite::LuaSprite()
 
 LuaSprite::~LuaSprite()
 {
+	CCLOG("Deleteing Lua Sprite '%s'", _spriteName.c_str());
 }
- bool LuaSprite::init(cocos2d::Vector<cocos2d::SpriteFrame*>* frame) {
-	 _frames = frame;
-	 _speed = 0.0f;
-	 _direction = 0.0f;
-	 _image_index = 0;
-	 _frameCount = frame->size();
-	 return initWithSpriteFrame(frame->at(0));
+ bool LuaSprite::init(istring spriteName, Vec2 pos) {
+	 UndertaleResources* res = UndertaleResources::getInstance();
+	 Vector<SpriteFrame*>* frames = res->getSpriteFrames(spriteName);
+	 if (this->initWithSpriteFrame(frames->at(0))) {
+		 _spriteName = spriteName;
+		 _frames = frames;
+		 _speed = 0;
+		 _direction = 0;
+		 _image_index = 0;
+		 _frameCount = frames->size();
+		 setPosition(pos);
+		 return true;
+	 }
+	 return false;
 }
-LuaSprite * LuaSprite::create(cocos2d::Vector<cocos2d::SpriteFrame*>* frame)
+LuaSprite * LuaSprite::create(istring spriteName,  Vec2 pos)
 {
 	LuaSprite* pSprite = new LuaSprite();
-	if (pSprite && pSprite->init(frame)) {
+	if (pSprite && pSprite->init(spriteName,pos)) {
 		pSprite->autorelease();
 		return pSprite;
 	}
 	CC_SAFE_DELETE(pSprite);
 	return nullptr;
+}
+LuaSprite * LuaSprite::create(istring spriteName, float x, float y) {
+	return create(spriteName, Vec2(x, y));
 }
 
 
@@ -38,16 +49,18 @@ void LuaSprite::update(float dt)
 		current += _movementVector;
 		this->setPosition(current);
 	}
-	if ( _image_speed > 0) {
-		_current_image_time += _image_speed;
-		if (abs(_current_image_time) >= 1.0f) {
-			if (_current_image_time > 0) {
-				if ((++_image_index) >= _frameCount) _image_index = 0;
+	if ( _image_speed !=0 ) {
+		_current_image_time -= dt;
+		if (_current_image_time < 0.0f) {
+			resetImageTime();
+			if (_image_speed > 0) {
+				if(_image_index < _frameCount)	_image_index++;
+				else _image_index = 0;
 			}
 			else {  // unsigned numbers don't go to -1 ugh
-				if ((--_image_index) >= _frameCount) _image_index = _frameCount-1;
+				if (_image_index > 0)	_image_index--;
+				else _image_index = _frameCount - 1;
 			}
-			_current_image_time = 0.0f;
 			setSpriteFrame(_frames->at(_image_index));
 		}
 	}
@@ -112,10 +125,7 @@ static int LuaSprite__new(lua_State* L) {
 	if (args == 0) return luaL_error(L, "Must atleast have the name of the sprite");
 	const char* spriteName = luaL_checkstring(L, 1);
 	
-	auto frames = UndertaleResources::getInstance()->getSpriteFrames(spriteName);
-	if (!frames) return luaL_error(L, "Unkonwn sprite name '%s'",spriteName);
-
-	LuaSprite* sprite = LuaSprite::create(frames);
+	LuaSprite* sprite = LuaSprite::create(spriteName);
 	if (!sprite) return luaL_error(L, "Could not create LuaSprite name '%s'", spriteName);
 	LuaEngine::getLuaScene()->addChild(sprite, 1);
 	sprite->scheduleUpdate();
