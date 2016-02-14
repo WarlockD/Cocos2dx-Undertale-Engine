@@ -112,6 +112,10 @@ public:
 		return  _halt == HaltType::WaitingOnKeyPress ; 
 	}
 	virtual void restartTyping();
+	virtual void setSpacing(uint32_t hspacing, uint32_t vspacing) {
+		_hspacing = hspacing;  _vspacing = vspacing; _needsUpdate
+			= true; updateContent(false);
+	}
 	virtual void setTypingSpeed(uint32_t speed);
 	virtual void setTypingSound(istring soundFile);
 	virtual void setString(const std::string& text, bool startTyping=true) ;

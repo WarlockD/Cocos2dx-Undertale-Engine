@@ -6,6 +6,7 @@
 #include "AudioEngine.h"
 #include "border.h"
 #include "obj_gasterblaster.h"
+#include "FaceDialog.h"
 
 USING_NS_CC;
 using namespace experimental;
@@ -101,18 +102,30 @@ bool HelloWorld::init()
 	//	auto musicID = AudioEngine::play2d("music\\mus_zz_megalovania.ogg", true);
 		//AudioEngine::setVolume(musicID, 0.25f);
 	}
+	/*
+
 	LuaSprite* test2 = LuaSprite::create("spr_border", 200, 200);
 	addChild(test2, 1);
+	*/
 
-	const int dialogueBox[4] = { 32,602,250,385 };
-	auto box = Undertale::Border::create(dialogueBox);
-	box->setPosition(0, 100);
-	addChild(box,1);
+	//auto box = Undertale::Border::create(32,602,250,385); // dialogueBox 0 570, 135
+	//auto box = Undertale::Border::create(570,135); // dialogueBox 0 570, 135
+	//auto box = Undertale::Border::create(217, 417, 180, 385); // standard box 1
+	//auto box = Undertale::Border::create(217, 417, 125, 385); // tower box 2
+	//auto box = Undertale::Border::create(237, 397, 250, 385); // // small box 3
+	//auto box = Undertale::Border::create(267, 367, 295, 385); // // claustrophobic box 4
+	//auto box = Undertale::Border::create(192, 442, 250, 385); // //  wide-small box 5
+	//auto box = Undertale::Border::create(227, 407, 250, 385); // //  slightly bigger box PREP 6
+	//auto box = Undertale::Border::create(227, 407, 200, 385); // //  slightly bigger box TALL 7
+	//auto box = Undertale::Border::create(202, 432, 290, 385); // //  short box 8
+//	addChild(box,1);
+//	box->setPosition(640/2,385);
+	//box->setAnchorPoint(Vec2(0, 0));
+#if 0
+	
+
 //	auto closeItem = MenuItemImage::create("CloseNormal.png","CloseSelected.png", [](Ref* r) {  Director::getInstance()->end(); });
 	auto muteItem = MenuItemImage::create("CloseNormal.png", "CloseSelected.png", [this,test2](Ref* r) {
-	//	AudioEngine::setVolume(musicID, mute ? 0.0f : 1.0f);
-	//	mute = !mute;
-		//Undertale::obj_gasterblaster* test = dynamic_cast<Undertale::obj_gasterblaster*>(testSprite);
 		test2->setSpeed(test2->getSpeed()+1);
 	});
 	
@@ -124,61 +137,20 @@ bool HelloWorld::init()
     auto menu = Menu::create(muteItem, NULL);
     menu->setPosition(Vec2::ZERO);
     this->addChild(menu, 1);
-
-    /////////////////////////////
-    // 3. add your codes below...
-
-
-
-    // add "HelloWorld" splash screen"
-  ///  auto sprite = Sprite::create("HelloWorld.png");
-
-  
-//	
-
-
-
+#endif
 	
 
-
+//	auto label = LuaLabel::create("fnt_main.fnt", 2,0.5f);
 	
-
-	/*
-
-	const Vector<SpriteFrame*>* frames = res->getSpriteFrames("spr_doglick");
-	Animation* animation = Animation::createWithSpriteFrames(*frames, 0.15f);
-	Animate* animate = Animate::create(animation);
-
-	auto sprite = Sprite::createWithSpriteFrame(frames->at(4));
-	// position the sprite on the center of the screen
-	sprite->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
-
-	// add the sprite as a child to this layer
-	sprite->runAction(animate);
-	this->addChild(sprite, 0);
-	*/
-	
-	/*
-	auto label = LuaLabel::create("fnt_main");
-	if (!label) {
-	label->setString("Hello Undertale\nNextLine");
-	label->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
-	// add the label as a child to this layer
-	this->addChild(label, 1);
-	}
-	*/
-	auto label = LuaLabel::create("fnt_main.fnt", 2,0.5f);
-	
-	//this->addChild(label, 1);
-		//label->setString("Hello Undertale\nNextLine");
-		//label->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
 	const char* test_str = "\\E2* If you truly wish to&  leave the RUINS.../* I will not stop you./\\E2* However^1, when you&  leave.../\\E1* Please do not come&  back./\\E2* I hope you understand./%%";
 	const char* test_str2 = "\XLa, la.^3 &Time to wake&up and\\R smell\\X &the^4 pain./* Though^2.^4.^6.^8.&It's still a&little shaky./* Though^2.^4.^6.^8.&It's still a&little shaky./fhuehfuehfuehfuheufhe / %";
-	
-	
+	Undertale::FaceDialog* face = Undertale::FaceDialog::create("fnt_main.fnt", Color3B::WHITE, 20, 20, 290, 0, 1, "snd_txtasr.wav");
+	face->setPosition(640 / 2, 385);
+	addChild(face);
+	face->setString(test_str);
+		/*
 	label->setPosition(200, 200);
 		label->setTypingSound("snd_txtasr.wav");
-		// add the label as a child to this layer
 		this->addChild(label, 1);
 		label->setString(test_str2); // "facemotionEvent"), _facemovement_event("facemovementEvent")
 		EventListenerCustom* listener = EventListenerCustom::create("facemotionEvent", [=](EventCustom* event) {
@@ -191,19 +163,18 @@ bool HelloWorld::init()
 		});
 		_eventDispatcher->addEventListenerWithFixedPriority(listener, 1);
 		label->restartTyping();
+		*/
 
+//	LuaEngine::setLuaScene(this);
+//	lua_State* L = LuaEngine::getLuaState();
 
-	LuaEngine::setLuaScene(this);
-	lua_State* L = LuaEngine::getLuaState();
-
-	int ret = luaL_loadfile(L, "D:\\luascripts\\startup.lua");
-	if (LuaEngine::DoFile("D:\\luascripts\\startup.lua") ){
+//	int ret = luaL_loadfile(L, "D:\\luascripts\\startup.lua");
+//	if (LuaEngine::DoFile("D:\\luascripts\\startup.lua")) {
 		//int ret = luaL_loadstring(L, "local tag = UndertaleSprite(\"spr_doglick\",200,200,4)\n\nfunction loop(dt)\n MoveSprite(tag,1,1)\n end\n ");
 		//	assert(ret == 0);
 		//	lua_pcall(L, 0, 1, 0);
-		this->scheduleUpdate();
-		
-	}
+	//	this->scheduleUpdate();
+
 	
 
 	//mus_zz_megalovania.ogg
@@ -233,9 +204,9 @@ void HelloWorld::menuCloseCallback(Ref* pSender)
 
 void HelloWorld::update(float dt)
 {
-	lua_State* L = LuaEngine::getLuaState();
-	lua_getglobal(L, "loop");
-	if(!LuaEngine::RunGlobalUpdate("loop",dt)) this->unscheduleUpdate();
+//	lua_State* L = LuaEngine::getLuaState();
+//	lua_getglobal(L, "loop");
+//	if(!LuaEngine::RunGlobalUpdate("loop",dt)) this->unscheduleUpdate();
 //	lua_pushnumber(L, dt);
 	//int status = lua_pcall(L, 1, 0, 0);
 //	if (lua_report(L, status) != LUA_OK) this->unscheduleUpdate();

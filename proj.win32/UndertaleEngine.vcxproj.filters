@@ -235,6 +235,9 @@
     <ClCompile Include="..\Classes\border.cpp">
       <Filter>src\Objects</Filter>
     </ClCompile>
+    <ClCompile Include="..\Classes\FaceDialog.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -407,6 +410,9 @@
       <Filter>src\Objects</Filter>
     </ClInclude>
     <ClInclude Include="..\Classes\border.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\FaceDialog.h">
       <Filter>src\Objects</Filter>
     </ClInclude>
   </ItemGroup>

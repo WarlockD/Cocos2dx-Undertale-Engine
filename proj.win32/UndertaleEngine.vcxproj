@@ -150,6 +150,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClCompile Include="..\Classes\BinaryReader.cpp" />
     <ClCompile Include="..\Classes\border.cpp" />
     <ClCompile Include="..\Classes\CabExtract.cpp" />
+    <ClCompile Include="..\Classes\FaceDialog.cpp" />
     <ClCompile Include="..\Classes\HelloWorldScene.cpp" />
     <ClCompile Include="..\Classes\LuaEngine.cpp" />
     <ClCompile Include="..\Classes\LuaEngineInternal.cpp" />
@@ -222,6 +223,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClInclude Include="..\Classes\AppDelegate.h" />
     <ClInclude Include="..\Classes\binaryReader.h" />
     <ClInclude Include="..\Classes\border.h" />
+    <ClInclude Include="..\Classes\FaceDialog.h" />
     <ClInclude Include="..\Classes\HelloWorldScene.h" />
     <ClInclude Include="..\Classes\LuaEngine.h" />
     <ClInclude Include="..\Classes\LuaFont.h" />

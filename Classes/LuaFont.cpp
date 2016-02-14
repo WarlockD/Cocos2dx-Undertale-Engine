@@ -378,6 +378,7 @@ void LuaLabel::updateContent(bool hideLetters)
 {
 	if (!_needsUpdate || _originalString.empty()) return;
 	const auto& text = _originalString;
+	_utf16Text.clear();
 	// Very annoying.  We have to pars
 	//	global.msg[0] = "\\E2* If you truly wish to&  leave the RUINS.../* I will not stop you./\\E2* However^1, when you&  leave.../\\E1* Please do not come&  back./\\E2* I hope you understand./%%"
 	Texture2D* letterTexture = _atlas->getTexture(0);
@@ -413,6 +414,7 @@ void LuaLabel::updateContent(bool hideLetters)
 		sprite->setTexture(letterTexture);
 		return sprite;
 	};
+	float lineHeight = _atlas->getLineHeight();
 	std::vector<LabelToken> line;
 	for (int i = 0; i < text.length(); i++) {
 		char16_t c, n;
@@ -467,8 +469,9 @@ void LuaLabel::updateContent(bool hideLetters)
 		}
 		if (c == '\n') {
 			if (contentSize.width < pos.x) contentSize.width = pos.x;
-			pos.y -= _atlas->getLineHeight();
+			pos.y -=  lineHeight;
 			if (contentSize.height < pos.y) contentSize.width = pos.y;
+			
 			pos.x = 0;
 			continue;
 		}
@@ -482,7 +485,7 @@ void LuaLabel::updateContent(bool hideLetters)
 		sprite->setPosition(px, py);
 		line.emplace_back(c, sprite);
 		_utf16Text.push_back(c);
-		pos.x += letterDef.xAdvance;
+		pos.x += (_hspacing > letterDef.xAdvance ? _hspacing : letterDef.xAdvance);
 		halt = HaltType::Typing;
 	}
 	if (line.size() > 0) {
@@ -494,7 +497,7 @@ void LuaLabel::updateContent(bool hideLetters)
 }
 
 
-LuaLabel::LuaLabel() :_atlas(nullptr), _typesound(0), _keyboardListener(nullptr), _currentTextPos(0), _currentLine(0), _textSpeed(0), _currentTime(0), _shakeTimer(0),
+LuaLabel::LuaLabel() :_atlas(nullptr), _typesound(0), _hspacing(0),_vspacing(0),_keyboardListener(nullptr), _currentTextPos(0), _currentLine(0), _textSpeed(0), _currentTime(0), _shakeTimer(0),
 _facemotion_event("facemotionEvent"), _facemovement_event("facemovementEvent"), _halt(HaltType::DoneTyping), _needsUpdate(false) ,_shake(0.0f) {}
 LuaLabel::~LuaLabel() {
 	_letters.clear();
