@@ -238,6 +238,18 @@
     <ClCompile Include="..\Classes\FaceDialog.cpp">
       <Filter>src\Objects</Filter>
     </ClCompile>
+    <ClCompile Include="..\Classes\face.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="UndertaleResourcesRooms.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\Room.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\Chara.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -413,6 +425,15 @@
       <Filter>src\Objects</Filter>
     </ClInclude>
     <ClInclude Include="..\Classes\FaceDialog.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\Face.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\Room.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\Chara.h">
       <Filter>src\Objects</Filter>
     </ClInclude>
   </ItemGroup>

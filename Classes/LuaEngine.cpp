@@ -210,6 +210,56 @@ bool istring::isEmpty() const
 	return _internal == internal_luaEngine::emptyString;
 }
 
+int LuaEngine::getUndertaleGlobalFlag(int index)
+{
+	lua_State* L = getLuaState();
+	lua_getglobal(L, "flag");
+	int value = 0;
+	int toPop = 1;
+	do {
+		if (!lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L); // lua_createtable(L,0,500) Not sure if all the values are used here though
+			lua_pushvalue(L, -1);
+			lua_setglobal(L, "flag");
+		}
+		if (!lua_istable(L, -1)) {
+			CCLOGERROR("Some reason the flag variable was changed globaly, throw something bad here");
+			break;
+		}
+		lua_rawgeti(L, -1, index);
+		toPop++;
+		if (lua_isnil(L, -1)) {
+			lua_pushinteger(L, 0);
+			lua_rawseti(L, -2, index);
+		} else
+			value = lua_tonumber(L, -1);
+	} while (false);
+	lua_pop(L, toPop);
+	return value;
+}
+
+void LuaEngine::setUndertaleGlobalFlag(int index, int value)
+{
+	lua_State* L = getLuaState();
+	lua_getglobal(L, "flag");
+	do {
+		if (!lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L); // lua_createtable(L,0,500) Not sure if all the values are used here though
+			lua_pushvalue(L, -1);
+			lua_setglobal(L, "flag");
+		}
+		if (!lua_istable(L, -1)) {
+			CCLOGERROR("Some reason the flag variable was changed globaly, throw something bad here");
+			break;
+		}
+		lua_pushinteger(L, value);
+		lua_rawseti(L, -2, index);
+	} while (false);
+	lua_pop(L, 1);
+}
+
 lua_State * LuaEngine::getLuaState()
 {
 	return internal_luaEngine::getInstance()->getState();

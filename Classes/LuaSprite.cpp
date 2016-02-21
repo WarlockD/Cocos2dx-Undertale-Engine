@@ -13,14 +13,14 @@ LuaSprite::~LuaSprite()
 }
  bool LuaSprite::init(istring spriteName, Vec2 pos) {
 	 UndertaleResources* res = UndertaleResources::getInstance();
-	 Vector<SpriteFrame*>* frames = res->getSpriteFrames(spriteName);
-	 if (this->initWithSpriteFrame(frames->at(0))) {
+	 const Vector<SpriteFrame*>& frames = res->getSpriteFrames(spriteName);
+	 if (this->initWithSpriteFrame(frames.at(0))) {
 		 _spriteName = spriteName;
 		 _frames = frames;
 		 _speed = 0;
 		 _direction = 0;
 		 _image_index = 0;
-		 _frameCount = frames->size();
+		 _frameCount = frames.size();
 		 setPosition(pos);
 		 return true;
 	 }
@@ -38,6 +38,18 @@ LuaSprite * LuaSprite::create(istring spriteName,  Vec2 pos)
 }
 LuaSprite * LuaSprite::create(istring spriteName, float x, float y) {
 	return create(spriteName, Vec2(x, y));
+}
+
+void LuaSprite::setSpriteName(istring name)
+{
+	if (name == _spriteName) return;
+	_spriteName = name;
+	UndertaleResources* res = UndertaleResources::getInstance();
+	const Vector<SpriteFrame*>& frames = res->getSpriteFrames(name);
+		setSpriteFrame(frames.at(0));
+		_frames = frames;
+		_frameCount = frames.size();
+		_image_index = 0; // reset sprite index in case of animation
 }
 
 
@@ -61,7 +73,7 @@ void LuaSprite::update(float dt)
 				if (_image_index > 0)	_image_index--;
 				else _image_index = _frameCount - 1;
 			}
-			setSpriteFrame(_frames->at(_image_index));
+			setSpriteFrame(_frames.at(_image_index));
 		}
 	}
 }
@@ -164,3 +176,4 @@ void lua_Regester_LuaSprite(lua_State* L) {
 	lua_pushcfunction(L, LuaSprite__new);
 	lua_setglobal(L, "Sprite");
 }
+

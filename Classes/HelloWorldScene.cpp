@@ -7,6 +7,7 @@
 #include "border.h"
 #include "obj_gasterblaster.h"
 #include "FaceDialog.h"
+#include "Chara.h"
 
 USING_NS_CC;
 using namespace experimental;
@@ -85,7 +86,31 @@ bool HelloWorld::init()
     }
     Size visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
+	Vec2 deadCenter(visibleSize.width / 2, visibleSize.height / 2);
 	UndertaleResources* res = UndertaleResources::getInstance();
+
+	Undertale::CharaOverworld* chara = Undertale::CharaOverworld::create();
+	addChild(chara);
+	chara->setPosition(deadCenter);
+
+	res->test_thing->setPosition(deadCenter);
+	MovementAction* moveMe = MovementAction::create(0, 0);
+	res->test_thing->runAction(moveMe);
+
+	addChild(res->test_thing, -10);
+	runAction(Follow::create(chara));
+//	this->setCameraMask((unsigned short)CameraFlag::USER2, true);
+	// add the sprite as a child to this layer
+//	this->addChild(sprite);
+
+//	moveMe->setScale(2.0f);
+
+	
+	//closeItem->setPosition(Vec2(origin.x + visibleSize.width - closeItem->getContentSize().width / 2, origin.y + closeItem->getContentSize().height / 2));
+
+
+	
+#if 0
     /////////////////////////////
     // 2. add a menu item with "X" image, which is clicked to quit the program
     //    you may modify it.
@@ -121,7 +146,7 @@ bool HelloWorld::init()
 //	addChild(box,1);
 //	box->setPosition(640/2,385);
 	//box->setAnchorPoint(Vec2(0, 0));
-#if 0
+
 	
 
 //	auto closeItem = MenuItemImage::create("CloseNormal.png","CloseSelected.png", [](Ref* r) {  Director::getInstance()->end(); });
@@ -137,14 +162,14 @@ bool HelloWorld::init()
     auto menu = Menu::create(muteItem, NULL);
     menu->setPosition(Vec2::ZERO);
     this->addChild(menu, 1);
-#endif
+
 	
 
 //	auto label = LuaLabel::create("fnt_main.fnt", 2,0.5f);
 	
 	const char* test_str = "\\E2* If you truly wish to&  leave the RUINS.../* I will not stop you./\\E2* However^1, when you&  leave.../\\E1* Please do not come&  back./\\E2* I hope you understand./%%";
 	const char* test_str2 = "\XLa, la.^3 &Time to wake&up and\\R smell\\X &the^4 pain./* Though^2.^4.^6.^8.&It's still a&little shaky./* Though^2.^4.^6.^8.&It's still a&little shaky./fhuehfuehfuehfuheufhe / %";
-	Undertale::FaceDialog* face = Undertale::FaceDialog::create("fnt_main.fnt", Color3B::WHITE, 20, 20, 290, 0, 1, "snd_txtasr.wav");
+	Undertale::FaceDialog* face = Undertale::FaceDialog::create("fnt_maintext.fnt", Color3B::WHITE, 20, 20, 290, 0, 1, "snd_txtasr.wav");
 	face->setPosition(640 / 2, 385);
 	addChild(face);
 	face->setString(test_str);
@@ -178,7 +203,7 @@ bool HelloWorld::init()
 	
 
 	//mus_zz_megalovania.ogg
-
+#endif
 	return true;
 }
 

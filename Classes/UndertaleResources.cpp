@@ -1,9 +1,10 @@
+
 #include "UndertaleResourcesInternal.h"
 
 USING_NS_CC;
 
 
-inline std::vector<uint32_t> getOffsetEntries(BinaryReader& r) {
+std::vector<uint32_t> getOffsetEntries(BinaryReader& r) {
 	std::vector<uint32_t> entries;
 	uint32_t count = r.read<uint32_t>();
 	while (count > 0) {
@@ -14,7 +15,7 @@ inline std::vector<uint32_t> getOffsetEntries(BinaryReader& r) {
 	return entries;
 
 }
-inline std::vector<uint32_t> getOffsetEntries(BinaryReader& r, uint32_t start) {
+std::vector<uint32_t> getOffsetEntries(BinaryReader& r, uint32_t start) {
 	r.push(start);
 	std::vector<uint32_t> vec(std::move(getOffsetEntries(r)));
 	r.pop();
@@ -255,8 +256,44 @@ bool UndertaleResources::init()
 	readAllTextures();
 	readAllSprites();
 	readAllFonts();
+	readAllObjects();
+	readAllBackgrounds();
+	readAllRooms();
 	return true;
 }
+
+
+
+//Humm, in reality how elegant IS this.  If I do it manualy I can link the spriteframes
+// to this object but humm.
+class ObjectBuilder : public UndertaleObject, public GM_ReaderHelper<RawObject> {
+	void setFromRaw(const RawDataType& raw) override {
+		throw std::exception("Do not use");
+	}
+	void setFromRaw(const RawDataType& raw, BinaryReader& r) override {
+		_name = r.readStringAtOffset(raw.nameOffset);
+		_spriteIndex = raw.spriteIndex;
+		_depth = raw.depth;
+		_visible = raw.visible != 0 ? true : false;
+		_solid = raw.solid != 0 ? true : false;
+		_parent = raw.parentIndex;
+		_mask = raw.mask;
+	}
+};
+
+void UndertaleResources::readAllObjects() {
+	const Chunk& objChunk = _chunks["OBJT"];
+	cocos2d::Vector<ObjectBuilder*> tempObjects;
+	ObjectBuilder::setRefArray(r, tempObjects, objChunk.begin());
+	for (size_t i = 0; i < tempObjects.size(); i++) {
+		UndertaleObject* o = tempObjects.at(i);
+		_objectLookup[o->getName()] = i;
+		_objectIndex.pushBack(o);
+
+	}
+
+}
+
 void UndertaleResources::readAllTextures()
 {
 		_textures.clear();
@@ -282,6 +319,7 @@ void UndertaleResources::readAllTextures()
 			image->initWithImageData((uint8_t*)fileBuffer.data(), size);
 			std::string image_key = "UndertaleTexture_" + std::to_string(i) + ".png";
 			Texture2D* texture = TextureCache::getInstance()->addImage(image, image_key);
+			texture->setAliasTexParameters(); // fix it
 			_textures.pushBack(texture);
 			_textureFilenames.push_back(image_key);
 			// still need to save it though
@@ -315,30 +353,32 @@ void UndertaleResources::readAllSprites()
 	_spriteFrameLookup.clear();
 	const Chunk& spriteChunk = _chunks["SPRT"];
 	GM_RawSpriteFrame rawFrame;
-	GM_SpriteFrame frameData;
+	std::vector<GM_SpriteFrame> framesData;
+	_spriteFrameIndex.clear();
 	r.seek(spriteChunk.begin());
 	auto spriteOffsets = getOffsetEntries(r);
+	_spriteFrameIndex.reserve(spriteOffsets.size());
 	for (uint32_t offset : spriteOffsets) {
 		r.seek(offset);
 		istring name = r.readStringAtOffset(r.readInt());
 		r.read(header);
 		r.push();
 		cocos2d::Vector<SpriteFrame*> frames;
-		auto frameOffsets = getOffsetEntries(r);
-		for (uint32_t foffset : frameOffsets) {
-			r.seek(foffset);
-			r.read(rawFrame);
-			if (rawFrame.texture_id > _textures.size()) {
+		GM_SpriteFrame::setArrayFromOffset(r, framesData);
+		for (const auto& frame : framesData) {
+			if (frame.texture_id > _textures.size()) {
 				CCLOG("Texture id invalid for sprite %sd", name.c_str());
 				continue;
 			}
-			frameData.setFromRaw(rawFrame);
-			Texture2D* texture = _textures.at(frameData.texture_id);
-			SpriteFrame* frame = SpriteFrame::createWithTexture(texture, frameData.rect, false, frameData.offset, frameData.original);
-			frames.pushBack(frame);
+			Texture2D* texture = _textures.at(frame.texture_id);
+			SpriteFrame* spr_frame = SpriteFrame::createWithTexture(texture, frame.rect, false, frame.offset, frame.original);
+			frames.pushBack(spr_frame);
 		}
 		r.pop();
-		if (frames.size() > 0) _spriteFrameLookup.emplace(std::make_pair(name, std::move(frames)));
+		if (frames.size() > 0) {
+			_spriteFrameIndex.push_back(name);
+			_spriteFrameLookup.emplace(std::make_pair(name, std::move(frames)));
+		}
 		// read mask stuff
 		int haveMask = r.readInt();
 		if (haveMask) { // have mask?

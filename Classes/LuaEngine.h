@@ -84,7 +84,11 @@ public:
 	template<typename T>  inline  static T** newUserData(lua_State*L, T* ptr) {
 		return newUserData<T>(L, ptr, LuaEngineMetaTableNames::metaTableName<T>());
 	}
-	
+	// There is this flag array in undertale that handles alot of the state changes between rooms and events
+	// so just made a helpful function to access it from c++ objects
+	// its bascily the global table, with a "flag" table.  It will create if it does not exist
+	static int getUndertaleGlobalFlag(int index);
+	static void setUndertaleGlobalFlag(int index, int value);
 	static lua_State* getLuaState();
 	static void  setLuaScene(cocos2d::Node* scene);// The scene that all your lua nodes go into
 	static cocos2d::Node*  getLuaScene();// The scene that all your lua nodes go into

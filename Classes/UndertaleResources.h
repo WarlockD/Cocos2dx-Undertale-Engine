@@ -8,7 +8,22 @@
 // We are copying the label class.  Because undertale has very flexable labels we have to reimplment it ourseves to get that
 // fine, fine letter control
 
+class UndertaleObject : public cocos2d::Ref {
+	CC_SYNTHESIZE_READONLY(istring, _name, Name);
+	CC_SYNTHESIZE_READONLY(int, _spriteIndex, SpriteIndex);
+	CC_SYNTHESIZE_READONLY(bool, _visible, Visible);
+	CC_SYNTHESIZE_READONLY(bool, _solid, Solid);
+	CC_SYNTHESIZE_READONLY(int, _depth, Depth);
+	CC_SYNTHESIZE_READONLY(int, _parent, Parent); // its -1 if there is no parent
+	CC_SYNTHESIZE_READONLY(int, _mask, Mask);
+	//UndertaleObject();
+public:
+	inline bool hasParent() const { return _parent == -1; }
+	friend class UndertaleResources;
+	friend class ObjectHelper;
+};
 
+typedef cocos2d::Vector<cocos2d::SpriteFrame*>* UndertaleSpriteFrames;
 class UndertaleResources {
 protected:
 	static cocos2d::Vector<cocos2d::Texture2D*> emptyList;
@@ -30,15 +45,25 @@ protected:
 	
 	std::unordered_map<istring, Chunk> _chunks;
 	std::unordered_map<istring, cocos2d::Vector<cocos2d::SpriteFrame*>> _spriteFrameLookup;
+	std::vector<istring> _spriteFrameIndex;
+
 	std::unordered_map<istring, cocos2d::Vector<cocos2d::Font*>> _fontLookup;
+
+	cocos2d::Vector<UndertaleObject*> _objectIndex;
+	std::unordered_map<istring, size_t> _objectLookup;
 	
+
 
 
 	void readAllTextures();
 	void readAllChunks();
 	void readAllSprites();
 	void readAllFonts();
+	void readAllObjects();
+	void readAllBackgrounds();
+	void readAllRooms();
 protected:
+
 	std::string _data_win_path;
 	
 	BinaryFileReader r;
@@ -52,22 +77,29 @@ protected:
 	std::vector<std::string> _textureFilenames;
 
 public:
+	cocos2d::Node* test_thing;
 	inline cocos2d::Texture2D* getTexture(size_t i) const { return (i < _textures.size()) ? _textures.at(i) : nullptr;}
-	cocos2d::SpriteFrame* getSpriteFrame(istring name, size_t frame = 0)const {
+	inline UndertaleObject* lookupObject(size_t index) { return _objectIndex.at(index); }
+	inline  UndertaleObject* lookupObject(istring name) {
+		auto it = _objectLookup.find(name);
+		if (it != _objectLookup.end()) return lookupObject(it->second);
+		return nullptr;
+	}
+
+	cocos2d::SpriteFrame* getSpriteFrame(istring name, size_t frame)const {
 		auto it = _spriteFrameLookup.find(name);
 		if (it == _spriteFrameLookup.cend()) return nullptr;
-		else return it->second.at(0);
+		else return it->second.at(frame);
 	}
 	cocos2d::Sprite* createSprite(istring name, size_t frame=0) const {
 		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(name, frame));
 	}
-	
-	cocos2d::Vector<cocos2d::SpriteFrame*>* getSpriteFrames(istring name) {
-		auto it = _spriteFrameLookup.find(name);
-		if (it == _spriteFrameLookup.cend()) return nullptr;
-		return &it->second;
+	cocos2d::Sprite* createSprite(uint32_t index, size_t frame = 0) const {
+		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(_spriteFrameIndex.at(index), frame));
 	}
-
+	const cocos2d::Vector<cocos2d::SpriteFrame*>& getSpriteFrames(istring name) { return _spriteFrameLookup[name]; }
+	cocos2d::SpriteFrame* getSpriteFrame(size_t index, size_t frame)const { return getSpriteFrame(_spriteFrameIndex.at(index), frame); }
+	const cocos2d::Vector<cocos2d::SpriteFrame*>& getSpriteFrames(size_t index)  { return getSpriteFrames(_spriteFrameIndex.at(index)); }
 	static UndertaleResources* getInstance();
 	//inline cocos2d::Vector<cocos2d::SpriteFrame*>& getFrames(const std::string& sprite) { return _frameMap[sprite]; }
 };

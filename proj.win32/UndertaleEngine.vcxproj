@@ -150,6 +150,8 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClCompile Include="..\Classes\BinaryReader.cpp" />
     <ClCompile Include="..\Classes\border.cpp" />
     <ClCompile Include="..\Classes\CabExtract.cpp" />
+    <ClCompile Include="..\Classes\Chara.cpp" />
+    <ClCompile Include="..\Classes\face.cpp" />
     <ClCompile Include="..\Classes\FaceDialog.cpp" />
     <ClCompile Include="..\Classes\HelloWorldScene.cpp" />
     <ClCompile Include="..\Classes\LuaEngine.cpp" />
@@ -157,6 +159,7 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClCompile Include="..\Classes\LuaFont.cpp" />
     <ClCompile Include="..\Classes\LuaSprite.cpp" />
     <ClCompile Include="..\Classes\obj_gasterblaster.cpp" />
+    <ClCompile Include="..\Classes\Room.cpp" />
     <ClCompile Include="..\Classes\TextWriter.cpp" />
     <ClCompile Include="..\Classes\UndertaleLabel.cpp" />
     <ClCompile Include="..\Classes\UndertaleResources.cpp" />
@@ -218,17 +221,21 @@ xcopy "$(ProjectDir)..\Resources" "$(OutDir)" /D /E /I /F /Y
     <ClCompile Include="..\external\Lua 5.3.2\lvm.c" />
     <ClCompile Include="..\external\Lua 5.3.2\lzio.c" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="UndertaleResourcesRooms.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Classes\AppDelegate.h" />
     <ClInclude Include="..\Classes\binaryReader.h" />
     <ClInclude Include="..\Classes\border.h" />
+    <ClInclude Include="..\Classes\Chara.h" />
+    <ClInclude Include="..\Classes\Face.h" />
     <ClInclude Include="..\Classes\FaceDialog.h" />
     <ClInclude Include="..\Classes\HelloWorldScene.h" />
     <ClInclude Include="..\Classes\LuaEngine.h" />
     <ClInclude Include="..\Classes\LuaFont.h" />
     <ClInclude Include="..\Classes\LuaSprite.h" />
     <ClInclude Include="..\Classes\obj_gasterblaster.h" />
+    <ClInclude Include="..\Classes\Room.h" />
     <ClInclude Include="..\Classes\TextWriter.h" />
     <ClInclude Include="..\Classes\UndertaleLabel.h" />
     <ClInclude Include="..\Classes\UndertaleResources.h" />
