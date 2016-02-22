@@ -30,7 +30,7 @@ namespace Undertale {
 	obj_gasterblaster * obj_gasterblaster::create(Vec2 pos)
 	{
 		obj_gasterblaster* obj = new obj_gasterblaster();
-		if (obj && obj->init("spr_gasterblaster",pos)) {
+		if (obj && obj->init("spr_gasterblaster")) {
 			obj->autorelease();
 			obj->_startPosition = pos;
 			obj->setScale(1, 1);
@@ -133,7 +133,7 @@ namespace Undertale {
 
 		if (btimer > (5 + terminal)) {
 			bt += 0.8f;
-			fade -= 0.1;
+			fade -= 0.1f;
 			setOpacity(fade);
 			if (bt <= 2) con = 8;// setVisible(false); // or remove from child
 		}

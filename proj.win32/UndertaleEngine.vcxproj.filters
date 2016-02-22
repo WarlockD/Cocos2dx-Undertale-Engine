@@ -250,6 +250,9 @@
     <ClCompile Include="..\Classes\Chara.cpp">
       <Filter>src\Objects</Filter>
     </ClCompile>
+    <ClCompile Include="..\Classes\Keyboard.cpp">
+      <Filter>src\Objects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -434,6 +437,9 @@
       <Filter>src\Objects</Filter>
     </ClInclude>
     <ClInclude Include="..\Classes\Chara.h">
+      <Filter>src\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\Keyboard.h">
       <Filter>src\Objects</Filter>
     </ClInclude>
   </ItemGroup>

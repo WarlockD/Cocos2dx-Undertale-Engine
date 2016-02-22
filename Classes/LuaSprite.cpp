@@ -9,9 +9,8 @@ LuaSprite::LuaSprite()
 
 LuaSprite::~LuaSprite()
 {
-	CCLOG("Deleteing Lua Sprite '%s'", _spriteName.c_str());
 }
- bool LuaSprite::init(istring spriteName, Vec2 pos) {
+ bool LuaSprite::init(istring spriteName) {
 	 UndertaleResources* res = UndertaleResources::getInstance();
 	 const Vector<SpriteFrame*>& frames = res->getSpriteFrames(spriteName);
 	 if (this->initWithSpriteFrame(frames.at(0))) {
@@ -21,23 +20,44 @@ LuaSprite::~LuaSprite()
 		 _direction = 0;
 		 _image_index = 0;
 		 _frameCount = frames.size();
-		 setPosition(pos);
 		 return true;
 	 }
 	 return false;
 }
-LuaSprite * LuaSprite::create(istring spriteName,  Vec2 pos)
+ bool LuaSprite::init(uint32_t index) {
+	 UndertaleResources* res = UndertaleResources::getInstance();
+	 const Vector<SpriteFrame*>& frames = res->getSpriteFrames(index);
+	 if (this->initWithSpriteFrame(frames.at(0))) {
+		 _spriteName = res->getSpriteIndexToName(index);
+		 _frames = frames;
+		 _speed = 0;
+		 _direction = 0;
+		 _image_index = 0;
+		 _frameCount = frames.size();
+		 return true;
+	 }
+	 return false;
+ }
+LuaSprite * LuaSprite::create(istring spriteName)
 {
 	LuaSprite* pSprite = new LuaSprite();
-	if (pSprite && pSprite->init(spriteName,pos)) {
+	if (pSprite && pSprite->init(spriteName)) {
 		pSprite->autorelease();
 		return pSprite;
 	}
 	CC_SAFE_DELETE(pSprite);
 	return nullptr;
 }
-LuaSprite * LuaSprite::create(istring spriteName, float x, float y) {
-	return create(spriteName, Vec2(x, y));
+
+LuaSprite * LuaSprite::create(uint32_t index)
+{
+	LuaSprite* pSprite = new LuaSprite();
+	if (pSprite && pSprite->init(index)) {
+		pSprite->autorelease();
+		return pSprite;
+	}
+	CC_SAFE_DELETE(pSprite);
+	return nullptr;
 }
 
 void LuaSprite::setSpriteName(istring name)

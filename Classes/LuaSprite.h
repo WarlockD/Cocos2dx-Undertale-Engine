@@ -74,6 +74,16 @@ public:
 		updateVector();
 		return true;
 	}
+	cocos2d::Vec2 forwardVector(uint32_t frames) { // number of frames moved forward in the current vector
+		return _movementVector * frames;
+	}
+	cocos2d::Vec2 backwardVector(uint32_t frames) { // frames backwards, used when we hit something and need to go back a frame
+		return _movementVector * -frames;
+	}
+	void moveBackward(uint32_t frames) { // used to move backward if we hit something, target should be valid
+		assert(_target);
+		if (_target) _target->setPosition(_target->getPosition() + backwardVector(frames));
+	}
 	static MovementAction* create(int speed, int direction, float duration) {
 		MovementAction* a = new MovementAction;
 		if (a && a->init(speed, direction, duration)) {
@@ -147,6 +157,7 @@ public:
 		_endingFrame = frames->size() - 1;
 		return true;
 	}
+
 	static AnimateAction* create(SpriteFrameVector frames, float imageSpeed) {
 		AnimateAction* a = new AnimateAction;
 		if (a && a->init(frames, imageSpeed)) {
@@ -207,13 +218,14 @@ protected:
 		}
 		if(_image_speed == 0 && _speed == 0) unscheduleUpdate();  else scheduleUpdate();
 	}
-	virtual bool init(istring spriteName,  cocos2d::Vec2 pos);
+	virtual bool init(istring spriteName);
+	virtual bool init(uint32_t index);
 	void resetImageTime() { _current_image_time = _image_speed * (1.0f / 30.0f); }
 public:
 	LuaSprite();
 	~LuaSprite();
-	static LuaSprite* create(istring spriteName, cocos2d::Vec2 pos = cocos2d::Vec2::ZERO);
-	static LuaSprite* create(istring spriteName, float x, float y);
+	static LuaSprite* create(istring spriteName);
+	static LuaSprite* create(uint32_t index);
 	void setSpriteName(istring name);
 	istring getSpriteName() const { return _spriteName;  }
 	inline void setImageIndex(uint32_t index) { if(index < _frameCount) setSpriteFrame(_frames.at(_image_index = index)); }
@@ -233,6 +245,7 @@ protected:
 	inline virtual void fireBullet() { scheduleUpdate();  setVisible(true); }
 	inline virtual bool stepBullet(float dt) { return false;  } // this step is run at the start of update, on true return, update dosn't run this frame.
 	inline virtual void stopBullet() { setVisible(true);  unscheduleUpdate(); }
+	friend class Room;
 };
 
 

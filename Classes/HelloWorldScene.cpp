@@ -8,6 +8,7 @@
 #include "obj_gasterblaster.h"
 #include "FaceDialog.h"
 #include "Chara.h"
+#include "Room.h"
 
 USING_NS_CC;
 using namespace experimental;
@@ -86,19 +87,77 @@ bool HelloWorld::init()
     }
     Size visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
-	Vec2 deadCenter(visibleSize.width / 2, visibleSize.height / 2);
+	Vec2 deadCenter(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y);
+
 	UndertaleResources* res = UndertaleResources::getInstance();
 
-	Undertale::CharaOverworld* chara = Undertale::CharaOverworld::create();
-	addChild(chara);
-	chara->setPosition(deadCenter);
+	//Undertale::CharaOverworld* chara = Undertale::CharaOverworld::create();
+	Undertale::Room* room = Undertale::Room::create("room_torhouse2");
+//	Undertale::Room* room = Undertale::Room::create("room_ruins3");
+	room->scheduleUpdate();
+	room->setPosition(deadCenter);
+	addChild(room,0);
 
-	res->test_thing->setPosition(deadCenter);
-	MovementAction* moveMe = MovementAction::create(0, 0);
-	res->test_thing->runAction(moveMe);
 
-	addChild(res->test_thing, -10);
-	runAction(Follow::create(chara));
+
+
+	//setCameraMask((uint16_t)CameraFlag::USER2);  //this is the layer, when adding camera to it, all its children will be affect only when you set the second parameter to true
+
+	//chara->setPosition(deadCenter);
+//	addChild(chara);
+	//room->setChara(chara);
+
+
+	auto keyboardListener = EventListenerKeyboard::create();
+	keyboardListener->onKeyPressed = [this,room](EventKeyboard::KeyCode key, Event* event) {
+		static int printScreenCount = 0;
+		if (key >= EventKeyboard::KeyCode::KEY_0 && key <= EventKeyboard::KeyCode::KEY_8) {
+			uint32_t index = (uint32_t)key - (uint32_t)EventKeyboard::KeyCode::KEY_0;
+			bool visible = room->getBackgroundVisible(index);
+			room->setBackgroundVisible(index, !visible);
+			event->stopPropagation();
+			return;
+		}
+		switch (key) {
+		case EventKeyboard::KeyCode::KEY_PRINT:
+		case EventKeyboard::KeyCode::KEY_F12: // my keyboard has to hit the fn key to get printscreen to work meh
+		{
+			std::string filename = FileUtils::getInstance()->getSearchPaths()[0];
+			filename+="capture_" + std::to_string(printScreenCount++) + ".jpg";
+			utils::captureScreen([filename](bool b, const std::string &name) {
+				if (b) CCLOG("Screenshot captured to '%s'", filename.c_str());
+				else CCLOG("Could not save screenshot to to '%s'", filename.c_str());
+			}, filename);
+			event->stopPropagation();
+		}
+		break;
+		case EventKeyboard::KeyCode::KEY_KP_MULTIPLY:
+			room->setAllObjectsVisible(!room->getAllObjectsVisible());
+			event->stopPropagation();
+			break;
+		case EventKeyboard::KeyCode::KEY_KP_DIVIDE:
+			room->setCollisionTestMode(!room->getCollisionTestMode());
+			event->stopPropagation();
+			break;
+		case EventKeyboard::KeyCode::KEY_KP_PLUS:
+		case EventKeyboard::KeyCode::KEY_PLUS:
+		case EventKeyboard::KeyCode::KEY_EQUAL:
+			room->loadNextRoom();
+			CCLOG("Loading Room '%s' index %i", room->getRoomName().c_str(), room->getRoomIndex());
+			event->stopPropagation();
+			break;
+		case EventKeyboard::KeyCode::KEY_KP_MINUS:
+		case EventKeyboard::KeyCode::KEY_MINUS:
+		case EventKeyboard::KeyCode::KEY_UNDERSCORE:
+			room->loadPreviousRoom();
+			CCLOG("Loading Room '%s' index %i", room->getRoomName().c_str(), room->getRoomIndex());
+			event->stopPropagation();
+			break;
+		}
+	};
+	getEventDispatcher()->addEventListenerWithSceneGraphPriority(keyboardListener, this);
+
+
 //	this->setCameraMask((unsigned short)CameraFlag::USER2, true);
 	// add the sprite as a child to this layer
 //	this->addChild(sprite);

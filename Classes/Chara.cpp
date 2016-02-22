@@ -4,13 +4,16 @@
 USING_NS_CC;
 
 namespace Undertale{
-	CharaOverworld::CharaOverworld()  {}
+	CharaOverworld::CharaOverworld() : _keyStates{ false , false ,  false ,  false } , _currentAnimation(nullptr) {}
 	CharaOverworld::~CharaOverworld()
 	{
+		disableKeyboard();
+		stopAllActions();
 		for (int i = 0; i < 4; i++) {
 			CC_SAFE_RELEASE_NULL(_facingAnimation[i]);
-			CC_SAFE_RELEASE_NULL(_facingNormal[i]);
 		}
+		_movmentAction->release();
+		_keyboardListener->release();
 	}
 	CharaOverworld* CharaOverworld::create() {
 		CharaOverworld* c = new CharaOverworld;
@@ -23,11 +26,12 @@ namespace Undertale{
 	}
 	void CharaOverworld::setFacing(CharaDirection value)
 	{
+		assert(value == CharaDirection::NOTMOVING);
 		if (value != _currentFacing) {
 			if (isMoving()) {
-				stopActionByTag(1);
+				if (isMoving()) stopAnimation();
 				setSpriteFrame(_facingNormal[(unsigned char)value]);
-				_currentlyMoving = _currentFacing;
+				_currentlyMoving = CharaDirection::NOTMOVING;
 			}
 			_currentFacing = value;
 		}
@@ -35,103 +39,146 @@ namespace Undertale{
 	void CharaOverworld::moveDirection(CharaDirection value)
 	{
 		if (value != _currentlyMoving) {
-			stopActionByTag(1);
+			if (isMoving()) stopAnimation();
+			
 			if (value == CharaDirection::NOTMOVING) { // if we arn't moving anymore make sure the facing is lined up
 				_currentFacing = _currentlyMoving;
 				setSpriteFrame(_facingNormal[(unsigned char)_currentFacing]);
 				_movmentAction->setSpeed(0);
 			}
 			else {
-				runAction(_facingAnimation[(unsigned char)value]);
+				startAnimation(value);
 				switch (value) {
 				case CharaDirection::UP: _movmentAction->setDirection(90); break;
 				case CharaDirection::RIGHT:_movmentAction->setDirection(0); break;
 				case CharaDirection::DOWN:_movmentAction->setDirection(270); break;
 				case CharaDirection::LEFT:_movmentAction->setDirection(180); break;
+
 				}
 				_movmentAction->setSpeed(2);
 			}
 			_currentlyMoving = value;
 		}
 	}
+	void CharaOverworld::updateKeys()
+	{ // ... It migth be better if I had 4 bools to test for this, 30 times a second? humm
+		stopMovement();
+		for (int i = 0; i < 4; i++) {
+			if (_keyStates[i]) {
+				moveDirection((CharaDirection)i); 
+				return;
+			}
+		}
+		
+	}
 	void CharaOverworld::stopMovement() { moveDirection(CharaDirection::NOTMOVING); }
 
+	void CharaOverworld::collided(const UndertaleObject * obj)
+	{
+		if (obj->isObject("obj_solidparent")) {
+			stopMovement();
+			runAction(MoveTo::create(0.0, getPosition() + _movmentAction->backwardVector(1)));
+		}
+	//	CCLOG("Collision with object %s", obj->getObjectName().c_str());
+	}
+	void CharaOverworld::startAnimation(CharaDirection d) {
+		if (_currentAnimation != nullptr) stopAnimation();
+		_currentAnimation = Animate::create(_facingAnimation[(int)d]);
+		runAction(_currentAnimation);
+	}
+	void CharaOverworld::stopAnimation() {
+		if (_currentAnimation != nullptr) {
+			stopAction(_currentAnimation); _currentAnimation = nullptr;
+		}
+	}
 	bool CharaOverworld::init()
 	{
 		UndertaleResources* res = UndertaleResources::getInstance();
-		_facingNormal[2] = res->getSpriteFrame("spr_maincharad", 0);
-		_facingNormal[3] = res->getSpriteFrame("spr_maincharar", 0);
-		_facingNormal[0] = res->getSpriteFrame("spr_maincharau", 0);
-		_facingNormal[1] = res->getSpriteFrame("spr_maincharal", 0);
+		_facingNormal[(int)CharaDirection::DOWN] = res->getSpriteFrame("spr_maincharad", 0);
+		_facingNormal[(int)CharaDirection::RIGHT] = res->getSpriteFrame("spr_maincharar", 0);
+		_facingNormal[(int)CharaDirection::UP] = res->getSpriteFrame("spr_maincharau", 0);
+		_facingNormal[(int)CharaDirection::LEFT] = res->getSpriteFrame("spr_maincharal", 0);
+	
+
 		if (!Sprite::initWithSpriteFrame(_facingNormal[0])) return false;
 		_movmentAction = MovementAction::create(0, 0);
 		_movmentAction->setTag(2); // the movment action
 		//setContentSize(_charaSprite->getContentSize());
-		_facingAnimation[2] = Animate::create(Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharad"), 0.25, -1));
-		_facingAnimation[3] = Animate::create(Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharar"), 0.25, -1));
-		_facingAnimation[0] = Animate::create(Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharau"), 0.25, -1));
-		_facingAnimation[1] = Animate::create(Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharal"), 0.25, -1));
+		
 		runAction(_movmentAction);
 
+	//	scheduleUpdate();
 		_currentlyMoving = CharaDirection::NOTMOVING;
 		_currentlyFacing = CharaDirection::DOWN;
+		_facingAnimation[(int)CharaDirection::DOWN] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharad"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::RIGHT] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharar"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::UP] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharau"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::LEFT] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharal"), 0.25, -1);
+		for (int i = 0; i < 4; i++) _facingAnimation[i]->retain();
 
-		for (int i = 0; i < 4; i++) {
-			_facingAnimation[i]->retain();
-			_facingAnimation[i]->setTag(1); // tag one is the moving animation
-			_facingNormal[i]->retain();
-		}
 		//moveMe->setScale(2.0f);
-		auto keyboardListener = EventListenerKeyboard::create();
-		keyboardListener->onKeyReleased = [this](EventKeyboard::KeyCode key, Event* event) {
-			if (!isMoving()) return;
+	
+		_keyboardListener = EventListenerKeyboard::create();
+		_keyboardListener->onKeyReleased = [this](EventKeyboard::KeyCode key, Event* event) {
 			switch (key) {
 			case EventKeyboard::KeyCode::KEY_W:
 			case EventKeyboard::KeyCode::KEY_UP_ARROW:
-				//	moveMe->setPositionY(moveMe->getPositionY() - 10);
+				_keyStates[(int)CharaDirection::UP] = false;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			case EventKeyboard::KeyCode::KEY_S:
 			case EventKeyboard::KeyCode::KEY_DOWN_ARROW:
-				//	moveMe->setPositionY(moveMe->getPositionY() + 10);
+				_keyStates[(int)CharaDirection::DOWN] = false;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			case EventKeyboard::KeyCode::KEY_A:
 			case EventKeyboard::KeyCode::KEY_LEFT_ARROW:
-				//	moveMe->setPositionX(moveMe->getPositionX() - 10);
+				_keyStates[(int)CharaDirection::LEFT] = false;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			case EventKeyboard::KeyCode::KEY_D:
 			case EventKeyboard::KeyCode::KEY_RIGHT_ARROW:
-				//	moveMe->setPositionX(moveMe->getPositionX() + 10);
+				_keyStates[(int)CharaDirection::RIGHT] = false;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			}
-			stopMovement();
 		};
-		keyboardListener->onKeyPressed = [this](EventKeyboard::KeyCode key, Event* event) {
+		_keyboardListener->onKeyPressed = [this](EventKeyboard::KeyCode key, Event* event) {
 			switch (key) {
 			case EventKeyboard::KeyCode::KEY_S:
 			case EventKeyboard::KeyCode::KEY_DOWN_ARROW:
-				moveDirection(CharaDirection::DOWN);
+				_keyStates[(int)CharaDirection::DOWN] = true;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			case EventKeyboard::KeyCode::KEY_D:
 			case EventKeyboard::KeyCode::KEY_RIGHT_ARROW:
-				moveDirection(CharaDirection::RIGHT);
+				_keyStates[(int)CharaDirection::RIGHT] = true;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			case EventKeyboard::KeyCode::KEY_W:
 			case EventKeyboard::KeyCode::KEY_UP_ARROW:
-				moveDirection(CharaDirection::UP);
+				_keyStates[(int)CharaDirection::UP] = true;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			case EventKeyboard::KeyCode::KEY_A:
 			case EventKeyboard::KeyCode::KEY_LEFT_ARROW:
-				moveDirection(CharaDirection::LEFT);
+				_keyStates[(int)CharaDirection::LEFT] = true;
+				updateKeys();
+				event->stopPropagation();
 				break;
 			}
+		
 		};
-		getEventDispatcher()->addEventListenerWithSceneGraphPriority(keyboardListener, this);
-		//if (!Sprite::initWithSpriteFrame(res->getSpriteFrame("spr_maincharad", 0))) return false;
-		//_facing[0] = res->getSpriteFrames("spr_maincharad");
-		//_facing[1] = res->getSpriteFrames("spr_maincharar");
-		//_facing[2] = res->getSpriteFrames("spr_maincharau");
-		//_facing[3] = res->getSpriteFrames("spr_maincharal");
-		//_currentFacing = CharaDirection::SOUTH;
+
+		_keyboardListener->retain();
+	
 		return true;
 	}
 

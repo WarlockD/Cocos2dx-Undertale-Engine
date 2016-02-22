@@ -22,109 +22,6 @@ std::vector<uint32_t> getOffsetEntries(BinaryReader& r, uint32_t start) {
 	return vec;
 }
 
-/*
-
-BinaryReader(const std::string& filename) {
-	std::fstream* fs = new std::fstream();
-	fs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	try {
-		fs->open(filename, std::ios::binary | std::ios::in);
-		fs->seekg(0, std::ios::end);
-		_length = fs->tellg();
-		fs->seekg(0, std::ios::beg);
-		s = std::unique_ptr<std::istream>(static_cast<std::istream*>(fs));
-	}
-	catch (std::ifstream::failure e) {
-		CCLOGERROR("BinaryReader::open: %s file %s", e.what(), filename);
-		delete fs;
-		throw e; // throw it back
-	}
-}
-*/
-
-
-
-
-
-
-/*
-
-	// STRING DATA
-private:
-	// On strings, some of the data uses the offset to the string thats located while others use the index
-	// in how the strings are read.  We keep both
-	std::vector<istring> _stringIndex;
-	std::unordered_map<uint32_t, istring> _stringOffsetMap;
-
-	void doStringss(BinaryReader& r) {
-		r.seek(_chunks["STRG"].begin());
-		std::vector<char> stringBuffer;
-		stringBuffer.resize(200);
-		//ChunkEntries entries(r, _chunks["STRG"]);
-		for (uint32_t offset : getOffsetEntries()) {
-			r.seek(offset);
-			int stringSize = r.readInt();
-			stringBuffer.resize(stringSize);
-			r.read(stringBuffer.data(), stringSize);
-			stringBuffer.push_back(0); // just on the safe size, but it should be in the file
-									   //std::string nstring(stringBuffer.data(), stringSize);
-			istring nstring(stringBuffer.data());
-			_stringIndex.push_back(nstring);
-			_stringOffsetMap[offset + 4] = nstring;
-		}
-	}
-public:
-	istring stringByIndex(uint32_t i) const {
-		if (i < _stringIndex.size()) return _stringIndex[i];
-		else return istring();
-	}
-	istring stringByOffset(uint32_t i) const {
-		auto it = _stringOffsetMap.find(i);
-		if (it != _stringOffsetMap.end()) return it->second;
-		else return istring();
-	}
-
-private: /// TEXTURES
-	std::vector<istring> textureFiles;
-	// textures
-	
-	}
-private: // SPRITE POS DATA
-#pragma pack( push )
-#pragma pack( 1 )
-	struct SpriteInfo {
-		short x, y, width, height, renderX, renderY, width0, height0, width1, height1, texture_id;
-	};
-#pragma pack( pop )
-	std::vector<SpriteInfo> _spriteInfo;
-	uint32_t _spritInfoOffset;
-	void doTPANG() { // bulk load of the sprite data
-		const Chunk& tpagChunk = _chunks["TPAG"];
-		r.seek(tpagChunk.begin());
-		uint32_t count = r.readInt();
-		_spritInfoOffset = r.tell() + count*sizeof(int);
-		r.seek(_spritInfoOffset);
-
-		//auto tpagOffsets = getOffsetEntries(); // we don't really need these 
-
-		_spriteInfo.resize(count);
-		r.read(_spriteInfo.data(), _spriteInfo.size()); // This works only because I am 100% sure all this data is in tpang
-	}
-	const SpriteInfo& lookupSpriteInfo(uint32_t fileOffset) const {
-		fileOffset -= _spritInfoOffset;
-		fileOffset /= sizeof(SpriteInfo);
-		assert(fileOffset % sizeof(SpriteInfo));
-		return _spriteInfo[fileOffset];
-	}
-public:
-	ChunkReader(const std::string& filename) : r(filename) {
-		readChunks();
-	}
-	void readChunks() {
-	
-
-};
-*/
 void GetFrames(ValueMap& dictionary, const std::string& sprite_name, Texture2D *texture, Vector<SpriteFrame*>& frames) {
 	ValueMap& framesDict = dictionary["newframes"].asValueMap();
 	int format = 0;
@@ -271,27 +168,50 @@ class ObjectBuilder : public UndertaleObject, public GM_ReaderHelper<RawObject> 
 		throw std::exception("Do not use");
 	}
 	void setFromRaw(const RawDataType& raw, BinaryReader& r) override {
-		_name = r.readStringAtOffset(raw.nameOffset);
+		_objectName = r.readStringAtOffset(raw.nameOffset);
 		_spriteIndex = raw.spriteIndex;
 		_depth = raw.depth;
-		_visible = raw.visible != 0 ? true : false;
+		_visibleAtStart = raw.visible != 0 ? true : false;
 		_solid = raw.solid != 0 ? true : false;
-		_parent = raw.parentIndex;
+		_parent = (UndertaleObject*)raw.parentIndex; // fix latter
 		_mask = raw.mask;
 	}
 };
 
+UndertaleObject::UndertaleObject(): _spriteIndex(-1),_visibleAtStart(true),_solid(false),_depth(-100),_parent(nullptr),_mask(-1) {}
+UndertaleObject::~UndertaleObject() {}
+std::string UndertaleObject::getFullName() const
+{
+	std::string full;
+	if (_parent) full += _parent->getFullName();
+	if (full.size() > 0) full += "::";
+	full += _objectName.c_str();
+	return full;
+}
+bool UndertaleObject::isObject(istring name) const {
+	if (name == _objectName) return true;
+	else if (_parent != nullptr) return _parent->isObject(name);
+	else return false;
+}
+LuaSprite * UndertaleObject::createSprite() const
+{
+	UndertaleResources* res = UndertaleResources::getInstance();
+	if (_spriteIndex >= 0) return LuaSprite::create(_spriteIndex);
+	else return nullptr;
+}
+
 void UndertaleResources::readAllObjects() {
 	const Chunk& objChunk = _chunks["OBJT"];
-	cocos2d::Vector<ObjectBuilder*> tempObjects;
-	ObjectBuilder::setRefArray(r, tempObjects, objChunk.begin());
+	std::vector<ObjectBuilder*> tempObjects;
+	ObjectBuilder::setPtrArrayFromOffset(r, tempObjects, objChunk.begin());
 	for (size_t i = 0; i < tempObjects.size(); i++) {
 		UndertaleObject* o = tempObjects.at(i);
-		_objectLookup[o->getName()] = i;
-		_objectIndex.pushBack(o);
-
+		int objIndex = (int)o->_parent; // fix parrent
+		if (objIndex >= 0) o->_parent = tempObjects.at(objIndex);
+		else o->_parent = nullptr;
+		_objectLookup[o->getObjectName()] = i;
+		_objectIndex.push_back(o);
 	}
-
 }
 
 void UndertaleResources::readAllTextures()
@@ -363,7 +283,15 @@ void UndertaleResources::readAllSprites()
 		istring name = r.readStringAtOffset(r.readInt());
 		r.read(header);
 		r.push();
-		cocos2d::Vector<SpriteFrame*> frames;
+#define VECTOR_BUG 
+#ifdef VECTOR_BUG
+		cocos2d::Vector<SpriteFrame*>  frames;
+#else
+		_spriteFrameIndex.push_back(name);
+		_spriteFrameLookup[name] = Vector<SpriteFrame*>();
+		cocos2d::Vector<SpriteFrame*> & frames = _spriteFrameLookup[name];
+#endif
+		
 		GM_SpriteFrame::setArrayFromOffset(r, framesData);
 		for (const auto& frame : framesData) {
 			if (frame.texture_id > _textures.size()) {
@@ -375,10 +303,12 @@ void UndertaleResources::readAllSprites()
 			frames.pushBack(spr_frame);
 		}
 		r.pop();
+#ifdef VECTOR_BUG
 		if (frames.size() > 0) {
 			_spriteFrameIndex.push_back(name);
 			_spriteFrameLookup.emplace(std::make_pair(name, std::move(frames)));
 		}
+#endif
 		// read mask stuff
 		int haveMask = r.readInt();
 		if (haveMask) { // have mask?

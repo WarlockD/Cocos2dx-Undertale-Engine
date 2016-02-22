@@ -53,16 +53,16 @@ bool AppDelegate::applicationDidFinishLaunching() {
     director->setDisplayStats(true);
 
     // set FPS. the default value is 1.0/60 if you don't call this
-    director->setAnimationInterval(1.0 / 30);
+    director->setAnimationInterval(1.0 / 30); // most rooms are 30 frames a second
 
     // Set the design resolution
     glview->setDesignResolutionSize(designResolutionSize.width, designResolutionSize.height, ResolutionPolicy::NO_BORDER);
     Size frameSize = glview->getFrameSize();
 	int i = 0;
 	CCFileUtils *fileUtils = CCFileUtils::sharedFileUtils();
-	auto searchPaths = fileUtils->getSearchPaths();
-	searchPaths.insert(searchPaths.begin() + i++, "..");
-	fileUtils->setSearchPaths(searchPaths);
+	//auto searchPaths = fileUtils->getSearchPaths();
+	//searchPaths.insert(searchPaths.begin() + i++, "..");
+	///fileUtils->setSearchPaths(searchPaths);
 
 	/*
 

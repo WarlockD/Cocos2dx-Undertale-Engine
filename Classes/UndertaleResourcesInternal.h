@@ -162,18 +162,7 @@ template<typename T> struct GM_ReaderHelper {
 		r.read(raw);
 		setFromRaw(raw,r);
 	}
-	template<typename F> static void setRefArray(BinaryReader& r, cocos2d::Vector<F*>& data) {
-		auto entries = getOffsetEntries(r);
-		r.push();
-		setRefEntries(entries, r, data);
-		r.pop();
-	}
-	template<typename F> static void setRefArray(BinaryReader& r, cocos2d::Vector<F*>& data, std::streamoff offset) {
-		r.push();
-		auto entries = getOffsetEntries(r, offset);
-		setRefEntries(entries, r, data);
-		r.pop();
-	}
+
 	// in case there are multipul lists,
 	template<typename F> static void setArrayFromOffset(BinaryReader& r, std::vector<F>& data) {
 		auto entries = getOffsetEntries(r); 
@@ -187,26 +176,25 @@ template<typename T> struct GM_ReaderHelper {
 		setFromEntries(entries, r,data);
 		r.pop();
 	}
+	// in case there are multipul lists,
+	template<typename F> static void setPtrArrayFromOffset(BinaryReader& r, std::vector<F*>& data) {
+		auto entries = getOffsetEntries(r);
+		r.push();
+		setPtrFromEntries(entries, r, data);
+		r.pop();
+	}
+	template<typename F> static void setPtrArrayFromOffset(BinaryReader& r, std::vector<F*>& data, std::streamoff offset) {
+		r.push();
+		auto entries = getOffsetEntries(r, offset);
+		setPtrFromEntries(entries, r, data);
+		r.pop();
+	}
 	virtual void setFromRaw(const RawDataType& raw, BinaryReader& r) {
 		CC_UNUSED(r);
 		setFromRaw(raw);
 	}
 	virtual void setFromRaw(const RawDataType& raw) = 0;
 private:
-	template<typename F> static void setRefEntries(const std::vector<uint32_t>& entries, BinaryReader& r, cocos2d::Vector<F*>& data) {
-		data.clear();
-		data.reserve(entries.size());
-		RawDataType temp;
-		std::vector<RawDataType> ret(entries.size());
-		for (size_t i = 0; i < entries.size(); i++) {
-			r.seek(entries[i]);
-			r.read(temp);
-			F* obj = new F;
-			GM_ReaderHelper<T>* toSet = dynamic_cast<GM_ReaderHelper<T>*>(obj);
-			toSet->setFromRaw(temp, r);
-			data.pushBack(obj);
-		}
-	}
 	template<typename F> static void setFromEntries(const std::vector<uint32_t>& entries, BinaryReader& r, std::vector<F>& data) {
 		data.resize(entries.size());
 		RawDataType temp;
@@ -216,6 +204,20 @@ private:
 			r.read(temp);
 			GM_ReaderHelper<T>* toSet = dynamic_cast<GM_ReaderHelper<T>*>(&data[i]);
 			toSet->setFromRaw(temp, r);
+			
+		}
+	}
+	template<typename F> static void setPtrFromEntries(const std::vector<uint32_t>& entries, BinaryReader& r, std::vector<F*>& data) {
+		data.resize(entries.size());
+		RawDataType temp;
+		std::vector<RawDataType> ret(entries.size());
+		for (size_t i = 0; i < entries.size(); i++) {
+			r.seek(entries[i]);
+			r.read(temp);
+			F* obj = new F;
+			GM_ReaderHelper<T>* toSet = dynamic_cast<GM_ReaderHelper<T>*>(obj);
+			toSet->setFromRaw(temp, r);
+			data[i] = obj;
 		}
 	}
 };
@@ -344,28 +346,6 @@ public:
 };
 class RoomData : public GM_ReaderHelper<RawRoom> {
 public:
-	void setFromRaw(const RawDataType& raw) override {
-		throw std::exception("Do not use");
-	}
-	void setFromRaw(const RawDataType& raw, BinaryReader& r) override {
-		roomName = r.readStringAtOffset(raw.nameOffset);
-		caption = r.readStringAtOffset(raw.captionOffset);
-		size.setSize(raw.width, raw.height);
-		speed = raw.speed;
-		persistent = raw.persistent != 0 ? true : false;
-		colour.set(raw.colour & 0xFF, (raw.colour >> 8) & 0xFF, (raw.colour >> 16) & 0xFF, (raw.colour >> 24) & 0xFF);
-		showColour = raw.show_colour!=0 ? true : false;
-		if (raw.codeOffset != -1)
-			codeFile = r.readStringAtOffset(raw.codeOffset - 8); // Name, size, data
-		else
-			codeFile = istring();
-		RoomBackgrounds::setArrayFromOffset(r, backrounds, raw.backgroundsOffset);
-		RoomInstance::setArrayFromOffset(r, objects, raw.instancesOffset);
-		RoomViews::setArrayFromOffset(r, views, raw.viewsOffset);
-		RoomTile::setArrayFromOffset(r, tiles, raw.tilesOffset);
-
-
-	}
 	istring roomName;
 	istring caption;
 	cocos2d::Size size;
@@ -381,5 +361,31 @@ public:
 	std::vector<RoomInstance> objects;
 	std::vector<RoomViews> views;
 	std::vector<RoomTile> tiles;
-	
+	void setFromRaw(const RawDataType& raw) override {
+		throw std::exception("Do not use");
+	}
+	void setFromRaw(const RawDataType& raw, BinaryReader& r) override {
+		roomName = r.readStringAtOffset(raw.nameOffset);
+		caption = r.readStringAtOffset(raw.captionOffset);
+		size.setSize(raw.width, raw.height);
+		speed = raw.speed;
+		persistent = raw.persistent != 0 ? true : false;
+		colour.set(raw.colour & 0xFF, (raw.colour >> 8) & 0xFF, (raw.colour >> 16) & 0xFF, (raw.colour >> 24) & 0xFF);
+		showColour = raw.show_colour != 0 ? true : false;
+		if (raw.codeOffset != -1)
+			codeFile = r.readStringAtOffset(raw.codeOffset - 8); // Name, size, data
+		else
+			codeFile = istring();
+		RoomBackgrounds::setArrayFromOffset(r, backrounds, raw.backgroundsOffset);
+		RoomInstance::setArrayFromOffset(r, objects, raw.instancesOffset);
+		RoomViews::setArrayFromOffset(r, views, raw.viewsOffset);
+		RoomTile::setArrayFromOffset(r, tiles, raw.tilesOffset);
+		// we have to fix the x,y positions as the cordinate system is diffrent
+		// doing it here as I was going CRAZY in the Room creator
+		for (auto& bgn : backrounds) bgn.pos.y = std::floorf(size.height - bgn.pos.y);
+		for (auto& bgn : objects) bgn.pos.y = std::floorf(size.height - bgn.pos.y);
+		for (auto& bgn : views) bgn.view.origin.y = std::floorf(size.height - bgn.view.origin.y);
+		for (auto& bgn : tiles) bgn.rect.origin.y = std::floorf(size.height - bgn.rect.origin.y);
+	}
+
 };

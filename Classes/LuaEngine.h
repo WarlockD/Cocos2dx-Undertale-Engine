@@ -45,6 +45,9 @@ public:
 	inline bool operator<(const istring& str) const { return  hash() < str.hash(); }
 
 	bool isEmpty() const; // hackery, but true since _internal is never null, or shouldn't be?
+
+	// some simple conversions to save me some time
+	operator std::string() const { return std::string(begin(),end()); }
 };
 
 // hash function for istring
