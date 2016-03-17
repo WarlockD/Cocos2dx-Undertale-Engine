@@ -9,7 +9,6 @@ namespace Undertale {
 		int con;
 		cocos2d::DrawNode *blaster[3];
 		cocos2d::Vec2 ideal;
-		cocos2d::Vec2 _startPosition;
 		int alarm;
 		int p_beam;
 		int idealrot;

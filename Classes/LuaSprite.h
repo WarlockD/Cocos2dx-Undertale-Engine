@@ -241,7 +241,7 @@ public:
 protected:
 	void update(float dt) override; 
 	// functions for using this sprite like a bullet
-	inline virtual void setupBullet(cocos2d::Vec2 pos) { setVisible(true); setPosition(pos); unscheduleUpdate(); } // set's the position of the sprite and makes it invisiable
+	inline virtual void setupBullet(cocos2d::Vec2 pos) { setVisible(false); setPosition(pos); unscheduleUpdate(); } // set's the position of the sprite and makes it invisiable
 	inline virtual void fireBullet() { scheduleUpdate();  setVisible(true); }
 	inline virtual bool stepBullet(float dt) { return false;  } // this step is run at the start of update, on true return, update dosn't run this frame.
 	inline virtual void stopBullet() { setVisible(true);  unscheduleUpdate(); }

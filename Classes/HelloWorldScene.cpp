@@ -98,7 +98,10 @@ bool HelloWorld::init()
 	room->setPosition(deadCenter);
 	addChild(room,0);
 
-
+	auto gaster = Undertale::obj_gasterblaster::create();
+	addChild(gaster, 1000);
+	gaster->setupBullet(deadCenter);
+	
 
 
 	//setCameraMask((uint16_t)CameraFlag::USER2);  //this is the layer, when adding camera to it, all its children will be affect only when you set the second parameter to true
@@ -106,7 +109,14 @@ bool HelloWorld::init()
 	//chara->setPosition(deadCenter);
 //	addChild(chara);
 	//room->setChara(chara);
-
+	gaster->fireBullet();
+	auto mouseListener = EventListenerMouse::create();
+	mouseListener->onMouseDown = [this, gaster](EventMouse* event) {
+		auto pos = event->getLocationInView();
+		gaster->setupBullet(pos);
+		gaster->fireBullet();
+	};
+	getEventDispatcher()->addEventListenerWithSceneGraphPriority(mouseListener, this);
 
 	auto keyboardListener = EventListenerKeyboard::create();
 	keyboardListener->onKeyPressed = [this,room](EventKeyboard::KeyCode key, Event* event) {
@@ -263,6 +273,7 @@ bool HelloWorld::init()
 
 	//mus_zz_megalovania.ogg
 #endif
+	
 	return true;
 }
 
