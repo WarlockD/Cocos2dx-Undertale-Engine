@@ -9,13 +9,66 @@ inline float lengthdir_x(float len, float dir) {
 	return std::cosf(CC_DEGREES_TO_RADIANS(dir)) * len;
 }
 inline float lengthdir_y(float len, float dir) {
-	return -std::sinf(CC_DEGREES_TO_RADIANS(dir)) * len;
+	return (-std::sinf(CC_DEGREES_TO_RADIANS(dir))) * len;
 }
 inline cocos2d::Vec2 CreateMovementVector(float direction, float speed) {
 	float x = std::cosf(CC_DEGREES_TO_RADIANS(direction)) * speed;
 	float y = std::sinf(CC_DEGREES_TO_RADIANS(direction)) * speed;
 	return cocos2d::Vec2(x, y);
 }
+// http://discuss.cocos2d-x.org/t/rotate-sprite-towards-a-point/16850/2
+// useful functions
+inline float getAngleDifference(float angle1, float angle2)
+{
+	float diffAngle = (angle1 - angle2);
+
+	if (diffAngle >= 180.f)
+	{
+		diffAngle -= 360.f;
+	}
+	else if (diffAngle < -180.f)
+	{
+		diffAngle += 360.f;
+	}
+
+	// how much angle the node needs to rotate
+	return diffAngle;
+}
+inline float getCurrentAngle(cocos2d::Node* node)
+{
+	float rotAng = node->getRotation();
+
+	if (rotAng >= 180.f)
+	{
+		rotAng -= 360.f;
+	}
+	else if (rotAng < -180.f)
+	{
+		rotAng += 360.f;
+	}
+
+	// negative angle means node is facing to its left
+	// positive angle means node is facing to its right
+	return rotAng;
+}
+inline float getAngleOfTwoVectors(cocos2d::Point vec1, cocos2d::Point vec2)
+{
+	auto vectorFromVec1ToVec2 = vec2 - vec1;
+	// the angle between two vectors
+	return CC_RADIANS_TO_DEGREES(-vectorFromVec1ToVec2.getAngle());
+}
+inline void rotateNodeToPoint(cocos2d::Node* node, cocos2d::Point point)
+{
+	float angleNodeToRotateTo = getAngleOfTwoVectors(node->getPosition(), point);
+	float nodeCurrentAngle = getCurrentAngle(node);
+
+	float diffAngle = getAngleDifference(angleNodeToRotateTo, nodeCurrentAngle);
+
+	float rotation = nodeCurrentAngle + diffAngle;
+
+	node->setRotation(rotation);
+}
+
 class TimedAction : public cocos2d::Action {
 protected:
 	bool _runForever;
@@ -199,7 +252,7 @@ public:
 
 class LuaSprite : public cocos2d::Sprite {
 protected:
-	cocos2d::Vector<cocos2d::SpriteFrame*> _frames;
+	const cocos2d::Vector<cocos2d::SpriteFrame*>* _frames;
 	istring _spriteName;
 	uint32_t _image_index = 0;
 	size_t _frameCount = 0;
@@ -228,7 +281,7 @@ public:
 	static LuaSprite* create(uint32_t index);
 	void setSpriteName(istring name);
 	istring getSpriteName() const { return _spriteName;  }
-	inline void setImageIndex(uint32_t index) { if(index < _frameCount) setSpriteFrame(_frames.at(_image_index = index)); }
+	inline void setImageIndex(uint32_t index) { if(index < _frameCount) setSpriteFrame(_frames->at(_image_index = index)); }
 	inline uint32_t getImageIndex() const { return _image_index;  }
 	inline void setZeroMovement() { _speed = _direction = 0; setMovementVector(); }
 	inline void setSpeed(int value) { _speed = value; setMovementVector(); }

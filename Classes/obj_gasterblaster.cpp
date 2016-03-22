@@ -4,11 +4,11 @@
 USING_NS_CC;
 
 namespace Undertale {
-	obj_gasterblaster::obj_gasterblaster() : LuaSprite() {
+	obj_gasterblaster::obj_gasterblaster() : Node() {
 		con = 1;
 		ideal = Vec2(200, 200);
 		idealrot = 90;
-
+		_image_index = 0;
 		skip = 1;
 		pause = 8;
 		col_o = 0;
@@ -20,17 +20,32 @@ namespace Undertale {
 		bbsiner = 0;
 		innate_karma = 10;
 		for (int i = 0; i < 3; i++) {
+			blaster[i] = nullptr;
+		}
+		_gasterSpriteFrames = nullptr;
+		_gasterSprite = nullptr;
+		_runAwayAction = nullptr;
+	}
+	bool obj_gasterblaster::init()  {
+		if (!Node::init()) return false;
+		UndertaleResources* res = UndertaleResources::getInstance();
+		_gasterSpriteFrames = res->getSpriteFrames("spr_gasterblaster");
+		_gasterSprite = Sprite::createWithSpriteFrame(_gasterSpriteFrames->at(0));
+		_image_index = 0;
+		addChild(_gasterSprite, 10);
+		for (int i = 0; i < 3; i++) {
 			blaster[i] = DrawNode::create();
 			addChild(blaster[i], -1);
 		}
-
+		return true;
+		
 	}
 	obj_gasterblaster* obj_gasterblaster::create(float x, float y) { return create(Vec2(x, y)); }
 
 	obj_gasterblaster * obj_gasterblaster::create(Vec2 pos)
 	{
 		obj_gasterblaster* obj = new obj_gasterblaster();
-		if (obj && obj->init("spr_gasterblaster")) {
+		if (obj && obj->init()) {
 			obj->autorelease();
 			obj->setScale(1, 1);
 			obj->setPosition(pos);
@@ -39,18 +54,19 @@ namespace Undertale {
 		return nullptr;
 	}
 
-	void obj_gasterblaster::setupBullet(Vec2 pos)
+	void obj_gasterblaster::fireBullet(Vec2 pos,float angle)
 	{
-		LuaSprite::setupBullet(getPosition());
+		_gasterSprite->setSpriteFrame(_gasterSpriteFrames->at(0));
+		_image_index = 0;
+		idealrot = angle+-90.0f; // the sprite is on its side
 		ideal = pos;
 		con = 1;
-		idealrot = 90;
 		skip = 1;
 		pause = 8;
 		col_o = 0;
 		bt = 0;
 		btimer = 0;
-		fade = 1;
+		fade = 1.0f;
 		terminal = 10;
 		bb = 0;
 		bbsiner = 0;
@@ -59,11 +75,10 @@ namespace Undertale {
 		for (int i = 0; i < 3; i++) blaster[i]->clear();
 	}
 
-	bool obj_gasterblaster::stepBullet(float dt)
+	void obj_gasterblaster::update(float dt)
 	{
-		if (alarm > 0) { alarm--; return true; }
+		if (alarm > 0) { alarm--;  }
 		else if (alarm == 0) { con++; alarm = -1; }
-
 
 		if (con == 1 && skip == 0) {
 			Vec2 pos = this->getPosition();
@@ -116,11 +131,13 @@ namespace Undertale {
 			con = 6;
 			alarm = 4;
 		}
-		if (con == 6) setImageIndex(getImageIndex() + 1);
+		if (con == 6) _gasterSprite->setSpriteFrame(_gasterSpriteFrames->at(++_image_index));
 		if (con == 7) {
-			if (getImageIndex() == 4)  setImageIndex(5);
-			else if (getImageIndex() == 5) setImageIndex(4);
-			//setDirection(idealrot + 90);
+			if(_image_index == 4) _gasterSprite->setSpriteFrame(_gasterSpriteFrames->at(++_image_index));
+			else if(_image_index==5) _gasterSprite->setSpriteFrame(_gasterSpriteFrames->at(--_image_index));
+			_runAwayAction = MovementAction::create(0, -idealrot + 90); //	setDirection(idealrot + 90);
+			this->runAction(_runAwayAction);
+		
 			//   if( btimer == 0 ) with(obj_sansb) p_beam = 1;
 			if (btimer == 0 && getScaleX() >= 2) {
 				//sh = instance_create("obj_sans_shaker", 0, 0);
@@ -128,17 +145,25 @@ namespace Undertale {
 			}
 			btimer++;
 			if (btimer < 5) {
-				setSpeed(getSpeed() + 1);
+				_runAwayAction->setSpeed(_runAwayAction->getSpeed() + 1);
 				bt = bt + std::floorf((35 * getScaleX()) / 4.0f);
 			}
-			else setSpeed(getSpeed() + 4);
+			else _runAwayAction->setSpeed(_runAwayAction->getSpeed() + 4);
+			Color4F beamColor(1.0f, 1.0f, 1.0f, 1.0f);
 
 			if (btimer > (5 + terminal)) {
 				bt *= 0.8f;
 				fade -= 0.1f;
-				int nfade = (int)(fade / 1.0f * 256);
-				setOpacity(nfade);
-				if (bt <= 2) con = 8;// void instance_destroy();
+				beamColor.a = fade;
+			//	beamFade = (int)(fade / 1.0f * 256);
+				//setOpacity(nfade);
+				if (bt <= 2) {
+				//	unscheduleUpdate();
+					for (auto a : blaster) a->clear(); // we want to clear this before we remove
+					this->runAction(new RemoveSelf());
+					//removeFromParent();//   con = 8;// void instance_destroy();
+					return;
+				}
 			}
 			Vec2 pos = getPosition();
 			float angle = getRotation();
@@ -152,39 +177,45 @@ namespace Undertale {
 			if (rect.origin.y < -rect.size.height) setSpeed(0);
 			if (rect.origin.y > (room.size.height + rect.size.height)) setSpeed(0);
 #endif
+			Size spriteSize = _gasterSprite->getContentSize();
+			Size visibleSize = Director::getInstance()->getVisibleSize();
+			Vec2 worldPos = _gasterSprite->convertToWorldSpace(pos);
+			// stop it moving when it gets off screen
+			if (worldPos.x < -spriteSize.width) _runAwayAction->setSpeed(0);
+			if (worldPos.x >(visibleSize.width + spriteSize.width))  _runAwayAction->setSpeed(0);
+			if (worldPos.y > (visibleSize.height + spriteSize.height)) _runAwayAction->setSpeed(0);
+			if (worldPos.y < -spriteSize.height)  _runAwayAction->setSpeed(0);
 			// lets fire the laser!
 			// make lasers visiable
 			bbsiner = bbsiner + 1;
 			float bb = (std::sinf(bbsiner / 1.5) * bt) / 4.0f;
-			float xx = lengthdir_x(70, (angle - 90)) * (xscale / 2.0f);
-			float yy = lengthdir_y(70, (angle - 90)) * (xscale / 2.0f);
 			float rr = random(0.0f, 2.0f) - random(0.0f, 2.0f);
 			float rr2 = random(0.0f, 2.0f) - random(0.0f, 2.0f);
-			float xxx = lengthdir_x(1000, (angle - 90));
-			float yyy = lengthdir_y(1000, (angle - 90));
-			Vec2 from(pos.x + xx + rr, pos.y + yy + rr2);
+			Vec2 offset = CreateMovementVector((angle - 90), 70)* (xscale / 2.0f);
+			Vec2 target = CreateMovementVector((angle - 90), 1000);
+			target += Vec2(rr, rr2);
+			offset += Vec2(rr, rr2);
 			blaster[0]->clear();
-			blaster[0]->setLineWidth(bt + bb);
 			blaster[0]->setRotation(getRotation());
 			blaster[0]->setVisible(true);
-			blaster[0]->drawLine(from, Vec2(pos.x + xxx + rr, pos.y + yyy + rr2), Color4F::WHITE);
-
+			blaster[0]->drawSegment(offset, target, (bt + bb)/2,beamColor);
+			Vec2 upperLine = CreateMovementVector(angle - 90, 50) * (xscale / 2.0f);
+			Vec2 bottomLine = CreateMovementVector(angle - 90, 60) * (xscale / 2.0f);
+			upperLine += Vec2(rr, rr2);
+			bottomLine += Vec2(rr, rr2);
 			float xxa = lengthdir_x(50, (angle - 90)) * (xscale / 2.0f);
 			float yya = lengthdir_y(50, (angle - 90)) * (xscale / 2.0f);
 			float xxb = lengthdir_x(60, (angle - 90)) * (xscale / 2.0f);
 			float yyb = lengthdir_y(60, (angle - 90)) * (xscale / 2.0f);
 
 			blaster[1]->clear();
-			blaster[1]->setLineWidth((bt / 2) + bb);
 			blaster[1]->setRotation(getRotation());
 			blaster[1]->setVisible(true);
-			blaster[1]->drawLine(from, Vec2(pos.x + xxa + rr, pos.y + yya + yy + rr2), Color4F::WHITE);
-
+			blaster[1]->drawSegment(offset, upperLine, ((bt / 2) + bb)/2, beamColor);
 			blaster[2]->clear();
-			blaster[2]->setLineWidth((bt / 1.25) + bb);
 			blaster[2]->setRotation(getRotation());
 			blaster[2]->setVisible(true);
-			blaster[2]->drawLine(from, Vec2(pos.x + xxb + rr, pos.y + yyb + yy + rr2), Color4F::WHITE);
+			blaster[2]->drawSegment(offset, bottomLine, ((bt / 1.25) + bb)/2, beamColor);
 
 			float nx_factor = lengthdir_x(1, angle);
 			float ny_factor = lengthdir_y(1, angle);
@@ -205,7 +236,6 @@ namespace Undertale {
 			if (col_o == 0) col_o = 1;
 #endif
 		}
-		return false;
 	}
 	
 }

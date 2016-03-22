@@ -98,9 +98,8 @@ bool HelloWorld::init()
 	room->setPosition(deadCenter);
 	addChild(room,0);
 
-	auto gaster = Undertale::obj_gasterblaster::create();
-	addChild(gaster, 1000);
-	gaster->setupBullet(deadCenter);
+
+
 	
 
 
@@ -109,12 +108,25 @@ bool HelloWorld::init()
 	//chara->setPosition(deadCenter);
 //	addChild(chara);
 	//room->setChara(chara);
-	gaster->fireBullet();
 	auto mouseListener = EventListenerMouse::create();
-	mouseListener->onMouseDown = [this, gaster](EventMouse* event) {
-		auto pos = event->getLocationInView();
-		gaster->setupBullet(pos);
-		gaster->fireBullet();
+	mouseListener->onMouseDown = [this, deadCenter](EventMouse* event) {
+		Vec2 pos = event->getLocationInView();
+		CCLOG("Click Pos %f, %f ", pos.x, pos.y);
+		auto gaster = Undertale::obj_gasterblaster::create();
+		addChild(gaster, 1000);
+		float rr = random(0.0f, 2.0f) - random(0.0f, 2.0f);
+		Vec2 randomStart(500 * rr, 500 * rr);
+		if (random(0, 1) == 0) gaster->setSkip(true);
+		if (random(0, 1) == 0) gaster->setScaleY(2.0f);
+		gaster->setPosition(randomStart);
+		auto vectorFromVec1ToVec2 =  deadCenter-pos;
+		// the angle between two vectors
+		float angle = CC_RADIANS_TO_DEGREES(-vectorFromVec1ToVec2.getAngle());
+		gaster->setRotation(getAngleDifference(angle, 180+ random(-90, 90)));
+		CCLOG("gaster Pos %f, %f angle: %f", randomStart.x, randomStart.y,angle);
+		gaster->fireBullet(pos, angle);
+	//	gaster->setScale(2.0f);
+		gaster->scheduleUpdate();
 	};
 	getEventDispatcher()->addEventListenerWithSceneGraphPriority(mouseListener, this);
 

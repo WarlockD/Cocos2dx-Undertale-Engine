@@ -110,10 +110,10 @@ namespace Undertale{
 	//	scheduleUpdate();
 		_currentlyMoving = CharaDirection::NOTMOVING;
 		_currentlyFacing = CharaDirection::DOWN;
-		_facingAnimation[(int)CharaDirection::DOWN] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharad"), 0.25, -1);
-		_facingAnimation[(int)CharaDirection::RIGHT] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharar"), 0.25, -1);
-		_facingAnimation[(int)CharaDirection::UP] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharau"), 0.25, -1);
-		_facingAnimation[(int)CharaDirection::LEFT] = Animation::createWithSpriteFrames(res->getSpriteFrames("spr_maincharal"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::DOWN] = Animation::createWithSpriteFrames(*res->getSpriteFrames("spr_maincharad"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::RIGHT] = Animation::createWithSpriteFrames(*res->getSpriteFrames("spr_maincharar"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::UP] = Animation::createWithSpriteFrames(*res->getSpriteFrames("spr_maincharau"), 0.25, -1);
+		_facingAnimation[(int)CharaDirection::LEFT] = Animation::createWithSpriteFrames(*res->getSpriteFrames("spr_maincharal"), 0.25, -1);
 		for (int i = 0; i < 4; i++) _facingAnimation[i]->retain();
 
 		//moveMe->setScale(2.0f);

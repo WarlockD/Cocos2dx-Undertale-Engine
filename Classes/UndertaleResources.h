@@ -105,11 +105,11 @@ public:
 		return cocos2d::Sprite::createWithSpriteFrame(getSpriteFrame(_spriteFrameIndex.at(index), frame));
 	}
 	istring getSpriteIndexToName(uint32_t index) const { return _spriteFrameIndex[index]; }
-	const cocos2d::Vector<cocos2d::SpriteFrame*>& getSpriteFrames(istring name) const  { return _spriteFrameLookup.at(name); }
+	const cocos2d::Vector<cocos2d::SpriteFrame*>* getSpriteFrames(istring name) const  { return &_spriteFrameLookup.at(name); }
 
 	cocos2d::SpriteFrame* getSpriteFrame(size_t index, size_t frame) const { return _spriteFrameLookup.at(getSpriteIndexToName(index)).at(frame); }
 
-	const cocos2d::Vector<cocos2d::SpriteFrame*>& const getSpriteFrames(size_t index)  const { return _spriteFrameLookup.at(getSpriteIndexToName(index)); }
+	const cocos2d::Vector<cocos2d::SpriteFrame*>* const getSpriteFrames(size_t index)  const { return &_spriteFrameLookup.at(getSpriteIndexToName(index)); }
 	static UndertaleResources* getInstance();
 };
 

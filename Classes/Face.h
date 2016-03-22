@@ -19,7 +19,7 @@ namespace Undertale {
 	/// Face mechanics.  Blink etc
 	class Face : public LuaSprite {
 	protected:
-		cocos2d::Vector<cocos2d::SpriteFrame*> _faceEmotionFrames[10];
+		const cocos2d::Vector<cocos2d::SpriteFrame*>* _faceEmotionFrames[10];
 		int _faceEmotion;
 		UndertaleFaces _currentFace;
 		Face();
