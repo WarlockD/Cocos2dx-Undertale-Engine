@@ -6,6 +6,17 @@
 static UndertaleLib::UndertaleFile* _file = nullptr;
 static Undertale* _singleton = nullptr;
 
+
+Vec2 FixUndertalePosition(const Vec2& pos, const Size& size) {
+	Vec2 npos(pos.x + size.width / 2, pos.y + size.height / 2);
+	return npos;
+}
+Vec2 FixUndertalePosition(Node* node) {
+	Vec2 npos = FixUndertalePosition(node->getPosition(), node->getContentSize());
+	node->setPosition(npos);
+	return npos;
+}
+
 bool Undertale::loadDataWin(const std::string& filename) {
 	if (!_file) {
 		_file = new UndertaleLib::UndertaleFile;
@@ -112,6 +123,7 @@ public:
 		if (texture == nullptr) return nullptr;
 		UndertaleFont* font = new UndertaleFont(ufont);
 		font->_configuration = std::move(ufont);
+
 		font->autorelease();
 		return font;
 	}
@@ -141,12 +153,13 @@ FontAtlas* UndertaleFont::createFontAtlas() {
 	Rect frameRect(frame.x, frame.y, frame.width, frame.height);
 	frameRect = CC_RECT_PIXELS_TO_POINTS(frameRect);
 	for (auto& f : _configuration.glyphs()) {
+		char c = f.ch;
 		FontLetterDefinition def;
 		Rect tempRect(f.x, f.y, f.width, f.height);
 		tempRect = CC_RECT_PIXELS_TO_POINTS(tempRect);
-
+	//	assert(f.ch != 'r' && f.ch != 'o');
 		//def.offsetX = f.offset;
-		def.offsetX = 0;
+	    def.offsetX = f.offset;
 		def.offsetY = 0;
 		def.U = tempRect.origin.x + frameRect.origin.x;
 		def.V = tempRect.origin.y + frameRect.origin.y;
@@ -155,6 +168,7 @@ FontAtlas* UndertaleFont::createFontAtlas() {
 		def.textureID = 0;
 		def.validDefinition = true;
 		def.xAdvance = f.shift;
+		
 		// add the new definition
 		if (65535 < f.ch) {
 			CCLOGWARN("Warning: 65535 < fontDef.charID (%u), ignored", f.ch);
@@ -251,7 +265,7 @@ UndertaleLabel::UndertaleLabel() : _shake(0.0f), _direction(0.0f), _speed(0.0f),
 
 bool UndertaleLabel::init()  {
 	if (Label::init()) {
-		setAnchorPoint(Vec2(0.0f, 1.0f));
+		//setAnchorPoint(Vec2(0.0f, 1.0f));
 		return true;
 	}
 	return false;
@@ -271,6 +285,7 @@ UndertaleLabel* UndertaleLabel::create(size_t font_index) {
 void UndertaleLabel::setUndertaleFont(size_t font_index) {
 	_currentLabelType = LabelType::CHARMAP;
 	setFontAtlas(Undertale::getSingleton()->LookupFontAtlas(font_index));
+	setLineSpacing(4);
 }
 
 void UndertaleLabel::updateColor()
@@ -313,6 +328,7 @@ void UndertaleLabel::updateColor()
 
 }
 void UndertaleLabel::update(float delta)  {
+	if ((int)_shake == 0) return;
 	cocos2d::TextureAtlas* textureAtlas;
 	V3F_C4B_T2F_Quad *quads;
 	if (_shake > 38) {
@@ -430,145 +446,12 @@ cocos2d::SpriteFrame* Undertale::createSpriteFrame(const UndertaleLib::SpriteFra
 	if (frame.valid()) {
 		auto texture = Undertale::getSingleton()->LookupTexture(frame.texture_index);
 		SpriteFrame* cframe = SpriteFrame::createWithTexture(texture, Rect(frame.x, frame.y, frame.width, frame.height), false, Vec2(frame.offset_x, frame.offset_y), Size(frame.original_width, frame.original_height));
-		cframe->setAnchorPoint(Vec2(0.0f, 1.0f));
 		return cframe;
 	}
 	return nullptr;
 }
 
 
-
-USprite::~USprite() {
-	CC_SAFE_RELEASE_NULL(_animationAction);
-}
-void USprite::setUndertaleSprite(size_t sprite_index) {
-	return setUndertaleSprite(_file->LookupSprite(sprite_index));
-}
-
-void USprite::setUndertaleSprite(const UndertaleLib::Sprite& sprite) {
-	if (sprite.valid() && _sprite.index() != sprite.index()) {
-		auto res = Undertale::getSingleton();
-		if (_animationAction != nullptr) {
-			stopAction(_animationAction); _animationAction = nullptr;
-		}
-		_frames.clear();
-		_sprite = sprite;
-		setContentSize(Size(sprite.width(), sprite.height()));
-	//	Vec2 anchor_point((float)sprite.origin_x() / (float)sprite.width(), (float)sprite.origin_y() / (float)sprite.height());
-		Vec2 anchor_point(0.0f, 1.0f);
-	///	anchor_point.y = 1.0 - anchor_point.y;
-		this->setAnchorPoint(anchor_point);
-		for (auto& f : sprite.frames()) {
-			if (f.valid()) _frames.pushBack(res->createSpriteFrame(f));
-		}
-		_image_index = 0;
-		setSpriteFrame(_frames.at(0));
-	}
-}
-
-
-USprite* USprite::create(const UndertaleLib::Sprite& sprite) {
-	USprite* usprite = new USprite;
-	if (sprite.valid() && usprite && usprite->init()) {
-		usprite->setUndertaleSprite(sprite);
-		usprite->autorelease();
-		return usprite;
-	}
-	CC_SAFE_DELETE(usprite);
-	return nullptr;
-}
-
-USprite* USprite::create(size_t sprite_index) {
-	return create(_file->LookupSprite(sprite_index));
-}
-USprite* USprite::create(const std::string& name) { return create(_file->LookupByName<UndertaleLib::Sprite>(name.c_str())); }
-
-void USprite::setImageIndex(size_t index) {
-	index %= _frames.size();
-	if (_image_index != index) setSpriteFrame(_frames.at(_image_index));
-}
-void USprite::startAnimation() {
-	if (_animationAction != nullptr) 
-		_animateAction->getAnimation()->setDelayPerUnit(_speed * (1.0f / 30.0f));
-	else {
-		_animateAction = Animate::create(Animation::createWithSpriteFrames(_frames, _speed * (1.0f / 30.0f)));
-		_animationAction = RepeatForever::create(_animateAction);
-		runAction(_animationAction);
-	}
-}
-void USprite::stopAnimation() {
-	if (_animationAction != nullptr) {
-		stopAction(_animationAction);
-		_animationAction = nullptr;
-		_animateAction = nullptr;
-	}
-}
-void USprite::setImageSpeed(float speed) {
-	_speed = speed;
-	if (_speed == 0.0f) stopAnimation();
-	else startAnimation();
-}
-void URoom::setUndertaleRoom(size_t room_index) {
-	setUndertaleRoom(_file->LookupRoom(room_index));
-}
-void UObject::setUndertaleObject(size_t object_index) {
-	setUndertaleObject(_file->LookupObject(object_index));
-}
-void UObject::setUndertaleObject(const std::string& name) {
-	setUndertaleObject(_file->LookupByName<UndertaleLib::Object>(name.c_str()));
-}
-UndertaleLib::Object UObject::getUndertaleParentObject() const {
-	if (_object.parent_index() >= 0)
-		return _file->LookupObject(_object.parent_index());
-	else
-		return UndertaleLib::Object();
-}
-
-
-void UObject::setUndertaleObject(const UndertaleLib::Object& object) {
-	if (object.valid() && _object.index() != object.index()) {
-		_object = object;
-		auto parent = getUndertaleParentObject();
-		_sprite = nullptr;
-		_body = nullptr;
-		setAnchorPoint(Vec2(0.0, 1.0));
-		removeAllChildrenWithCleanup(true);
-		if (object.sprite_index() > -1) {
-			addChild(_sprite=USprite::create(object.sprite_index()));
-			//_sprite->setVisible(object.visible());
-			_sprite->setAnchorPoint(Vec2(0.0, 1.0));
-			setContentSize(_sprite->getContentSize());
-		}
-		if (object.solid() || (parent.valid() && parent.solid())) {
-			// we have collision with this thing
-			_body = PhysicsBody::createEdgeBox(getContentSize());
-			_body->setDynamic(false);
-			setPhysicsBody(_body);
-		}
-		setLocalZOrder(object.depth());
-		setName(object.name().c_str());
-		setTag(object.index());
-	}
-}
-UObject* UObject::create(const UndertaleLib::Object& object) {
-	if (object.valid()) {
-		UObject* obj = new UObject;
-		if (obj && obj->init()) {
-			obj->setUndertaleObject(object);
-			obj->autorelease();
-			return obj;
-		}
-		CC_SAFE_DELETE(obj);
-	}
-
-	return nullptr;
-}
-UObject* UObject::create(size_t object_index) {
-	return create(_file->LookupObject(object_index));
-}
-UObject* UObject::create(const std::string& name) {
-	return create(_file->LookupByName<UndertaleLib::Object>(name.c_str()));
-}
 class BackgroundCache {
 	Map<size_t, SpriteFrame*> _backgrounds;
 	std::unordered_map<UndertaleLib::String, SpriteFrame*> _backgroundText;
@@ -594,46 +477,168 @@ static Sprite* CreateTile(BackgroundCache& cache,  const UndertaleLib::Room::Til
 	Rect tileRect(Vec2(t.offset_x+f.x,t.offset_y+f.y), Size(t.width, t.height));
 	auto sprite = Sprite::createWithTexture(texture, tileRect);
 
-	sprite->setAnchorPoint(Vec2(0.0f, 1.0f));
+	//sprite->setAnchorPoint(Vec2(0.0f, 1.0f));
 	sprite->setScale(t.scale_x, t.scale_y);
 	assert(t.blend==-1);
 	return sprite;
 }
+bool compare_nocase(const std::string& first, const std::string& second)
+{
+	unsigned int i = 0;
+	while ((i<first.length()) && (i<second.length()))
+	{
+		if (tolower(first[i])<tolower(second[i])) return true;
+		else if (tolower(first[i])>tolower(second[i])) return false;
+		++i;
+	}
+	return (first.length() < second.length());
+}
+UObject* URoom::instance_exists(size_t object_index) const {
+		auto it = std::find_if(_objects.cbegin(), _objects.cend(), [object_index](const UObject* o) { return o->is(object_index); });
+		return it == _objects.cend() ? nullptr : (*it);
+}
+
+
+UObject* CreateInstance(size_t object_index);
+
+
+UObject* URoom::instance_create(float x, float y, size_t object_index) {
+	UObject* obj = CreateInstance(object_index);
+
+	CCLOG("\tCreating Instance: (%i)%s", obj->getUndertaleObject().index(), obj->getUndertaleObject().name().c_str());
+	addUObject(obj);
+
+	obj->setAnchorPoint(Vec2(0.0f, 1.0f));
+	obj->setPosition(x, getContentSize().height - y);
+	return obj;
+
+}
+
+
+void URoom::instance_destroy(size_t object_index) {
+	auto it = _objects.begin();
+	while (it != _objects.end()) {
+		UObject* obj = (*it);
+		if (obj->is(object_index)) {
+			_objectLayer->removeChild(obj);
+			it = _objects.erase(it);
+		}
+		else it++;
+	}
+}
+#include "obj_dialoguer.h"
+
 void URoom::setUndertaleRoom(const UndertaleLib::Room& room) {
 	if (room.valid() && room.index() != _room.index()) {
+		//setAnchorPoint(Vec2(0.0f, 1.0f));
 		_objects.clear();
 		removeAllChildrenWithCleanup(true);
 		CCLOG("Loading Room: (%i)%s", room.index(), room.name().c_str());
 		Size roomSize(room.width(), room.height());
 		setContentSize(roomSize);
 		_room = room;
-		_tileLayer = Layer::create();
+#if _DEBUG
+		// draw the hard box around this room
+		{
+			auto box = DrawNode::create();
+			box->drawRect(Vec2(0.0f, 0.0f), this->getContentSize(), Color4F::WHITE);
+			box->setPosition(0.0f, 0.0f);
+			addChild(box, -100);
+		}
+
+#endif
+		
+
+		addChild(_tileLayer = Layer::create(),-1);
+		_tileLayer->setAnchorPoint(Vec2(0.0f, 1.0f));
 		BackgroundCache cache;
 		for (auto& t : _room.tiles()) {
 			auto sprite = CreateTile(cache,  t);
+			Vec2 objpos(t.x, roomSize.height - t.y);
+			sprite->setAnchorPoint(Vec2(0.0f, 1.0f));
 			sprite->setPosition(t.x, roomSize.height - t.y);
 			_tileLayer->addChild(sprite, t.depth);
-		}
-		addChild(_tileLayer);
-		_objectLayer = Layer::create();
+			}
 
+		addChild(_objectLayer = Layer::create(),0);
 		for (auto& o : _room.objects()) {
-			UObject* obj = nullptr;
-			if (obj_mainchara::object_index == o.object_index)
-				obj = obj_mainchara::create();
-			else
-				obj = UObject::create(o.object_index);
-			CCLOG("\tLoading Instance: (%i)%s", obj->getUndertaleObject().index(), obj->getUndertaleObject().name().c_str());
-			_objects.pushBack(obj);
+			auto obj = instance_create(o.x, o.y, o.object_index);
+
 			obj->setScale(o.scale_x, o.scale_y);
+			assert(o.rotation == 0.0f);
 			obj->setRotation(o.rotation);
-			assert(o.color == -1);
-			obj->setPosition(o.x,  roomSize.height - o.y);
-			_objectLayer->addChild(obj);
+			assert(o.color == -1);		
 		}
-		addChild(_objectLayer);
+	
+		
+		Layer* backgroundLayer=nullptr;// weak pointer
+		Layer* forgroundLayer = nullptr; // weak pointer
+		for (auto& b : _room.backgrounds()) {
+			if (b.background_index >= 0) {
+				auto frame = cache[b.background_index];
+				auto sprite = Sprite::createWithSpriteFrame(frame);
+				addChild(sprite, b.foreground ? 2:-3);
+				auto d = DrawNode::create();
+				d->drawDot(Vec2(0, 0), 4.0f, Color4F::WHITE);
+				d->drawCircle(Vec2(0, 0), 4.0f, 90.0f, 10, true, Color4F::WHITE);
+				addChild(d, 10);
+
+				//sprite->setAnchorPoint(Vec2(0.0f, 1.0f));
+				sprite->setPosition(b.x, roomSize.height - b.y);
+			}
+		
+		}
 	}
 	
+}
+UObject* URoom::containsObject(std::function<bool(UObject*)> pred) const {
+	for (auto o : _objects)
+		if (pred(o)) return o;
+	return nullptr;
+}
+void URoom::addUObject(UObject* object) {
+	object->_room = this;
+	_objects.push_back(object);
+	_objectLayer->addChild(object);
+
+}
+void URoom::removeObject(UObject* object) {
+	object->_room = nullptr;
+	_objects.remove(object);
+	_objectLayer->removeChild(object, true);
+}
+#ifdef _DEBUG
+extern Label* s_debugText;
+
+#endif
+bool URoom::init() {
+	if (LayerColor::init()) {
+#if 0
+		auto moseListener = EventListenerMouse::create();
+
+
+		moseListener->onMouseMove = [this](EventMouse* event) {
+			auto pos = event->getLocation();
+			Point locationInRoom = this->convertToNodeSpace(pos);
+			for (auto o : this->getObjects()) {
+				if (o->getBoundingBox().containsPoint(locationInRoom)) {
+					std::stringstream ss;
+					ss.precision(2);
+					ss << '(' << o->getTag() << ')' << o->getName() << std::endl;
+					ss << '(' << std::fixed << getPosition().x << ',' << getPosition().y << ')' << std::endl;
+					s_debugText->setString(ss.str());
+					return;
+				}
+			}
+			s_debugText->setString("nothing");
+		};
+
+		this->_eventDispatcher->addEventListenerWithSceneGraphPriority(moseListener, this);
+#endif
+		return true;
+	}
+	return false;
+
 }
 void URoom::nextRoom() {
 	if (_room.valid()) setUndertaleRoom(_room.index() + 1);

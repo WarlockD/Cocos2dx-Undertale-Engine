@@ -1,14 +1,21 @@
 #include "HelloWorldScene.h"
 #include "SimpleAudioEngine.h"
 #include "../proj.win32/UndertaleResourceNode.h"
-
+#include "../proj.win32/UObject.h"
+#include "../proj.win32/obj_dialoguer.h"
 USING_NS_CC;
+
+#ifdef _DEBUG
+UndertaleLabel* s_debugText = nullptr;
+
+#endif
 
 Scene* HelloWorld::createScene()
 {
     // 'scene' is an autorelease object
    // auto scene = Scene::create();
 	auto scene = Scene::createWithPhysics();
+	scene->getPhysicsWorld()->setDebugDrawMask(PhysicsWorld::DEBUGDRAW_ALL);
     // 'layer' is an autorelease object
     auto layer = HelloWorld::create();
 
@@ -31,7 +38,7 @@ bool HelloWorld::init()
 
     auto visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
-
+	
     /////////////////////////////
     // 2. add a menu item with "X" image, which is clicked to quit the program
     //    you may modify it.
@@ -61,12 +68,18 @@ bool HelloWorld::init()
 	
 
   
-	static size_t ufont = 4;
+	static size_t ufont = 2;
 	static float shake = 37.0f;
-	auto debugtouch = _debugTouch = UndertaleLabel::create(ufont);
+	auto debugtouch = _debugTouch = s_debugText = UndertaleLabel::create(ufont);
+
+	//auto debugtouch = _debugTouch = s_debugText=Label::createWithTTF("empty", "fonts/8bitoperator_jve.ttf", 18);
+
+	
 	auto label = UndertaleLabel::create(ufont);
 	_debugTouch->setPosition(Vec2(origin.x, visibleSize.height - label->getLineHeight() + origin.y));
 	_debugTouch->setString("NoTouch");
+	_debugTouch->setPosition(origin.x, visibleSize.height + origin.y);
+	_debugTouch->setAnchorPoint(Vec2(0.0, 1.0));
 	label->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height - label->getLineHeight() + origin.y));
 	this->addChild(label, 10);
 	this->addChild(_debugTouch, 10);
@@ -78,8 +91,14 @@ bool HelloWorld::init()
 	// add the label as a child to this layer
 	//this->addChild(label, 1);
 
-	URoom* uroom = URoom::create(40);
+	URoom* uroom = URoom::create(35);
 	_currentRoom = uroom;
+
+	// obj_dialoguer::create();
+	 obj_dialoguer* writer = (obj_dialoguer*)uroom->instance_create(10, 10, obj_dialoguer::object_index);
+	writer->setString("1This is a test\nThis another test");
+	writer->setLocalZOrder(10000);
+	
 	uroom->setPosition(0.0f, 0.0f);
 	//uroom->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
 	this->addChild(uroom, -10);
@@ -131,14 +150,18 @@ bool HelloWorld::init()
 
 	//sprite->setScale(4.0f);
 	auto eventListener = EventListenerKeyboard::create();
-	eventListener->onKeyPressed = [ uroom,label](EventKeyboard::KeyCode keyCode, Event* event) {
+	eventListener->onKeyPressed = [uroom,label](EventKeyboard::KeyCode keyCode, Event* event) {
 
 		Vec2 loc = event->getCurrentTarget()->getPosition();
 		switch (keyCode) {
 		case EventKeyboard::KeyCode::KEY_LEFT_ARROW:
+			ufont++;
+			s_debugText->setUndertaleFont(ufont);
 		//	event->getCurrentTarget()->setPosition(--loc.x, loc.y);
 			break;
 		case EventKeyboard::KeyCode::KEY_RIGHT_ARROW:
+			ufont--;
+			s_debugText->setUndertaleFont(ufont);
 		//	event->getCurrentTarget()->setPosition(++loc.x, loc.y);
 			break;
 		case EventKeyboard::KeyCode::KEY_UP_ARROW:
@@ -157,6 +180,16 @@ bool HelloWorld::init()
 			label->setString(uroom->getDebugName());
 		//	event->getCurrentTarget()->setPosition(loc.x, --loc.y);
 			break;
+		case EventKeyboard::KeyCode::KEY_1:
+			for (auto o : uroom->getObjects()) o->setDrawNonVisiableSprite(!o->getDrawNonVisiableSprite());
+			break;
+		case EventKeyboard::KeyCode::KEY_2:
+			for (auto o : uroom->getObjects()) o->setDrawIndex(!o->getDrawIndex());
+			break;
+		case EventKeyboard::KeyCode::KEY_3:
+			for (auto o : uroom->getObjects()) o->setDrawBox(!o->getDrawBox());
+			break;
+
 		}
 	};
 

@@ -128,6 +128,7 @@ namespace UndertaleLib {
 
 	void UndertaleText::parse(bool includeNewLinesInCleanedText) {
 		_charCount = 0;
+		_lineno = 1;
 		_parsed.clear();
 		_cleaned.clear();
 		for (size_t n = 0; n < _text.length(); n++) {
@@ -137,12 +138,14 @@ namespace UndertaleLib {
 			case '&':
 				_parsed.emplace_back(Token::NewLine,n); 
 				if (includeNewLinesInCleanedText) _cleaned.push_back('\n');
+				_lineno++;
 				break;
 			case '\r':
 			case '\n':
 				_parsed.emplace_back(Token::NewLine,n);
 				if (nch != ch && (nch == '\r' || nch == '\n')) n++; // skip it
 				if (includeNewLinesInCleanedText) _cleaned.push_back('\n');
+				_lineno++;
 				break;
 			case '^':  // delay, '0' is considered default
 				_parsed.emplace_back(Token::Delay, n, 10 * (nch - '0'));  break;

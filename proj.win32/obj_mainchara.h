@@ -1,5 +1,5 @@
 #pragma once
-#include "UndertaleResourceNode.h"
+#include "UObject.h"
 
 
 class obj_mainchara : public UObject {
@@ -10,4 +10,5 @@ private:
 	friend class UObject;
 public:
 	static obj_mainchara* create();
+	virtual void update(float dt) override;
 };

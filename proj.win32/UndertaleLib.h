@@ -116,6 +116,7 @@ namespace UndertaleLib {
 		virtual bool valid() const { return index() >= 0; }
 		virtual int index() const { return _index; }
 		virtual const String& name() const { return _name; }
+		std::string to_string() const { return "(" + std::to_string(_index) + ")" + _name.c_str(); }
 		inline bool operator==(const Resource& other) const { return _name == other._name; } // its name will be unique cause the pointer is
 	};
 	template<class T> class OffsetVectorIt;
@@ -248,22 +249,22 @@ namespace UndertaleLib {
 		std::string _cleaned;
 		std::vector<token_t> _parsed;
 		size_t _charCount; // number of displable chars
+		size_t _lineno;
 		void parse(bool includeNewLinesInCleanedText);
 	public:
-		UndertaleText() {}
+		UndertaleText() :_charCount(0), _lineno(0) {}
 		UndertaleText(const std::string& text) : _text(text) { parse(true); }
 		UndertaleText(const std::string& text, bool includeNewLinesInCleanedText) : _text(text) { parse(includeNewLinesInCleanedText); }
 		const std::string& getText() const { return _text; }
 		void setText(const std::string& text, bool includeNewLinesInCleanedText = true) { _text = text; parse(includeNewLinesInCleanedText); }
 		const std::string& getCleanedText() const { return _cleaned; }
 		const token_container& getTokens() const { return _parsed; }
-		iterator begin() { return _parsed.begin(); }
-		iterator end() { return _parsed.end(); }
 		const_iterator begin() const { return _parsed.begin(); }
 		const_iterator end() const { return _parsed.end(); }
 		token_t operator[](size_t i) const { return i >= _parsed.size() ? token_t() : _parsed[i]; }
 		size_t size() const { return _parsed.size(); }
 		size_t charCount() const { return _charCount; }
+		size_t lineno() const { return _lineno; }
 	};
 	// This structure is pointed to somewhere in the data win
 	struct SpriteFrame {

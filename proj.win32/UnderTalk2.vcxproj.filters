@@ -13,6 +13,9 @@
     <Filter Include="Undertale Resource">
       <UniqueIdentifier>{1c91436e-b33d-44e9-90c2-fc0e33561124}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Undertale Resource\Objects">
+      <UniqueIdentifier>{7401cc07-b3c4-4f6d-96c7-d81ba490020a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -32,6 +35,18 @@
     </ClCompile>
     <ClCompile Include="obj_mainchara.cpp">
       <Filter>Undertale Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="UObject.cpp">
+      <Filter>Undertale Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="obj_regester.cpp">
+      <Filter>Undertale Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="obj_dialoguer.cpp">
+      <Filter>Undertale Resource\Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="obj_writer.cpp">
+      <Filter>Undertale Resource\Objects</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -55,6 +70,15 @@
     </ClInclude>
     <ClInclude Include="obj_mainchara.h">
       <Filter>Undertale Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="UObject.h">
+      <Filter>Undertale Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="obj_writer.h">
+      <Filter>Undertale Resource\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="obj_dialoguer.h">
+      <Filter>Undertale Resource\Objects</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

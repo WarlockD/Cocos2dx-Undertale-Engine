@@ -46,62 +46,28 @@ public:
 	virtual void update(float delta) override;
 };
 
-class USprite : public Sprite {
-protected:
-	Vector<SpriteFrame*> _frames;
-	UndertaleLib::Sprite _sprite;
-	size_t _image_index;
-	float _speed;
-	Animate* _animateAction;
-	Action* _animationAction;
-	void startAnimation();
-	void stopAnimation();
-public:
-	USprite() : _image_index(0), _speed(0.0f) , _animationAction(nullptr), Sprite() {}
-	virtual ~USprite();
-	const UndertaleLib::Sprite& getUndertaleSprite() const { return _sprite; }
-	void setUndertaleSprite(const UndertaleLib::Sprite& sprite);
-	void setUndertaleSprite(size_t sprite_index);
-
-	static USprite* create(const UndertaleLib::Sprite& sprite);
-	static USprite* create(size_t sprite_index);
-	static USprite* create(const std::string& name);
-
-	virtual void setImageIndex(size_t index);
-	size_t getImageIndex() const { return _image_index; }
-
-	void setImageSpeed(float speed);
-	float getImageSpeed() const { return _speed; }
-};
-
-class UObject : public Node {
-public:
-	static constexpr int object_index = -1; // = 1570
-	static constexpr char* object_name = "";
-protected:
-	USprite* _sprite;
-	PhysicsBody* _body;
-	UndertaleLib::Object _object;
-	void setUndertaleObject(const UndertaleLib::Object& object);
-	void setUndertaleObject(size_t object_index);
-	void setUndertaleObject(const std::string& name);
-	static UObject* create(const UndertaleLib::Object& object);
-	
-public:
-	UObject() : _sprite(nullptr), _body(nullptr), Node() {}
-	const UndertaleLib::Object& getUndertaleObject() const { return _object; }
-	UndertaleLib::Object getUndertaleParentObject() const;
-	static UObject* create(size_t object_index);
-	static UObject* create(const std::string& name);
-};
+class UObject;
 
 class URoom : public LayerColor {
 	UndertaleLib::Room _room;
 	Layer* _tileLayer; // weak pointer
 	Layer* _objectLayer; // weak pointer
-	Vector<UObject*> _objects;
+
+	std::unordered_multiset<size_t, UObject*> _objectLookup;// weak pointer
+	std::list<UObject*> _objects;
 	Layer* _backgroundLayer; // weak pointer
+
+	void addUObject(UObject* object);
+	void removeObject(UObject* object);
+	bool init() override;
 public:
+	const std::list<UObject*> getObjects() const { return _objects; }
+	UObject* containsObject(std::function<bool(UObject*)> pred) const;
+	UObject* instance_exists(size_t object_index) const;
+	void instance_destroy(size_t object_index);
+	UObject* instance_create(float x, float y, size_t object_index);
+
+
 	URoom() : _tileLayer(nullptr), LayerColor() {}
 	void setUndertaleRoom(const UndertaleLib::Room& room);
 	void setUndertaleRoom(size_t room_index);
