@@ -25,17 +25,18 @@ private:
 	FontAtlas* _fontAtlas;
 	UndertaleLib::UndertaleText _text;
 	cocos2d::Sprite* getletter(char16_t ch) ;
-	void preFixWriting(char16_t ch);
-	void newLine();
-	void postFixWriting(char16_t ch);
 	cocos2d::Vector<cocos2d::Sprite*> _letterCache;
 	size_t _currentCachePosition;
+	size_t _frameDelay;
+	size_t _typeingPosition;
 
 	void updateLetters(bool visable);
 	size_t _face;
 	size_t _emotion;
-	size_t _typeingPosition;
+
 	bool _instant;
+	void changeFace(size_t face);
+	void changeEmotion(size_t emotion);
 public:
 	size_t getFace() const { return _face; }
 	size_t getEmotion() const { return _emotion; }

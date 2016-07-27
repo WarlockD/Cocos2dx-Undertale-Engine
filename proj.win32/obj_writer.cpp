@@ -3,7 +3,7 @@
 USING_NS_CC;
 
 
-obj_writer::obj_writer() : UObject(), _fontAtlas(nullptr) {}
+obj_writer::obj_writer() : UObject(), _fontAtlas(nullptr) , _face(0), _emotion(0) {}
 obj_writer::~obj_writer() {
 	
 	if (_fontAtlas)
@@ -30,6 +30,33 @@ void obj_writer::setFontAtlas(FontAtlas* atlas) {
 }
 #define TOKEN UndertaleLib::UndertaleText::Token
 
+union FaceState {
+	struct {
+		char face;
+		char emotion;
+		char flag;
+		char delay;
+	};
+	void* to_void;
+	int to_int;
+};
+
+void obj_writer::changeFace(size_t face) {
+	if (_face != face) {
+		_face = face;
+		EventCustom event("face_change");
+		event.setUserData((void*)face);
+		_eventDispatcher->dispatchEvent(&event);
+	}
+}
+void obj_writer::changeEmotion(size_t emotion) {
+	if (_emotion != emotion) {
+		_emotion = emotion;
+		EventCustom event("emotion_change");
+		event.setUserData((void*)emotion);
+		_eventDispatcher->dispatchEvent(&event);
+	}
+}
 void obj_writer::updateLetters(bool visable) {
 	removeAllChildren();
 	_currentCachePosition = 0;
@@ -37,14 +64,12 @@ void obj_writer::updateLetters(bool visable) {
 	Color3B color(_config.mycolor >> 16, _config.mycolor >> 8, _config.mycolor);
 	Vec2 startWriting(0.0f, getContentSize().height);
 	Vec2 writing = startWriting;
-	_face = _emotion = 0;
-#ifdef _DEBUG
-	bool emotionSet = false;
-	bool faceSet = false;
-#endif
-	size_t frameDelay = 1;
+	FaceState state;
+	state.face = _face;
+	state.emotion = _emotion;
+	state.delay = 1;
+	state.flag = 0;
 	for (auto& t : _text) {
-		
 		switch (t.token()) {
 		case TOKEN::Color:
 		{
@@ -53,21 +78,13 @@ void obj_writer::updateLetters(bool visable) {
 		}
 		break;
 		case TOKEN::Face:
-#ifdef _DEBUG
-			assert(!faceSet);
-			faceSet = true;
-#endif
-			_face = t.value();
+			state.face = t.value();
 			break;
 		case TOKEN::Emotion:
-#ifdef _DEBUG
-			assert(!emotionSet);
-			emotionSet = true;
-#endif
-			_emotion = t.value();
+			state.emotion = t.value();
 			break;
 		case TOKEN::Delay:
-			if (t.value() != 0) frameDelay = t.value();
+			if (t.value() != 0) state.delay = t.value();
 			break;
 		case TOKEN::NewLine:
 			writing.x = startWriting.x;
@@ -96,11 +113,12 @@ void obj_writer::updateLetters(bool visable) {
 			}
 			auto sprite = getletter(ch);
 			if (sprite) {
+				state.flag = ch;
 				sprite->setPosition(writing);
 				sprite->setVisible(visable);
-				sprite->setTag(frameDelay);
+				sprite->setTag(state.to_int);
 				addChild(sprite);
-				frameDelay = 1; // reset frame delay
+				state.delay = 1; // reset frame delay
 			}
 			{
 				int kern = 0;
@@ -146,23 +164,51 @@ void obj_writer::updateLetters(bool visable) {
 		}
 	}
 }
-Sprite* obj_writer::getletter(char16_t ch)  {
-	FontLetterDefinition letterDef;
-	if (_fontAtlas && _fontAtlas->getLetterDefinitionForChar(ch, letterDef)) {
-		auto textureID = letterDef.textureID;
+/**
+* LabelLetter used to update the quad in texture atlas without SpriteBatchNode.
+*/
+class LabelLetter : public Sprite
+{
+public:
+	LabelLetter() : Sprite() {}
+	void setLetterDef(Texture2D* texture, const FontLetterDefinition& letterDef) {
 		Rect uvRect;
 		uvRect.size.height = letterDef.height;
 		uvRect.size.width = letterDef.width;
 		uvRect.origin.x = letterDef.U;
 		uvRect.origin.y = letterDef.V;
-		Sprite* sprite = nullptr;
+
+		_offsetPosition = Vec2(letterDef.offsetX, letterDef.offsetY);
+		setTexture(texture);
+		setTextureRect(uvRect);
+		_dirty = true;
+	}
+	static LabelLetter* create(Texture2D* texture, const FontLetterDefinition& letterDef)
+	{
+		auto letter = new (std::nothrow) LabelLetter();
+		if (letter && letter->init())
+		{
+			letter->Sprite::setVisible(false);
+			letter->setLetterDef(texture, letterDef);
+			letter->autorelease();
+			return letter;
+		}
+		CC_SAFE_DELETE(letter);
+		return nullptr;
+	}
+};
+
+Sprite* obj_writer::getletter(char16_t ch)  {
+	FontLetterDefinition letterDef;
+	if (_fontAtlas && _fontAtlas->getLetterDefinitionForChar(ch, letterDef)) {
+		auto textureID = letterDef.textureID;
+		LabelLetter* sprite = nullptr;
 		if (_currentCachePosition < _letterCache.size()) {
-			sprite = _letterCache.at(_currentCachePosition++);
-			sprite->setTextureRect(uvRect);
-			sprite->setTexture(_fontAtlas->getTexture(textureID));
+			sprite = (LabelLetter*)_letterCache.at(_currentCachePosition++);
+			sprite->setLetterDef(_fontAtlas->getTexture(textureID), letterDef);
 		}
 		else {
-			sprite = Sprite::createWithTexture(_fontAtlas->getTexture(textureID), uvRect);
+			sprite = LabelLetter::create( _fontAtlas->getTexture(textureID), letterDef);
 			sprite->setAnchorPoint(Vec2::ANCHOR_BOTTOM_LEFT);// top left
 			_letterCache.pushBack(sprite);
 			_currentCachePosition++;
@@ -190,6 +236,7 @@ void obj_writer::clear() {
 void obj_writer::start() {
 	if (!_instant) {
 		_typeingPosition = 0;
+		_frameDelay = 0;
 		scheduleUpdate();
 		clear();
 	}
@@ -214,8 +261,24 @@ void obj_writer::setType(const TEXTTYPE& type) {
 
 
 void obj_writer::update(float dt) {
+	UObject::update(dt);
 	if (!_instant) {
-
+		if (_typeingPosition < getChildrenCount()) {
+			if (_frameDelay == 0) {
+				
+				auto sprite = _children.at(_typeingPosition++);
+				sprite->setVisible(true);
+				FaceState state;
+				
+				state.to_int = sprite->getTag();
+				CCLOG("Displaying: '%c', F:%i, E:%i, D:%i", state.flag, state.face, state.emotion, state.delay);
+				_frameDelay = state.delay;
+				changeFace(state.face);
+				changeEmotion(state.emotion);
+			}
+			else _frameDelay--;
+		}
+		
 	}
 
 	if (getChildrenCount() > 0) {

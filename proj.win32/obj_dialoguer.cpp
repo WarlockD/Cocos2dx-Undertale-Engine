@@ -123,39 +123,49 @@ bool obj_dialoguer::init()  {
 		addChild(_writer, 100);
 		_eventDispatcher->addCustomEventListener("obj_writer_halt", [this](EventCustom* e) {
 			size_t halt = (size_t)e->getUserData();
-			if (halt == 1) {
-				this->nextDialogLine(); // key press
-			}
+		//	if (halt == 1) {
+		//		this->nextDialogLine(); // key press
+		//	}
 
 
 		});
-		
-
+		_eventDispatcher->addCustomEventListener("face_change", [this](EventCustom* e) {
+			size_t new_face = (size_t)e->getUserData();
+			if (new_face != this->_face_index) {
+				if (_face) removeChild(_face, true);
+				addChild(_face = obj_face::create(new_face));
+				_face->setEmotion(_emotion_index);
+				reset();
+				_face_index = new_face;
+			}
+		});
+		_eventDispatcher->addCustomEventListener("emotion_change", [this](EventCustom* e) {
+			size_t new_emotion = (size_t)e->getUserData();
+			if (new_emotion != _emotion_index) {
+				if (_face) _face->setEmotion((size_t)e->getUserData());
+				_emotion_index = new_emotion;
+			}
+			
+		});
 		return true;
 	}
 	return false;
 }
+
 void obj_dialoguer::nextDialogLine() {
 	_writer->clear();
 	if (!_dialog.empty()) {
-		_writer->setString(_dialog.front(),true);
+		_writer->setString(_dialog.front(),false);
 		_dialog.pop();
 		_writer->start();
 	}
 }
 void obj_dialoguer::setFace(size_t index) {
-	if (index == 0) {
-		if (_face) {
-			removeChild(_face, true);
-			_face = nullptr;
-			reset();
-		}
-	}
-	else if (!_face || _face->getFace() != index) {
-		if (!_face) removeChild(_face, true);
-		addChild(_face = obj_face::create(index));
-		reset();
-	}
+	_eventDispatcher->dispatchCustomEvent("face_change", (void*)index);
+}
+
+void obj_dialoguer::setEmotion(size_t index) {
+	_eventDispatcher->dispatchCustomEvent("emotion_change", (void*)index);
 }
 void obj_dialoguer::reset() {
 	const Size& size = getContentSize();
@@ -178,9 +188,9 @@ void obj_dialoguer::startDialog() {
 		_keyboardListener = EventListenerKeyboard::create();
 		_keyboardListener->onKeyReleased = [this](EventKeyboard::KeyCode keyCode, Event* event) {
 			this->nextDialogLine();
-
 		};
 		_eventDispatcher->addEventListenerWithSceneGraphPriority(_keyboardListener, this);
 	}
 	this->nextDialogLine();
+
 }

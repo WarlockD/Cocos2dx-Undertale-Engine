@@ -25,7 +25,19 @@ Scene* HelloWorld::createScene()
     // return the scene
     return scene;
 }
-
+void debugWriter(obj_dialoguer* writer) {
+	writer->setFace(1);
+	writer->addString("\\E2* Greetings,^1 my child^2.&* Do not worry^1, I did&  not leave you./");
+	writer->addString("\\E0* I was merely behind this&  pillar the whole time./");
+	writer->addString("* Thank you for trusting&  me./");
+	writer->addString("\\E2* However^1, there was an&  important reason for&  this exercise./");
+	writer->addString("* ... to test your&  independence./");
+	writer->addString("\\E1* I must attend to some&  business^1, and you must&  stay alone for a while./");
+	writer->addString("\\E0* Please remain here^2.&*\\E1 It\'s dangerous to&  explore by yourself./");
+	writer->addString("\\E0* I have an idea^2.&* I will give you a&  CELL PHONE./");
+	writer->addString("* If you have a need for&  anything^1, just call./");
+	writer->addString("\\E1* Be good^1, alright?/%");
+}
 // on "init" you need to initialize your instance
 bool HelloWorld::init()
 {
@@ -97,9 +109,7 @@ bool HelloWorld::init()
 	// obj_dialoguer::create();
 	obj_dialoguer* writer = dynamic_cast<obj_dialoguer*>(uroom->instance_create(10, 10, obj_dialoguer::object_index));
 	writer->setFace(1);
-	writer->addString("* Yo^1, I know I\'m not supposed&  to be here^1, but.../");
-	writer->addString("* I wanna ask you something./");
-	writer->addString("* Undyne told me^1, um^1, \"stay&  away from that human.\"/");
+	debugWriter(writer);
 	writer->startDialog();
 	writer->setLocalZOrder(10000);
 	writer->setPosition(0.0f, 400.0f);

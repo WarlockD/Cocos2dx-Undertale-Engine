@@ -26,6 +26,8 @@ class obj_dialoguer : public UObject
 
 private:
 	friend class UObject;
+	size_t _face_index;
+	size_t _emotion_index;
 	obj_face* _face;
 	obj_writer* _writer;
 	std::queue<std::string> _dialog;
@@ -39,6 +41,7 @@ public:
 	void reset(); // set up the dialog boxes, align face, etc
 	void addString(const std::string& text);
 	void setFace(size_t index);
+	void setEmotion(size_t index);
 	obj_dialoguer();
 	void startDialog();
 
