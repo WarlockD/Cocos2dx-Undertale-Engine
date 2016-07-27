@@ -108,6 +108,7 @@ bool obj_dialoguer::init()  {
 		CC_SAFE_RELEASE_NULL(_face);
 		_writer = obj_writer::create();
 		CC_SAFE_RETAIN(_writer);
+		_writer->setUndertaleFont(2); //generic dialog
 		Size size(304 - 16, 80 - 5);
 
 		setContentSize(size);
@@ -120,9 +121,27 @@ bool obj_dialoguer::init()  {
 		_writer->setAnchorPoint(Vec2::ZERO);
 		addChild(box, -100);
 		addChild(_writer, 100);
+		_eventDispatcher->addCustomEventListener("obj_writer_halt", [this](EventCustom* e) {
+			size_t halt = (size_t)e->getUserData();
+			if (halt == 1) {
+				this->nextDialogLine(); // key press
+			}
+
+
+		});
+		
+
 		return true;
 	}
 	return false;
+}
+void obj_dialoguer::nextDialogLine() {
+	_writer->clear();
+	if (!_dialog.empty()) {
+		_writer->setString(_dialog.front(),true);
+		_dialog.pop();
+		_writer->start();
+	}
 }
 void obj_dialoguer::setFace(size_t index) {
 	if (index == 0) {
@@ -150,8 +169,18 @@ void obj_dialoguer::reset() {
 		_writer->setPosition(3, getContentSize().height / 2);
 	}
 }
-void obj_dialoguer::setString(const std::string& text) {
-	_writer->setString(text);
-	reset();
-	_writer->start();
+void obj_dialoguer::addString(const std::string& text) {
+	_dialog.push(text);
+}
+
+void obj_dialoguer::startDialog() {
+	if (_keyboardListener != nullptr) {
+		_keyboardListener = EventListenerKeyboard::create();
+		_keyboardListener->onKeyReleased = [this](EventKeyboard::KeyCode keyCode, Event* event) {
+			this->nextDialogLine();
+
+		};
+		_eventDispatcher->addEventListenerWithSceneGraphPriority(_keyboardListener, this);
+	}
+	this->nextDialogLine();
 }

@@ -148,7 +148,9 @@ namespace UndertaleLib {
 				_lineno++;
 				break;
 			case '^':  // delay, '0' is considered default
-				_parsed.emplace_back(Token::Delay, n, 10 * (nch - '0'));  break;
+				_parsed.emplace_back(Token::Delay, n, 10 * (nch - '0')); 
+				n++;
+				break;
 			case '\\':
 				switch (nch) {
 				case 'R': _parsed.emplace_back(Token::Color, n, 255);  break;

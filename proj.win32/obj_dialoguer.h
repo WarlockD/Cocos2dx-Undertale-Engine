@@ -28,16 +28,19 @@ private:
 	friend class UObject;
 	obj_face* _face;
 	obj_writer* _writer;
+	std::queue<std::string> _dialog;
+	cocos2d::EventListenerKeyboard* _keyboardListener;
 	
 public:
+	void nextDialogLine(); // key press
 	bool init() override;
 	static constexpr int object_index = 779;
 	static constexpr char* object_name = "obj_dialoguer";
-	
 	void reset(); // set up the dialog boxes, align face, etc
-	void setString(const std::string& text);
+	void addString(const std::string& text);
 	void setFace(size_t index);
 	obj_dialoguer();
+	void startDialog();
 
 	virtual ~obj_dialoguer();
 	CREATE_FUNC(obj_dialoguer);

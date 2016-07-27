@@ -97,7 +97,10 @@ bool HelloWorld::init()
 	// obj_dialoguer::create();
 	obj_dialoguer* writer = dynamic_cast<obj_dialoguer*>(uroom->instance_create(10, 10, obj_dialoguer::object_index));
 	writer->setFace(1);
-	writer->setString("1This is a test\nThis another test");
+	writer->addString("* Yo^1, I know I\'m not supposed&  to be here^1, but.../");
+	writer->addString("* I wanna ask you something./");
+	writer->addString("* Undyne told me^1, um^1, \"stay&  away from that human.\"/");
+	writer->startDialog();
 	writer->setLocalZOrder(10000);
 	writer->setPosition(0.0f, 400.0f);
 	uroom->setPosition(0.0f, 0.0f);

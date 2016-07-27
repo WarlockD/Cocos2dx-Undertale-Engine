@@ -30,6 +30,13 @@ bool USprite::init(const UndertaleLib::Sprite& sprite) {
 		setSpriteFrame(_frames.at(0));
 		setName(sprite.name().c_str());
 		setTag(sprite.index());
+		// we make a point that is the 0,0 point
+		DrawNode* node = DrawNode::create();
+		node->drawLine(Vec2(-2, 0), Vec2(2, 0), Color4F::GREEN);
+		node->drawLine(Vec2(0, -2), Vec2(0, 2), Color4F::GREEN);
+		node->setRotation(45);
+		node->setGlobalZOrder(1000);
+		addChild(node, 1000);
 		return true;
 	}
 	return false;

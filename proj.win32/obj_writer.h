@@ -22,28 +22,35 @@ class obj_writer : public UObject
 private:
 	friend class UObject;
 	TEXTTYPE _config;
-	CC_SYNTHESIZE_RETAIN(FontAtlas*, _fontAtlas, FontAtlas);
+	FontAtlas* _fontAtlas;
 	UndertaleLib::UndertaleText _text;
-	cocos2d::Vec2 _startWriting;
-	cocos2d::Vec2 _writing;
-	size_t _lineno;
-	UndertaleLib::UndertaleText::const_iterator _current;
-	int _frameDelay;
-	cocos2d::Color3B _currentColor;
-	cocos2d::Sprite* getletter(char16_t ch) const;
+	cocos2d::Sprite* getletter(char16_t ch) ;
 	void preFixWriting(char16_t ch);
 	void newLine();
 	void postFixWriting(char16_t ch);
-	
+	cocos2d::Vector<cocos2d::Sprite*> _letterCache;
+	size_t _currentCachePosition;
+
+	void updateLetters(bool visable);
+	size_t _face;
+	size_t _emotion;
+	size_t _typeingPosition;
+	bool _instant;
 public:
+	size_t getFace() const { return _face; }
+	size_t getEmotion() const { return _emotion; }
 	bool init() override;
+
+	void setFontAtlas(FontAtlas* atlas);
+	void setUndertaleFont(size_t font_index);
 	static constexpr int object_index = 782;
 	static constexpr char* object_name = "OBJ_WRITER";
 	obj_writer();
 	virtual ~obj_writer();
-	void setString(const std::string& text);
+	void setString(const std::string& text,bool instant=false);
 	UndertaleLib::UndertaleText& getParser() { return _text; }
 	const UndertaleLib::UndertaleText& getParser() const { return _text; }
+	void clear();
 	void reset();
 	void start();
 	void stop();

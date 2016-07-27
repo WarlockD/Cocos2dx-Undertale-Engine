@@ -174,17 +174,17 @@ FontAtlas* UndertaleFont::createFontAtlas() {
 		FontLetterDefinition def;
 		Rect tempRect(f.x, f.y, f.width, f.height);
 		tempRect = CC_RECT_PIXELS_TO_POINTS(tempRect);
-	//	assert(f.ch != 'r' && f.ch != 'o');
+		assert(f.ch != 'p');
 		//def.offsetX = f.offset;
 	    def.offsetX = f.offset;
-		def.offsetY = 0;
+		def.offsetY = f.shift;
 		def.U = tempRect.origin.x + frameRect.origin.x;
 		def.V = tempRect.origin.y + frameRect.origin.y;
 		def.width = tempRect.size.width;
 		def.height = tempRect.size.height;
 		def.textureID = 0;
 		def.validDefinition = true;
-		def.xAdvance = f.shift;
+		def.xAdvance = tempRect.size.width;
 		
 		// add the new definition
 		if (65535 < f.ch) {

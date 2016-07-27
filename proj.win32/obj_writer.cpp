@@ -4,173 +4,219 @@ USING_NS_CC;
 
 
 obj_writer::obj_writer() : UObject(), _fontAtlas(nullptr) {}
-obj_writer::~obj_writer() { CC_SAFE_RELEASE_NULL(_fontAtlas); }
+obj_writer::~obj_writer() {
+	
+	if (_fontAtlas)
+	{
+		Node::removeAllChildrenWithCleanup(true);
+	//	CC_SAFE_RELEASE_NULL(_reusedLetter);
+		CC_SAFE_RELEASE_NULL(_fontAtlas);
+	}
+}
 
 bool obj_writer::init()  {
 	return UObject::init(object_index);
 }
 
-Sprite* obj_writer::getletter(char16_t ch) const {
+void obj_writer::setUndertaleFont(size_t font_index) {
+	setFontAtlas(Undertale::getSingleton()->LookupFontAtlas(font_index));
+}
+void obj_writer::setFontAtlas(FontAtlas* atlas) {
+	if (atlas != _fontAtlas) {
+		CC_SAFE_RELEASE_NULL(_fontAtlas);
+		_fontAtlas = atlas;
+		CC_SAFE_RETAIN(_fontAtlas);
+	}
+}
+#define TOKEN UndertaleLib::UndertaleText::Token
+
+void obj_writer::updateLetters(bool visable) {
+	removeAllChildren();
+	_currentCachePosition = 0;
+	auto& spriteLetters = getChildren();
+	Color3B color(_config.mycolor >> 16, _config.mycolor >> 8, _config.mycolor);
+	Vec2 startWriting(0.0f, getContentSize().height);
+	Vec2 writing = startWriting;
+	_face = _emotion = 0;
+#ifdef _DEBUG
+	bool emotionSet = false;
+	bool faceSet = false;
+#endif
+	size_t frameDelay = 1;
+	for (auto& t : _text) {
+		
+		switch (t.token()) {
+		case TOKEN::Color:
+		{
+			int icolor = t.value();
+			color = Color3B(icolor >> 16, icolor >> 8, icolor);
+		}
+		break;
+		case TOKEN::Face:
+#ifdef _DEBUG
+			assert(!faceSet);
+			faceSet = true;
+#endif
+			_face = t.value();
+			break;
+		case TOKEN::Emotion:
+#ifdef _DEBUG
+			assert(!emotionSet);
+			emotionSet = true;
+#endif
+			_emotion = t.value();
+			break;
+		case TOKEN::Delay:
+			if (t.value() != 0) frameDelay = t.value();
+			break;
+		case TOKEN::NewLine:
+			writing.x = startWriting.x;
+			writing.y -= _config.spacing;
+			break;
+		case TOKEN::Letter:
+			// letter, type it and make a sound
+		{
+			char16_t ch = t.value();
+			if (writing.y > _config.writingxend) {
+				writing.x = startWriting.x;
+				writing.y -= _config.spacing;
+			}
+			else {
+				if (_config.typer == 18) {
+					if (ch == 'l' || ch == 'i') writing.x += 2;
+					if (ch == 'I') writing.x += 2;
+					if (ch == '!') writing.x += 2;
+					if (ch == '.') writing.x += 2;
+					if (ch == 'S') writing.x++;
+					if (ch == '?') writing.x += 2;
+					if (ch == 'D') writing.x++;
+					if (ch == 'A') writing.x++;
+					if (ch == '\'') writing.x++;
+				}
+			}
+			auto sprite = getletter(ch);
+			if (sprite) {
+				sprite->setPosition(writing);
+				sprite->setVisible(visable);
+				sprite->setTag(frameDelay);
+				addChild(sprite);
+				frameDelay = 1; // reset frame delay
+			}
+			{
+				int kern = 0;
+				if (_config.myfont == 8) { // only two cases that have kernings?
+					if (ch == 'w') kern += 2;
+					if (ch == 'm') kern += 2;
+					if (ch == 'i') kern -= 2;
+					if (ch == 'l') kern -= 2;
+					if (ch == 's') kern--;
+					if (ch == 'j') kern--;
+				}
+				if (_config.myfont == 9) { // only two cases that have kernings?
+					if (ch == 'D') kern++;
+					if (ch == 'Q') kern += 3;
+					if (ch == 'M') kern++;
+					if (ch == 'L') kern--;
+					if (ch == 'K') kern--;
+					if (ch == 'C') kern++;
+					if (ch == '.') kern -= 3;
+					if (ch == '!') kern -= 3;
+					if (ch == 'O' || ch == 'W') kern += 2;
+					if (ch == 'I') kern -= 6;
+					if (ch == 'T') kern--;
+					if (ch == 'P') kern -= 2;
+					if (ch == 'R') kern -= 2;
+					if (ch == 'A') kern++;
+					if (ch == 'H') kern++;
+					if (ch == 'B') kern++;
+					if (ch == 'G') kern++;
+					if (ch == 'F') kern--;
+					if (ch == '?') kern -= 3;
+					if (ch == '\'') kern -= 6;
+					if (ch == 'J') kern--;
+				}
+				writing.x += kern;
+				//postFixWriting(ch);
+			}
+
+
+			writing.x += _config.spacing;
+			break;
+		}
+		}
+	}
+}
+Sprite* obj_writer::getletter(char16_t ch)  {
 	FontLetterDefinition letterDef;
-	if (_fontAtlas->getLetterDefinitionForChar(ch, letterDef)) {
+	if (_fontAtlas && _fontAtlas->getLetterDefinitionForChar(ch, letterDef)) {
 		auto textureID = letterDef.textureID;
 		Rect uvRect;
 		uvRect.size.height = letterDef.height;
 		uvRect.size.width = letterDef.width;
 		uvRect.origin.x = letterDef.U;
 		uvRect.origin.y = letterDef.V;
-		auto sprite = Sprite::createWithTexture(_fontAtlas->getTexture(textureID), uvRect);
-		sprite->setAnchorPoint(Vec2(0, 1)); // top left
-		sprite->setColor(_currentColor);
+		Sprite* sprite = nullptr;
+		if (_currentCachePosition < _letterCache.size()) {
+			sprite = _letterCache.at(_currentCachePosition++);
+			sprite->setTextureRect(uvRect);
+			sprite->setTexture(_fontAtlas->getTexture(textureID));
+		}
+		else {
+			sprite = Sprite::createWithTexture(_fontAtlas->getTexture(textureID), uvRect);
+			sprite->setAnchorPoint(Vec2::ANCHOR_BOTTOM_LEFT);// top left
+			_letterCache.pushBack(sprite);
+			_currentCachePosition++;
+		}
 		return sprite;
 	}
 	return nullptr;
 }
-void obj_writer::newLine() {
-	_writing.x = _startWriting.x;
-	_writing.y += _config.spacing;
-	_lineno++;
-}
-void obj_writer::preFixWriting(char16_t ch) {
-	if (_config.typer == 18) {
-		if (ch == 'l' || ch == 'i') _writing.x += 2;
-		if (ch == 'I') _writing.x += 2;
-		if (ch == '!') _writing.x += 2;
-		if (ch == '.') _writing.x += 2;
-		if (ch == 'S') _writing.x++;
-		if (ch == '?') _writing.x += 2;
-		if (ch == 'D') _writing.x++;
-		if (ch == 'A') _writing.x++;
-		if (ch == '\'') _writing.x++;
-	}
-}
 
-void obj_writer::postFixWriting(char16_t ch) {
-	int kern = 0;
-	if (_config.myfont == 8) { // only two cases that have kernings?
-		if (ch == 'w') kern += 2;
-		if (ch == 'm') kern += 2;
-		if (ch == 'i') kern -= 2;
-		if (ch == 'l') kern -= 2;
-		if (ch == 's') kern--;
-		if (ch == 'j') kern--;
-	}
-	if (_config.myfont == 9) { // only two cases that have kernings?
-		if (ch == 'D') kern++;
-		if (ch == 'Q') kern += 3;
-		if (ch == 'M') kern++;
-		if (ch == 'L') kern--;
-		if (ch == 'K') kern--;
-		if (ch == 'C') kern++;
-		if (ch == '.') kern -= 3;
-		if (ch == '!') kern -= 3;
-		if (ch == 'O' || ch == 'W') kern += 2;
-		if (ch == 'I') kern -= 6;
-		if (ch == 'T') kern--;
-		if (ch == 'P') kern -= 2;
-		if (ch == 'R') kern -= 2;
-		if (ch == 'A') kern++;
-		if (ch == 'H') kern++;
-		if (ch == 'B') kern++;
-		if (ch == 'G') kern++;
-		if (ch == 'F') kern--;
-		if (ch == '?') kern -= 3;
-		if (ch == '\'') kern -= 6;
-		if (ch == 'J') kern--;
-	}
-	_writing.x += kern;
-}
 
-void obj_writer::setString(const std::string& text) {
+void obj_writer::setString(const std::string& text,bool instant) {
 	_text.setText(text);
-	if (_fontAtlas == nullptr) setType(_config);
-	
-	reset();
+	_instant = instant;
+	if (_fontAtlas) {
+		setContentSize(Size(_config.writingxend, 2 * _config.vspacing));
+	}
+	updateLetters(instant);
+	_typeingPosition = instant ? getChildrenCount() : 0;
+}
+void obj_writer::clear() {
+	if (_children.size()) {
+		for (auto& child : _children) child->setVisible(false);
+	}
 }
 void obj_writer::start() {
-	scheduleUpdate();
-	_frameDelay = 0;
+	if (!_instant) {
+		_typeingPosition = 0;
+		scheduleUpdate();
+		clear();
+	}
 }
 void obj_writer::stop() {
-	unscheduleUpdate();
-	_frameDelay = -1;
+	if (!_instant) {
+		unscheduleUpdate();
+	}
 }
 void obj_writer::reset() {
-	removeAllChildrenWithCleanup(true);
-	setContentSize(Size(_config.writingxend, _text.lineno() * _config.vspacing));
-	_startWriting = Vec2(0.0f,getContentSize().height);
-
-	_lineno = 1;
-	_currentColor = Color3B(_config.mycolor >> 24, _config.mycolor >> 16, _config.mycolor);
-	_frameDelay = -1;
-	_current = _text.begin();
-	_writing = _startWriting;
+	updateLetters(_instant);
 }
 void obj_writer::setType(const TEXTTYPE& type) {
 	
 	//setPosition(type.writingx, _room->getContentSize().height- type.writingy);
-	if (_fontAtlas == nullptr || _config.myfont != type.myfont) {
+	if (!_fontAtlas|| _config.myfont != type.myfont) {
 		setFontAtlas(Undertale::getSingleton()->LookupFontAtlas(type.myfont));
 	}
 	_config = type;
 	reset();
 }
-#define TOKEN UndertaleLib::UndertaleText::Token
-
 
 
 void obj_writer::update(float dt) {
-	if (_frameDelay == -1) return;
-	
-	if (_frameDelay == 0) {
-		_frameDelay = 1;
-		if (_current != _text.end()) {
-			bool finished = false;
-			do {
-				switch (_current->token()) {
-				case TOKEN::Color:
-				{
-					int color = _current->value();
-					_currentColor = Color3B(color >> 24, color >> 16, color);
-				}
-				break;
-				case TOKEN::Halt:
-				{
-					EventCustom event("obj_writer_halt");
-					event.setUserData((void*)_current->value());
-					_eventDispatcher->dispatchEvent(&event);
-					stop();
-					finished = true;
-				}
-				break;
-				case TOKEN::Delay:
-					if (_current->value() != 0) _frameDelay = _current->value();
-					break;
-				case TOKEN::NewLine:
-					newLine();
-					break;
-				case TOKEN::Letter:
-					// letter, type it and make a sound
-				{
-					auto sprite = getletter(_current->value());
-					if (_writing.y > _config.writingxend) newLine();
-					char16_t ch = _current->value();
-					preFixWriting(ch);
-					sprite->setPosition(_writing);
-					postFixWriting(ch);
-					_writing.x += _config.spacing;
-					addChild(sprite);
-					finished = true;
-					break;
-				}
+	if (!_instant) {
 
-				}
-				_current++;
-			} while (!finished || _current != _text.end());
-
-		}
 	}
-	else _frameDelay--;;
 
 	if (getChildrenCount() > 0) {
 		for (auto& n : getChildren()) {
