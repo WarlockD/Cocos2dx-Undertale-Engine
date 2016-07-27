@@ -45,6 +45,23 @@ Undertale* Undertale::getSingleton() {
 UndertaleLib::UndertaleFile* Undertale::getFile() {
 	return _file;
 }
+const cocos2d::Value& Undertale::getGlobal(const std::string& name) const {
+	return _globals.at(name);
+}
+cocos2d::Value& Undertale::getGlobal(const std::string& name)  {
+	return _globals.at(name);
+}
+void Undertale::setGlobal(const std::string& name, cocos2d::Value value) {
+	_globals[name] = value;
+}
+int Undertale::getFlag(int index) const {
+	Value value = _flags.at(index);
+	return value.asInt();
+}
+void Undertale::setFlag(int index, int value) {
+	_flags[index] = value;
+}
+
 Texture2D* Undertale::LookupTexture(size_t index) {
 	std::string key = "undertale_" + std::to_string(index) + ".png";
 	auto texture = Director::getInstance()->getTextureCache()->addImage(LookupImage(index), key);
@@ -504,7 +521,7 @@ UObject* CreateInstance(size_t object_index);
 
 UObject* URoom::instance_create(float x, float y, size_t object_index) {
 	UObject* obj = CreateInstance(object_index);
-
+	assert(obj->getUndertaleObject().index() != -1);
 	CCLOG("\tCreating Instance: (%i)%s", obj->getUndertaleObject().index(), obj->getUndertaleObject().name().c_str());
 	addUObject(obj);
 

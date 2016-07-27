@@ -22,8 +22,9 @@ class obj_writer : public UObject
 private:
 	friend class UObject;
 	TEXTTYPE _config;
-	CC_SYNTHESIZE_RETAIN(FontAtlas*, _fontAtlas, Fontatlas);
+	CC_SYNTHESIZE_RETAIN(FontAtlas*, _fontAtlas, FontAtlas);
 	UndertaleLib::UndertaleText _text;
+	cocos2d::Vec2 _startWriting;
 	cocos2d::Vec2 _writing;
 	size_t _lineno;
 	UndertaleLib::UndertaleText::const_iterator _current;
@@ -35,7 +36,7 @@ private:
 	void postFixWriting(char16_t ch);
 	
 public:
-
+	bool init() override;
 	static constexpr int object_index = 782;
 	static constexpr char* object_name = "OBJ_WRITER";
 	obj_writer();
@@ -47,8 +48,7 @@ public:
 	void start();
 	void stop();
 	void setType(const TEXTTYPE& type);
-	static obj_writer* create();
 	virtual void update(float dt) override;
-
+	CREATE_FUNC(obj_writer);
 };
 

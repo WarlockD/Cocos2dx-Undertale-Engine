@@ -4,17 +4,11 @@ USING_NS_CC;
 
 
 obj_writer::obj_writer() : UObject(), _fontAtlas(nullptr) {}
-obj_writer::~obj_writer(){}
-obj_writer* obj_writer::create() {
-	obj_writer* obj = new obj_writer;
-	if (obj && obj->init(obj_writer::object_index)) {
-		obj->autorelease();
-		return obj;
-	}
-	CC_SAFE_DELETE(obj);
-	return nullptr;
-}
+obj_writer::~obj_writer() { CC_SAFE_RELEASE_NULL(_fontAtlas); }
 
+bool obj_writer::init()  {
+	return UObject::init(object_index);
+}
 
 Sprite* obj_writer::getletter(char16_t ch) const {
 	FontLetterDefinition letterDef;
@@ -33,7 +27,7 @@ Sprite* obj_writer::getletter(char16_t ch) const {
 	return nullptr;
 }
 void obj_writer::newLine() {
-	_writing.x = 0.0f;
+	_writing.x = _startWriting.x;
 	_writing.y += _config.spacing;
 	_lineno++;
 }
@@ -104,17 +98,19 @@ void obj_writer::stop() {
 void obj_writer::reset() {
 	removeAllChildrenWithCleanup(true);
 	setContentSize(Size(_config.writingxend, _text.lineno() * _config.vspacing));
+	_startWriting = Vec2(0.0f,getContentSize().height);
+
 	_lineno = 1;
 	_currentColor = Color3B(_config.mycolor >> 24, _config.mycolor >> 16, _config.mycolor);
 	_frameDelay = -1;
 	_current = _text.begin();
-	_writing = Vec2::ZERO;
+	_writing = _startWriting;
 }
 void obj_writer::setType(const TEXTTYPE& type) {
 	
 	//setPosition(type.writingx, _room->getContentSize().height- type.writingy);
 	if (_fontAtlas == nullptr || _config.myfont != type.myfont) {
-		_fontAtlas = Undertale::getSingleton()->LookupFontAtlas(type.myfont);
+		setFontAtlas(Undertale::getSingleton()->LookupFontAtlas(type.myfont));
 	}
 	_config = type;
 	reset();

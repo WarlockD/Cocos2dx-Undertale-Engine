@@ -16,6 +16,9 @@
     <Filter Include="Undertale Resource\Objects">
       <UniqueIdentifier>{7401cc07-b3c4-4f6d-96c7-d81ba490020a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="lua533">
+      <UniqueIdentifier>{af78c15e-18fb-4488-94ae-f2477b9c694a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -33,9 +36,6 @@
     <ClCompile Include="UndertaleResourceNode.cpp">
       <Filter>Undertale Resource</Filter>
     </ClCompile>
-    <ClCompile Include="obj_mainchara.cpp">
-      <Filter>Undertale Resource</Filter>
-    </ClCompile>
     <ClCompile Include="UObject.cpp">
       <Filter>Undertale Resource</Filter>
     </ClCompile>
@@ -46,6 +46,10 @@
       <Filter>Undertale Resource\Objects</Filter>
     </ClCompile>
     <ClCompile Include="obj_writer.cpp">
+      <Filter>Undertale Resource\Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="lua_system.cpp" />
+    <ClCompile Include="obj_mainchara.cpp">
       <Filter>Undertale Resource\Objects</Filter>
     </ClCompile>
   </ItemGroup>
@@ -68,9 +72,6 @@
     <ClInclude Include="..\Classes\Global.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="obj_mainchara.h">
-      <Filter>Undertale Resource</Filter>
-    </ClInclude>
     <ClInclude Include="UObject.h">
       <Filter>Undertale Resource</Filter>
     </ClInclude>
@@ -78,6 +79,9 @@
       <Filter>Undertale Resource\Objects</Filter>
     </ClInclude>
     <ClInclude Include="obj_dialoguer.h">
+      <Filter>Undertale Resource\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="obj_mainchara.h">
       <Filter>Undertale Resource\Objects</Filter>
     </ClInclude>
   </ItemGroup>

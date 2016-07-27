@@ -95,10 +95,11 @@ bool HelloWorld::init()
 	_currentRoom = uroom;
 
 	// obj_dialoguer::create();
-	 obj_dialoguer* writer = (obj_dialoguer*)uroom->instance_create(10, 10, obj_dialoguer::object_index);
+	obj_dialoguer* writer = dynamic_cast<obj_dialoguer*>(uroom->instance_create(10, 10, obj_dialoguer::object_index));
+	writer->setFace(1);
 	writer->setString("1This is a test\nThis another test");
 	writer->setLocalZOrder(10000);
-	
+	writer->setPosition(0.0f, 400.0f);
 	uroom->setPosition(0.0f, 0.0f);
 	//uroom->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
 	this->addChild(uroom, -10);

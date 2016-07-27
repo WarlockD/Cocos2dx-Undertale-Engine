@@ -1,7 +1,7 @@
 #include "UObject.h"
 #include "obj_mainchara.h"
 #include "obj_writer.h"
-
+#include "obj_dialoguer.h"
 static std::unordered_map<size_t, std::function<UObject*(void)>> object_create_factory;
 
 void RegesterObjectCreate(size_t obj_index, std::function<UObject*(void)> func) {
@@ -18,6 +18,7 @@ struct RegesterAll {
 	RegesterAll() {
 		RegesterObjectCreate(obj_mainchara::object_index, &obj_mainchara::create);
 		RegesterObjectCreate(obj_writer::object_index, &obj_writer::create);
+		RegesterObjectCreate(obj_dialoguer::object_index, &obj_dialoguer::create);
 	}
 };
 

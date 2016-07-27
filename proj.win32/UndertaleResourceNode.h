@@ -83,7 +83,14 @@ public:
 class Undertale : public Ref {
 	Map<size_t, Image*> _images;
 	Map<size_t, FontAtlas*> _fontAtlases;
+	ValueMap _globals;
+	ValueMapIntKey _flags;
 public:
+	const cocos2d::Value& getGlobal(const std::string& name) const;
+	cocos2d::Value& getGlobal(const std::string& name) ;
+	void setGlobal(const std::string& nam, cocos2d::Value value);
+	int getFlag(int index) const;
+	void setFlag(int index, int value);
 	static bool loadDataWin(std::vector<uint8_t>&& data);
 	static bool loadDataWin(const std::string& filename);
 	static Undertale* getSingleton();

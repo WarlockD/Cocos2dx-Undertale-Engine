@@ -2,79 +2,156 @@
 
 
 
+void obj_face::setEmotion(int i) {
+	if (i != _emotion) {
+		_emotion = i; 
+		updateEmotion();
+	}
+}
+bool obj_face::init()  {
+	if (Node::init() && (_faceSprite = USprite::create())) {
+		CC_SAFE_RETAIN(_faceSprite);
+		addChild(_faceSprite);
+		updateEmotion();
+		return true;
+	}
+	return false;
+}
+obj_face::~obj_face() {
+	CC_SAFE_RELEASE_NULL(_faceSprite);
+}
+class obj_face_torieltalk : public obj_face {
+	USprite* _glasses;
+	USprite* _body;
+protected:
+	virtual void updateEmotion() override {
+	//	if (_glasses) removeChild(_glasses);
+	//	_glasses = nullptr;
+		if (_emotion == 99) {
+			_faceSprite->setUndertaleSprite(1986);
+			setContentSize(_faceSprite->getContentSize());
+			if (!_glasses) {
+				addChild(_glasses = USprite::create(1989),100); // spr_face_torielglasses
+				_glasses->setPosition(_glasses->getContentSize() / 2);
+			}
+			_emotion = 0;
+		}
+		else {
+			switch (_emotion) {
+			case 0: _faceSprite->setUndertaleSprite(1986); break;
+			case 1: _faceSprite->setUndertaleSprite(2004); break;
+			case 2: _faceSprite->setUndertaleSprite(1990); break;
+			case 3: _faceSprite->setUndertaleSprite(1999); break;
+			case 4: _faceSprite->setUndertaleSprite(2000); break;
+			case 6: _faceSprite->setUndertaleSprite(1991); break;
+			case 7: _faceSprite->setUndertaleSprite(1993); break;
+			case 8: _faceSprite->setUndertaleSprite(1996); break;
+			case 9: _faceSprite->setUndertaleSprite(1987); break;
+			}
+			
+		}
+		if (!_body) {
+			addChild(_body = USprite::create(1985), -100); // "spr_face_torielbody" obj_torface.x + obj_torface.sprite_width / 2 - self.sprite_width / 2;
+			Size contentSize(_body->getContentSize().width, _body->getContentSize().height + _faceSprite->getContentSize().height+9);
+			setContentSize(contentSize);
+			_faceSprite->setPositionY(_faceSprite->getPositionY() + 9);
+			_body->setPositionY(_body->getPositionY() - 9);
+	
+			{// test box
+				DrawNode * debug = DrawNode::create();
+				Vec2 pos = getContentSize()/2;
+				debug->drawRect(-pos, pos, Color4F::GREEN);
+				addChild(debug, 1000);
+			}
+		}
+	}
+public:
+	obj_face_torieltalk() : obj_face(), _glasses(nullptr), _body(nullptr) {}
+	CREATE_FUNC(obj_face_torieltalk);
+};
+
+obj_face* obj_face::create(size_t face_index) {
+	if(face_index == 1) return obj_face_torieltalk::create();
+	else return nullptr;
+	/*
+
+	switch (face_index) {
+	case 1: // obj_face_torieltalk
+		
+	case 2: // obj_face_floweytalk
+	case 3: // obj_face_sans
+	case 4: // obj_face_papyrus
+	case 5: // obj_face_undyne
+	case 6: // obj_face_alphys
+	case 7: // obj_face_asgore
+	case 8: // obj_face_mettaton
+	case 9: //obj_face_asriel
+	}
+	return nullptr;
+	*/
+}
+
+
 obj_dialoguer::obj_dialoguer() : UObject(), _face(nullptr), _writer(nullptr) {} 
 
 
 obj_dialoguer::~obj_dialoguer()
 {
+	CC_SAFE_RELEASE_NULL(_face);
+	CC_SAFE_RELEASE_NULL(_writer);
 }
-obj_dialoguer* obj_dialoguer::create() {
-	obj_dialoguer* obj = new obj_dialoguer;
-	if (obj && obj->init(obj_dialoguer::object_index)) {
-		obj->setAnchorPoint(Vec2(0, 1));
-		obj->autorelease();
-		return obj;
+
+bool obj_dialoguer::init()  {
+	if (UObject::init(obj_dialoguer::object_index)) {
+		removeAllChildren();
+		CC_SAFE_RELEASE_NULL(_writer);
+		CC_SAFE_RELEASE_NULL(_face);
+		_writer = obj_writer::create();
+		CC_SAFE_RETAIN(_writer);
+		Size size(304 - 16, 80 - 5);
+
+		setContentSize(size);
+		DrawNode* box = DrawNode::create(3);
+		box->drawSolidRect(Vec2(0, 0), size, Color4F::WHITE);
+		box->drawSolidRect(Vec2(3, 3), size - Size(3, 3), Color4F::BLACK);
+		//	box->drawRect(Vec2(0, 0), Vec2(304 - 16, 80 - 5), Color4F::WHITE);
+		//box->setPosition(size / 2);
+		box->setAnchorPoint(Vec2::ZERO);
+		_writer->setAnchorPoint(Vec2::ZERO);
+		addChild(box, -100);
+		addChild(_writer, 100);
+		return true;
 	}
-	CC_SAFE_DELETE(obj);
-	return nullptr;
+	return false;
+}
+void obj_dialoguer::setFace(size_t index) {
+	if (index == 0) {
+		if (_face) {
+			removeChild(_face, true);
+			_face = nullptr;
+			reset();
+		}
+	}
+	else if (!_face || _face->getFace() != index) {
+		if (!_face) removeChild(_face, true);
+		addChild(_face = obj_face::create(index));
+		reset();
+	}
 }
 void obj_dialoguer::reset() {
-
-	/*
-
-	if (instance_exists(1570)) {
-		if (obj_mainchara.y > self.yy + 130) {
-			self.side = 0;
-			if (global.facechoice != 0) {
-				self.writer = instance_create(self.xx + 68, self.yy - 5, 782/* OBJ_WRITER );
-			//	script_execute(144 scr_facechoice );
-			}
-			else  self.writer = instance_create(self.xx + 10, self.yy - 5, 782/* OBJ_WRITER );
-		}
-		else {
-			self.side = 1;
-			if (global.facechoice != 0) {
-				self.writer = instance_create(self.xx + 68, self.yy + 150, 782/* OBJ_WRITER );
-				//script_execute(144 scr_facechoice );
-			}
-			else  self.writer = instance_create(self.xx + 10, self.yy + 150, 782/* OBJ_WRITER );
-		}
+	const Size& size = getContentSize();
+	_writer->setAnchorPoint(Vec2(0, 1));
+	if (_face) {
+		_face->setAnchorPoint(Vec2(-0.5,-0.5));
+		_face->setPosition(4, 8);
+		_writer->setPosition(68, getContentSize().height / 2);
 	}
-	*/
+	else {
+		_writer->setPosition(3, getContentSize().height / 2);
+	}
 }
 void obj_dialoguer::setString(const std::string& text) {
-	removeAllChildrenWithCleanup(true);
-	Size size(304 - 16, 80 - 5);
-
-	setContentSize(size);
-	DrawNode* box = DrawNode::create(3);
-	box->drawSolidRect(Vec2(0, 0), Vec2(304-16, 80-5), Color4F::WHITE);
-	box->drawSolidRect(Vec2(3, 3), Vec2(301 - 19, 77 - 8), Color4F::BLACK);
-	
-	//box->setPosition(size / 2);
-	addChild(box, -1);
-	addChild(_writer = obj_writer::create());
-	//_writer->setAnchorPoint(Vec2(0, 1));
-//	_writer->setPosition(10, 10);
-
-	/*
-
-	UObject* mainchara = _room->instance_exists(1570);
-	if (mainchara != nullptr) { // obj_mainchara
-		if (mainchara->getPosition().y > 130)
-			_writer->setPosition(10, -5);
-		else
-			_writer->setPosition(10, 150);
-	}
-		*/
 	_writer->setString(text);
 	reset();
 	_writer->start();
-	/*
-
-	if (instance_exists(self.writer) && self.writer.writingy > self.yy + 80)
-		self.writer.writingy -= 155;
-	if (instance_exists(774/* obj_face ) && obj_face.y > self.yy + 80)
-		obj_face.y -= 155;
-	*/
 }
