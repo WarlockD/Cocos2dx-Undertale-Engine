@@ -19,14 +19,15 @@ void obj_writer::clear() {
 	_bounds.width = 0.0f;
 }
 void obj_writer::push_back(int a, const sf::Color& color) {
-	auto& glyph = _font->getGlyph(a);
+
 	if (a == '\n') {
-		_nextLetterPosition.y += _font->getFontSize();
-		_bounds.height += _font->getFontSize();
+		_nextLetterPosition.y += _font->getFontSize()+2;
+		_bounds.height += _font->getFontSize()+2;
 	}
 	else if(a == '\r')
 		_nextLetterPosition.x = 0.0f;
 	else {
+		auto& glyph = _font->getGlyph(a);
 		float x = _nextLetterPosition.x;// +glyph.bounds.width / 2; //+_linesOffsetX[letterInfo.lineIndex];
 		float y = _nextLetterPosition.y;// +glyph.bounds.height / 2.0f;// +glyph.bounds.height / 2;// +glyph.bounds.top;
 

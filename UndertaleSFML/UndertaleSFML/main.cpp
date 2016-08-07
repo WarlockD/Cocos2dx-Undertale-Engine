@@ -25,7 +25,7 @@ void gameLoop(sf::RenderWindow& window) {
 	window.setView(view);
 	obj_writer writer;
 	writer.setFont(2);
-	writer.setText("* mind your p and q's and I");
+	writer.setText("* mind your p and\n\r q's and I");
 	while (window.isOpen())
 	{
 		// Handle events
