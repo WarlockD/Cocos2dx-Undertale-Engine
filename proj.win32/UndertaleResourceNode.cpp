@@ -178,16 +178,16 @@ FontAtlas* UndertaleFont::createFontAtlas() {
 
 		//def.offsetX = f.offset;
 	    def.offsetX = f.offset;
-		def.offsetY = f.height > _configuration.size() ? f.height - _configuration.size() : 0;
+		def.offsetY =  0;
 		def.U = tempRect.origin.x + frameRect.origin.x;
 		def.V = tempRect.origin.y + frameRect.origin.y;
 		def.width = tempRect.size.width;
 		def.height = tempRect.size.height;
 		def.textureID = 0;
 		def.validDefinition = true;
-		def.xAdvance = tempRect.size.width;
+		def.xAdvance = f.shift;
 
-		assert(f.ch != 'p');
+//		assert(f.ch != 'p');
 		// add the new definition
 		if (65535 < f.ch) {
 			CCLOGWARN("Warning: 65535 < fontDef.charID (%u), ignored", f.ch);

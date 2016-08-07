@@ -11,11 +11,19 @@ obj_writer::~obj_writer() {
 		Node::removeAllChildrenWithCleanup(true);
 	//	CC_SAFE_RELEASE_NULL(_reusedLetter);
 		CC_SAFE_RELEASE_NULL(_fontAtlas);
+		CC_SAFE_RELEASE_NULL(_textLayer);
 	}
 }
 
 bool obj_writer::init()  {
-	return UObject::init(object_index);
+	if (UObject::init(object_index)) {
+		_textLayer = Node::create();
+		addChild(_textLayer,1000);
+		_textLayer->retain();
+		_textLayer->setVisible(true);
+		return true;
+	}
+	return false;
 }
 
 void obj_writer::setUndertaleFont(size_t font_index) {
@@ -58,9 +66,8 @@ void obj_writer::changeEmotion(size_t emotion) {
 	}
 }
 void obj_writer::updateLetters(bool visable) {
-	removeAllChildren();
+	_textLayer->removeAllChildren();
 	_currentCachePosition = 0;
-	auto& spriteLetters = getChildren();
 	Color3B color(_config.mycolor >> 16, _config.mycolor >> 8, _config.mycolor);
 	Vec2 startWriting(0.0f, getContentSize().height);
 	Vec2 writing = startWriting;
@@ -117,7 +124,7 @@ void obj_writer::updateLetters(bool visable) {
 				sprite->setPosition(writing);
 				sprite->setVisible(visable);
 				sprite->setTag(state.to_int);
-				addChild(sprite);
+				_textLayer->addChild(sprite);
 				state.delay = 1; // reset frame delay
 			}
 			{
@@ -261,12 +268,12 @@ void obj_writer::setType(const TEXTTYPE& type) {
 
 
 void obj_writer::update(float dt) {
-	UObject::update(dt);
+	
 	if (!_instant) {
-		if (_typeingPosition < getChildrenCount()) {
+		auto& children = _textLayer->getChildren();
+		if (_typeingPosition < children.size()) {
 			if (_frameDelay == 0) {
-				
-				auto sprite = _children.at(_typeingPosition++);
+				Node* sprite = sprite = children.at(_typeingPosition++);
 				sprite->setVisible(true);
 				FaceState state;
 				
@@ -286,4 +293,5 @@ void obj_writer::update(float dt) {
 			// handle shake
 		}
 	}
+	UObject::update(dt);
 }

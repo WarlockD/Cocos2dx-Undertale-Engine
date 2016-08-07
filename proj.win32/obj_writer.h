@@ -21,6 +21,7 @@ class obj_writer : public UObject
 {
 private:
 	friend class UObject;
+	cocos2d::Node* _textLayer;
 	TEXTTYPE _config;
 	FontAtlas* _fontAtlas;
 	UndertaleLib::UndertaleText _text;
