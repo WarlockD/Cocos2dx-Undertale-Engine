@@ -149,12 +149,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BatchSprite.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="obj_writer.cpp" />
     <ClCompile Include="UndertaleLib.cpp" />
     <ClCompile Include="UndertaleLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BatchSprite.h" />
     <ClInclude Include="obj_writer.h" />
     <ClInclude Include="UndertaleLib.h" />
     <ClInclude Include="UndertaleLoader.h" />
