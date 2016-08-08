@@ -1,5 +1,6 @@
+#include "Global.h"
 #include "UndertaleLoader.h"
-#include "obj_writer.h"
+#include "obj_dialoger.h"
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "jpeg.lib")
@@ -23,31 +24,38 @@ void gameLoop(sf::RenderWindow& window) {
 	auto font = UFont::LoadUndertaleFont(4);
 	sf::View view(sf::FloatRect(0, 0, 320, 240));
 	window.setView(view);
-	obj_writer writer;
-	writer.setFont(2);
-	writer.setText("* mind your p and\n\r q's and I");
+	obj_dialoger writer;
+	//writer.setFont(4);
+	writer.setConfig();
+	writer.setText("* mind your p \\Yand\n\r q's and I");
+	writer.start_typing();
 	while (window.isOpen())
 	{
 		// Handle events
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
-			// Window closed or escape key pressed: exit
-			if ((event.type == sf::Event::Closed) ||
-				((event.type == sf::Event::KeyPressed) && (event.key.code == sf::Keyboard::Escape)))
-			{
+			switch (event.type) {
+			case sf::Event::Closed:
 				window.close();
+				return;
+			case sf::Event::KeyPressed:
+				if (event.key.code == sf::Keyboard::Escape) {
+					window.close();
+					return;
+				}
 				break;
 			}
-
 		}
-		if (!window.isOpen()) break;
+		writer.update(0.0f);
 		window.draw(writer);
 		window.display();
 	}
 }
 int main(int argc, const char* argv[]) {
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
+	logging::init_cerr();
+	logging::init_cout();
 	const int gameWidth = 800;
 	const int gameHeight = 600;
 

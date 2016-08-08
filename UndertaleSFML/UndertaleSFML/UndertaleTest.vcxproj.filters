@@ -16,6 +16,9 @@
     <Filter Include="shaders">
       <UniqueIdentifier>{514a60ca-1ea7-4641-a0dd-6e1c2b3501b0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="UndertaleObjects">
+      <UniqueIdentifier>{7eb46093-9300-4fd4-aef6-f21d3674ac72}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -27,11 +30,17 @@
     <ClCompile Include="UndertaleLoader.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
-    <ClCompile Include="obj_writer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="BatchSprite.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UndertaleLabel.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Global.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="obj_writer.cpp">
+      <Filter>UndertaleObjects</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -41,11 +50,20 @@
     <ClInclude Include="UndertaleLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="obj_writer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="BatchSprite.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UndertaleLabel.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="obj_writer.h">
+      <Filter>UndertaleObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="obj_dialoger.h">
+      <Filter>UndertaleObjects</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -150,14 +150,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BatchSprite.cpp" />
+    <ClCompile Include="Global.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="obj_writer.cpp" />
+    <ClCompile Include="UndertaleLabel.cpp" />
     <ClCompile Include="UndertaleLib.cpp" />
     <ClCompile Include="UndertaleLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BatchSprite.h" />
+    <ClInclude Include="Global.h" />
+    <ClInclude Include="obj_dialoger.h" />
     <ClInclude Include="obj_writer.h" />
+    <ClInclude Include="UndertaleLabel.h" />
     <ClInclude Include="UndertaleLib.h" />
     <ClInclude Include="UndertaleLoader.h" />
   </ItemGroup>
