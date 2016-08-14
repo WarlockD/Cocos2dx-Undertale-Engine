@@ -6,6 +6,8 @@
 #include <Windows.h>
 #endif
 
+const std::string global::empty_string;
+
 // all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
 class basic_debugbuf : public std::streambuf {
 protected:

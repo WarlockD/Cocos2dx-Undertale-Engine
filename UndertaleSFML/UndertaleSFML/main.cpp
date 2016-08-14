@@ -1,6 +1,8 @@
 #include "Global.h"
 #include "UndertaleLoader.h"
 #include "obj_dialoger.h"
+#include <cassert>
+
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "jpeg.lib")
@@ -17,18 +19,29 @@
 #pragma comment(lib, "sfml-graphics-s-d.lib")
 #pragma comment(lib, "sfml-window-s-d.lib")
 
+sf::RenderWindow* s_window = nullptr; // global window
 
-void gameLoop(sf::RenderWindow& window) {
+namespace global {
+	sf::RenderWindow& getWindow() {
+		assert(s_window);
+		return *s_window;
+	}
+};
+
+
+constexpr size_t UpdateTime = 30 / 1000; // 30 frames a second
+void gameLoop() {
+	sf::RenderWindow& window = global::getWindow();
 	sf::Clock clock;
 	bool isPlaying = false;
 	auto font = UFont::LoadUndertaleFont(4);
 	sf::View view(sf::FloatRect(0, 0, 320, 240));
 	window.setView(view);
-	obj_dialoger writer;
+	auto writer = obj_dialoger::create();
 	//writer.setFont(4);
-	writer.setConfig();
-	writer.setText("* mind your p \\Yand\n\r q's and I");
-	writer.start_typing();
+	writer->setConfig();
+	writer->setText("* mind your p \\Yand\n\r q's and I");
+	writer->start_typing();
 	while (window.isOpen())
 	{
 		// Handle events
@@ -47,8 +60,12 @@ void gameLoop(sf::RenderWindow& window) {
 				break;
 			}
 		}
-		writer.update(0.0f);
-		window.draw(writer);
+		auto time = clock.getElapsedTime();
+		if (time.asMilliseconds() > UpdateTime) {
+			writer->update(time);
+			clock.restart();
+		}
+		window.draw(*writer);
 		window.display();
 	}
 }
@@ -60,11 +77,12 @@ int main(int argc, const char* argv[]) {
 	const int gameHeight = 600;
 
 	// Create the window of the application
-	sf::RenderWindow window(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close);
-	gameLoop(window);
-	
-
+	s_window = new sf::RenderWindow(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close);
+	gameLoop();
 	// we got to run this to delete all the loaded textures we have or visual studio blows a fit
 	Global::DestroyEveything();
+	delete s_window;
+	s_window = nullptr;
+	
 	return 0;
 }

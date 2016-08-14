@@ -42,6 +42,9 @@
     <ClCompile Include="obj_writer.cpp">
       <Filter>UndertaleObjects</Filter>
     </ClCompile>
+    <ClCompile Include="obj_face.cpp">
+      <Filter>UndertaleObjects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">

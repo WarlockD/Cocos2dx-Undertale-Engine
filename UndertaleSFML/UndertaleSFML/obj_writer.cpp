@@ -1,7 +1,12 @@
 #include "obj_writer.h"
-obj_writer::obj_writer() : UndertaleLabel(), _color(sf::Color::White), _isTyping(false) {
+#include "obj_dialoger.h"
+
+ sf::View obj_dialoger::_dialog_vew(sf::FloatRect(0, 0, 320, 240));
+
+obj_writer::obj_writer(): _color(sf::Color::White), _isTyping(false) {
 	setConfig(TEXTTYPE());
 }
+
 
 void obj_writer::do_typing() {
 
@@ -17,11 +22,19 @@ void obj_writer::setConfig(const TEXTTYPE& config) {
 	_color = sf::Color(_config.mycolor, _config.mycolor >> 8, _config.mycolor >> 16);
 	clear();
 }
-void obj_writer::update(float dt) {
+void obj_writer::draw(sf::RenderTarget& target, sf::RenderStates states) const {
+	if (_font && _textVerts.size() > 0) {
+		states.transform *= getTransform();
+		states.texture = &_font->getTexture();
+		target.draw(_textVerts.data(), _textVerts.size(), sf::PrimitiveType::Triangles, states);
+	}
+}
+void obj_writer::update(sf::Time dt) {
 	if (!_isTyping) return;
-	if (_clock.getElapsedTime().asMilliseconds() > _nextLetterDelay) {
+	_frameTime += dt;
+	if (_frameTime.asMilliseconds() > _nextLetterDelay) {
 		_nextLetterDelay = 100;
-		_clock.restart();
+		_frameTime = sf::Time::Zero;
 		while (_pos != _text.end()) {
 			const auto& t = *_pos++;
 			switch (t.token()) {
@@ -32,38 +45,42 @@ void obj_writer::update(float dt) {
 			}
 			break;
 			case TOKEN::Face:
-				setFace(t.value());
+				faceCallback(t.value());
 				break;
 			case TOKEN::Emotion:
-				setEmotion(t.value());
+				emotionCallback(t.value());
 				break;
+			case TOKEN::Typer:
+				typerCallback(t.value());
+				break;
+			case TOKEN::Halt:
+				_isTyping = false;
+				haltFCallback(t.value());
+				return;
 			case TOKEN::Delay:
 				if (t.value() != 0) _nextLetterDelay *= t.value();
 				break;
 			case TOKEN::NewLine:
-				_nextLetterPosition.y += _font->getFontSize() + 2;
-				_nextLetterPosition.x = 0.0f;
-				_bounds.height += _font->getFontSize() + 2;
+				newline();
 				break;
 			case TOKEN::Letter:
 				// letter, type it and make a sound
 			{
 				char16_t ch = t.value();
-				if (_nextLetterPosition.y > _config.writingxend) {
-					_nextLetterPosition.x = 0.0;
-					_nextLetterPosition.y -= _config.spacing;
+				if (_writing.y > _config.writingxend) {
+					newline();
 				}
 				else {
 					if (_config.typer == 18) {
-						if (ch == 'l' || ch == 'i') _nextLetterPosition.x += 2;
-						if (ch == 'I') _nextLetterPosition.x += 2;
-						if (ch == '!') _nextLetterPosition.x += 2;
-						if (ch == '.') _nextLetterPosition.x += 2;
-						if (ch == 'S') _nextLetterPosition.x++;
-						if (ch == '?') _nextLetterPosition.x += 2;
-						if (ch == 'D') _nextLetterPosition.x++;
-						if (ch == 'A') _nextLetterPosition.x++;
-						if (ch == '\'') _nextLetterPosition.x++;
+						if (ch == 'l' || ch == 'i') _writing.x += 2;
+						if (ch == 'I') _writing.x += 2;
+						if (ch == '!') _writing.x += 2;
+						if (ch == '.') _writing.x += 2;
+						if (ch == 'S') _writing.x++;
+						if (ch == '?') _writing.x += 2;
+						if (ch == 'D') _writing.x++;
+						if (ch == 'A') _writing.x++;
+						if (ch == '\'') _writing.x++;
 					}
 				}
 				push_back(t.value(), _currentColor);
@@ -100,7 +117,7 @@ void obj_writer::update(float dt) {
 					if (ch == '\'') kern -= 6;
 					if (ch == 'J') kern--;
 				}
-				_nextLetterPosition.x += kern;
+				_writing.x += kern;
 				return;
 			}
 			}

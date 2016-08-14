@@ -2,23 +2,31 @@
 #include "UndertaleLoader.h"
 #include "UndertaleLib.h"
 
-
-class UndertaleLabel : public sf::Drawable, public sf::Transformable {
+class UndertaleLabelBuilder {
 protected:
 	std::shared_ptr<UFont> _font;
-	std::vector<sf::Vertex> _verts;
-	sf::Vector2f _nextLetterPosition;
-	sf::FloatRect _bounds;
-	
+	std::vector<sf::Vertex> _textVerts;
+	sf::Vector2f _writing;
+	sf::Vector2f _offset; // starting offset
+	sf::Vector2f _textBounds;
 public:
-	UndertaleLabel();
+	UndertaleLabelBuilder();
+	virtual ~UndertaleLabelBuilder() {}
+	virtual void setTextOffset(const sf::Vector2f& v);
+	const sf::Vector2f getTextOffset() const { return _offset; }
 	virtual void setText(const std::string& text);
-	
-	void setFont(size_t index);
+	virtual void setFont(size_t index);
 	virtual void clear();
+	virtual void newline();
 	virtual void push_back(int a, const sf::Color& color = sf::Color::White);
 	virtual void pop_back();
-	sf::FloatRect getLocalBounds() const { return _bounds; }
+	const sf::Vector2f& getTextSize() const { return _textBounds; }
+};
+
+class UndertaleLabel : public UndertaleLabelBuilder,  public sf::Drawable, public sf::Transformable {
+public:
+	sf::FloatRect getLocalBounds() const { return sf::FloatRect(sf::Vector2f(), getTextSize()); }
 	sf::FloatRect getGlobalBounds() const { return  getTransform().transformRect(getLocalBounds()); }
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const;
 };
+

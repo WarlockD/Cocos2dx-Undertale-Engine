@@ -2,37 +2,43 @@
 
 using namespace sf;
 
-UndertaleLabel::UndertaleLabel() : _nextLetterPosition(0.0f,0.0f) {
-	_verts.reserve(6 * 40);
+UndertaleLabelBuilder::UndertaleLabelBuilder() : _writing(0.0f, 0.0f), _textBounds(0.0f, 0.0f), _offset(0.0f, 0.0f) {
+	_textVerts.reserve(6 * 40);
 }
-void UndertaleLabel::setText(const std::string& text) {
+void UndertaleLabelBuilder::setText(const std::string& text) {
 	clear();
-	for (char c : text) push_back(c); 
+	for (char c : text) push_back(c);
 }
-void UndertaleLabel::setFont(size_t index) {
-	_font = UFont::LoadUndertaleFont(index); 
-	clear(); 
+void UndertaleLabelBuilder::setFont(size_t index) {
+	_font = UFont::LoadUndertaleFont(index);
+	clear();
 }
-void UndertaleLabel::clear() {
-	_verts.clear();
-	_bounds.height = _font ? _font->getFontSize() : 0.0f;
-	_bounds.width = 0.0f;
+void UndertaleLabelBuilder::setTextOffset(const sf::Vector2f& v) {
+	if (_textVerts.size() >0) for (auto& vert : _textVerts) vert.position = (vert.position - _offset) + v;
+	_offset = v;
 }
-void UndertaleLabel::push_back(int a, const sf::Color& color) {
-
+void UndertaleLabelBuilder::clear() {
+	_textVerts.clear();
+	_textBounds.y = _font ? _font->getFontSize() : 0.0f;
+	_textBounds.x = 0.0f;
+	_writing = _offset;
+}
+void UndertaleLabelBuilder::newline() {
+	_writing.y += _font->getFontSize() + 2;
+	_textBounds.y += _font->getFontSize() + 2;
+	_writing.x = _offset.x;
+}
+void UndertaleLabelBuilder::push_back(int a, const sf::Color& color) {
 	if (a == '\n') {
-		_nextLetterPosition.y += _font->getFontSize()+2;
-		_bounds.height += _font->getFontSize()+2;
+		newline();
 	}
-	else if(a == '\r')
-		_nextLetterPosition.x = 0.0f;
 	else {
 		auto& glyph = _font->getGlyph(a);
-		float x = _nextLetterPosition.x;// +glyph.bounds.width / 2; //+_linesOffsetX[letterInfo.lineIndex];
-		float y = _nextLetterPosition.y;// +glyph.bounds.height / 2.0f;// +glyph.bounds.height / 2;// +glyph.bounds.top;
+		float x = _writing.x +glyph.bounds.width / 2.0f; //+_linesOffsetX[letterInfo.lineIndex];
+		float y = _writing.y + _font->getFontSize() / 2.0f;// +glyph.bounds.height / 2;// +glyph.bounds.top;
 
 		float left = x + glyph.bounds.left;
-		float top = y + glyph.bounds.top;
+		float top = y + glyph.bounds.top ;
 		float right = x + glyph.bounds.left + glyph.bounds.width;
 		float bottom = y + glyph.bounds.top + glyph.bounds.height;
 
@@ -42,29 +48,26 @@ void UndertaleLabel::push_back(int a, const sf::Color& color) {
 		float v2 = static_cast<float>(glyph.textureRect.top + glyph.textureRect.height);
 
 		// Add a quad for the current character
-		_verts.push_back(Vertex(Vector2f(left, top), color, Vector2f(u1, v1)));
-		_verts.push_back(Vertex(Vector2f(right, top), color, Vector2f(u2, v1)));
-		_verts.push_back(Vertex(Vector2f(left, bottom), color, Vector2f(u1, v2)));
-		_verts.push_back(Vertex(Vector2f(left, bottom), color, Vector2f(u1, v2)));
-		_verts.push_back(Vertex(Vector2f(right, top), color, Vector2f(u2, v1)));
-		_verts.push_back(Vertex(Vector2f(right, bottom), color, Vector2f(u2, v2)));
-		_nextLetterPosition.x += glyph.advance;
+		_textVerts.push_back(Vertex(Vector2f(left, top), color, Vector2f(u1, v1)));
+		_textVerts.push_back(Vertex(Vector2f(right, top), color, Vector2f(u2, v1)));
+		_textVerts.push_back(Vertex(Vector2f(left, bottom), color, Vector2f(u1, v2)));
+		_textVerts.push_back(Vertex(Vector2f(left, bottom), color, Vector2f(u1, v2)));
+		_textVerts.push_back(Vertex(Vector2f(right, top), color, Vector2f(u2, v1)));
+		_textVerts.push_back(Vertex(Vector2f(right, bottom), color, Vector2f(u2, v2)));
+		_writing.x += glyph.advance;
 
 		// Update the current bounds
-		_bounds.width += std::max(_bounds.width, _nextLetterPosition.x);
-		_bounds.height = y + _font->getFontSize();
+		_textBounds.x += std::max(_textBounds.x, _writing.x);
 	}
-	
-	
 }
-void UndertaleLabel::pop_back() {
-	if(_verts.size() > 0) _verts.resize(_verts.size() - 6);
+void UndertaleLabelBuilder::pop_back() {
+	if(_textVerts.size() > 0) _textVerts.resize(_textVerts.size() - 6);
 }
 
 void UndertaleLabel::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-	if (_font && _verts.size() > 0) {
+	if (_font && _textVerts.size() > 0) {
 		states.transform *= getTransform();
 		states.texture = &_font->getTexture();
-		target.draw(_verts.data(), _verts.size(), sf::PrimitiveType::Triangles, states);
+		target.draw(_textVerts.data(), _textVerts.size(), sf::PrimitiveType::Triangles, states);
 	}
 }

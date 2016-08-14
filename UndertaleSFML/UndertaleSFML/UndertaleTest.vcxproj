@@ -152,6 +152,7 @@
     <ClCompile Include="BatchSprite.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="obj_face.cpp" />
     <ClCompile Include="obj_writer.cpp" />
     <ClCompile Include="UndertaleLabel.cpp" />
     <ClCompile Include="UndertaleLib.cpp" />
