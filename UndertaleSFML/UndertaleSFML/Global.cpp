@@ -30,7 +30,7 @@ SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureR
 	float v1 = static_cast<float>(textureRect.top);
 	float u2 = static_cast<float>(textureRect.left + textureRect.width);
 	float v2 = static_cast<float>(textureRect.top + textureRect.height);
-	sf::Vertex* verts = _verts;
+	sf::Vertex* verts = _verts.data();
 	// Add a quad for the current character
 	*verts++ = (Vertex(Vector2f(left, top), sf::Color::White, Vector2f(u1, v1)));
 	*verts++ = (Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
@@ -39,6 +39,15 @@ SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureR
 	*verts++ = (Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
 	*verts++ = (Vertex(Vector2f(right, bottom), sf::Color::White, Vector2f(u2, v2)));
 }
+
+SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts) :
+	_texture(texture), 
+	_textureRect(static_cast<int>(verts[0].texCoords.x), static_cast<int>(verts[0].texCoords.y), 
+		static_cast<int>(verts[5].texCoords.x- verts[0].texCoords.x), static_cast<int>(verts[5].texCoords.y- verts[0].texCoords.y)),
+	_bounds(verts[0].position, verts[5].position - verts[0].position)
+	{
+	std::copy(verts, verts + 6, _verts.begin());
+};  // build from triangles
 
 
 sf::FloatRect Mesh::getVerteicsBounds() const {
@@ -112,9 +121,10 @@ const sf::Transform& Body::getTransform() const {
 		float syc = _scale.y * cosine;
 		float sxs = _scale.x * sine;
 		float sys = _scale.y * sine;
-		float tx = -_origin.x * sxc - _origin.y * sys + _position.x;
-		float ty = _origin.x * sxs - _origin.y * syc + _position.y;
-
+		//float tx = -_origin.x * sxc - _origin.y * sys + (int)(_position.x + 0.5f);// _position.x;
+		//float ty = _origin.x * sxs - _origin.y * syc + (int)(_position.y + 0.5f); // _position.y;
+		float tx = -_origin.x * sxc - _origin.y * sys +  _position.x;
+		float ty = _origin.x * sxs - _origin.y * syc +  _position.y;
 		_transform = sf::Transform(sxc, sys, tx,
 			-sxs, syc, ty,
 			0.f, 0.f, 1.f);

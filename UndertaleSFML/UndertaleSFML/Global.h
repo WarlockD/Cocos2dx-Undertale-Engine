@@ -5,6 +5,7 @@
 #include <ctime>
 #include <sstream>
 #include <atomic>
+#include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include <memory>
@@ -162,38 +163,103 @@ public:
 };
 
 
+template<typename T, typename TCI=T::const_iterator> class VertsInterface
+{
+public: // trates
+	typedef T t_verts;
+	typedef TCI const_iterator;
+public:
+	virtual const_iterator begin() const = 0; 
+	virtual const_iterator end() const = 0; 
+	inline void insert(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
+	inline void insert(std::vector<sf::Vertex>& verts, const sf::Transform& transform) const {
+		for (auto it = begin(); it != end(); it++) {
+			verts.emplace_back(transform * it->position, it->color, it->texCoords);
+		}
+	}
+	inline void insert(std::vector<sf::Vertex>& verts, const sf::Transform& transform, const sf::Color& color) const {
+		for (auto it = begin(); it != end(); it++) {
+			verts.emplace_back(transform * it->position, color, it->texCoords);
+		}
+	}
+	inline void insert(std::vector<sf::Vertex>& verts, std::function<sf::Vertex(const sf::Vertex&v)> func) const {
+		for (auto it = begin(); it != end(); it++) {
+			verts.emplace_back(func(*it));
+		}
+	}
+};
 
-class SpriteFrame : public Renderable2 {
+class SpriteFrame  : public VertsInterface<std::array<sf::Vertex, 6>> {
 	const sf::Texture* _texture;
 	sf::IntRect _textureRect;
 	sf::FloatRect _bounds;
-	sf::Vertex _verts[6];
+	t_verts _verts;
 public:
+	SpriteFrame() : _texture(nullptr) {}
 	SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds);
-	const sf::IntRect& getTextureRect() const { return _textureRect; }
-	// interface
-	const sf::Texture* getTexture() const override { return _texture; }
-	
-	const sf::Vertex* getVerteics() const override { return &_verts[0]; }
-	size_t getVerteicsCount() const override { return 6; }
-	sf::FloatRect getVerteicsBounds() const override { return _bounds; }
+	SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts);  // build from triangles
+	// we want to default to triangles for compatablity with opengles
+	const sf::IntRect& textureRect() const { return _textureRect; }
+	const sf::Texture* getTexture() const  { return _texture; }
+	const sf::FloatRect& getBounds() const  { return _bounds; }
+	const_iterator begin() const override { return _verts.begin();}
+	const_iterator end() const override { return _verts.end(); }
 };
-class SpriteFrameCollection : public Renderable2 {
-	std::vector<SpriteFrame> _frames;
-	size_t _current;
-	sf::Vector2f _size;
+
+template<typename T> class StopWatch {
 public:
-	SpriteFrameCollection(const std::vector<SpriteFrame>& frames, sf::Vector2f& size) : _frames(frames), _current(0), _size(size) {}
-	SpriteFrameCollection(std::vector<SpriteFrame>&& frames, sf::Vector2f& size) : _frames(frames), _current(0), _size(size) {}
-	size_t getImageIndex() const { return _current; }
-	void setImageIndex(size_t image_index) { _current = image_index % _frames.size(); }
-	const SpriteFrame& getSpriteFrame() const { return _frames.at(_current); }
-	const sf::IntRect& getTextureRect() const { return _frames.at(_current).getTextureRect(); }
-	// interface
-	const sf::Texture* getTexture() const override { return _frames[_current].getTexture(); }
-	const sf::Vertex* getVerteics() const override { return _frames[_current].getVerteics(); }
-	size_t getVerteicsCount() const override { return 6; }
-	sf::FloatRect getVerteicsBounds() const override { return sf::FloatRect(0.0f, 0.0f, _size.x, _size.y); }
+	typedef T Type;
+	static constexpr Type Zero = ((Type)0);
+	static constexpr Type One = ((Type)1); // used for incrment
+protected:
+	Type _toAmount;
+	Type _current;
+public:
+	StopWatch() : _toAmount(Zero), _current(Zero) {}
+	StopWatch(Type init) : _toAmount(init), _current(Zero) {}
+	template<class B, class = typename std::enable_if<std::is_convertible<B, T>::value, B>::type>
+	void setTime(B v) { _toAmount = static_cast<T>(v); }
+	template<class B, class = typename std::enable_if<std::is_convertible<B, T>::value, B>::type>
+	void addCurrent(B v) { _current += static_cast<T>(v); }
+	template<class B, class = typename std::enable_if<std::is_convertible<B, T>::value, B>::type>
+	void setCurrent(B v) { _current += static_cast<T>(v); }
+	Type getTime() const { return _toAmount; }
+	Type getCurrent() const { return _current; }
+	void reset() { _current = Zero; }
+	bool test() const { return _current >= _toAmount; }
+	bool test_then_reset() {
+		if (test()) { reset(); return true; }
+		else return false;
+	}
+	template<class B>
+	bool test_then_reset(B v) {
+		addCurrent(v);
+		if (test()) { reset(); return true; }
+		else return false;
+	}
+	
+
+	
+};
+class SpriteFrameCollection :  public VertsInterface<std::vector<sf::Vertex>, SpriteFrame::const_iterator> {
+private:
+	t_verts _frames;
+	const sf::Vertex* _current;
+	size_t _image_index;
+	sf::Vector2f _size;
+	const sf::Texture* _texture;
+public:
+	SpriteFrameCollection() : _texture(nullptr), _current(nullptr),_image_index(0) {}
+	SpriteFrameCollection(const sf::Texture* texture, const t_verts& frames, sf::Vector2f& size) : _frames(frames), _current(frames.data()), _image_index(0),_size(size), _texture(texture) {}
+	SpriteFrameCollection(const sf::Texture* texture, t_verts&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _current(_frames.data()), _image_index(0), _size(size), _texture(texture) {}
+	size_t getImageIndex() const { return _image_index; }
+	void setImageIndex(size_t image_index) { _image_index = image_index % (_frames.size() / 6); _current = _frames.data() + (_image_index * 6); }	
+	// cheat and use the iliterator from an array
+	SpriteFrame getSpriteFrame() const { return SpriteFrame(_texture, _current); }
+	const_iterator begin() const override { return const_iterator(_current, 0); }
+	const_iterator end() const override { return const_iterator(_current, 6); }
+	const sf::Texture* getTexture() const  { return _texture; }
+	const sf::Vector2f& getFrameSize() const { return _size; }
 };
 
 class LockingObject {

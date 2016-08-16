@@ -51,19 +51,22 @@ namespace kult {
 	using type = unsigned;
 
 	// kult::helpers
+
 	struct _can_copy {};
 	struct _can_move : public _can_copy {};
 
 	template<class B>
 	typename std::enable_if<std::is_copy_assignable<B>::value>::type
-	inline _assign(B& l, B&, _can_copy) {
+		inline _assign(B& l, B&, _can_copy) {
 		l = r;
 	}
 	template<class B>
 	typename std::enable_if<std::is_move_assignable<B>::value>::type
-	inline _assign(B& l, B& r, _can_move) {
+		inline _assign(B& l, B& r, _can_move) {
 		l = std::move(r);
 	}
+
+	
 
 	template<typename T>
 	T zero() {
@@ -137,7 +140,7 @@ namespace kult {
 			return statics;
 		}
 
-		type id;
+		const type id;
 		entity(const type &id_ = kult::id()) : id(id_) {
 			all().insert(this);
 		}
@@ -169,7 +172,7 @@ namespace kult {
 		}
 		void purge() {
 			kult::purge(id);
-			id = none<type>();
+			*const_cast<type*>(&id) = none<type>();
 		}
 	};
 
@@ -278,60 +281,11 @@ namespace kult {
 		}
 	};
 
-	// template class to check if we can dump an object
-	template<typename S, typename T>
-	class is_streamable
-	{
-		template<typename SS, typename TT>
-		static auto test(int)-> decltype(std::declval<SS&>() << std::declval<TT>(), std::true_type());
+	
 
-		template<typename, typename>
-		static auto test(...)->std::false_type;
-
-	public:
-		static const bool value = decltype(test<S, T>(0))::value;
-	};
-	// SFINAE test
-#define HAS_MEM_FUNC(func, name)                                        \
-    template<typename T, typename Sign>                                 \
-    struct name {                                                       \
-        typedef char yes[1];                                            \
-        typedef char no [2];                                            \
-        template <typename U, U> struct type_check;                     \
-        template <typename _1> static yes &chk(type_check<Sign, &_1::func > *); \
-        template <typename   > static no  &chk(...);                    \
-        static bool const value = sizeof(chk<T>(0)) == sizeof(yes);     \
-    };
-	template<typename B>
-	class has_generic_dump {
-		template<typename TT>
-		static auto test(int)-> decltype(TT::generic_dump, , std::true_type());
-		template<typename>
-		static auto test(...)->std::false_type;
-	public:
-		static const bool value = decltype(test<B>(0))::value;
-
-	};
-//	HAS_MEM_FUNC(generic_dump,has_dump2);
 
 	template<type NAME, typename T>
-	struct component : interface {
-	private:
-		struct general_ {};
-		struct special_ : general_ {};
-		template<class Q=T>
-		typename std::enable_if<is_streamable<std::ostream, Q>::value>::type
-		generic_dump(std::ostream &os, const type &id, special_)  const {
-			if (has<component>(id)) {
-				os << "\t" << name() << ": " << KULT_SERIALIZER_FN(get<component>(id)) << ",\n";
-			}
-		}
-		template<class Q = T>
-		void generic_dump(std::ostream &os, const type &id, general_)  const {
-			if (has<component>(id)) {
-				os << "\t" << name() << ": " << id << ",\n";
-			}
-		}
+	struct component : interface {		
 	public:
 		T value_type;
 		component(bool reentrant = 0) {
@@ -386,15 +340,10 @@ namespace kult {
 					std::swap(get<component>(dst), get<component>(src));
 			)
 		}
-	//	template<class T>
-		//	typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value && std::is_copy_assignable<T>, PtrComponent<Base>&>::type
-	//	typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value, PtrComponent<Base>&>::type
-		//template<class B=T, class = typename std::enable_if<std::is_copy_assignable<B>, B>::type>
-		
-	//	template<class B, class = typename std::enable_if<std::is_copy_constructible<B>, B>::type>
+
 		virtual void merge(const type &dst, const type &src) const {
-				//add<component>(dst) = get<component>(src);
-			_assign(add<component>(dst), get<component>(src),_can_move());
+				add<component>(dst) = get<component>(src);
+			//_assign(add<component>(dst), get<component>(src),_can_move());
 		}
 		virtual void copy(const type &dst, const type &src) const {
 			if (has<component>(src)) {
@@ -406,12 +355,39 @@ namespace kult {
 		}
 
 		//http://stackoverflow.com/questions/5839357/detect-operator-support-with-decltype-sfinae
+		// template class to check if we can dump an object
+		template<typename S, typename T>
+		class is_streamable
+		{
+			template<typename SS, typename TT>
+			static auto test(int)-> decltype(std::declval<SS&>() << std::declval<TT>(), std::true_type());
 
-	
+			template<typename, typename>
+			static auto test(...)->std::false_type;
+
+		public:
+			static const bool value = decltype(test<S, T>(0))::value;
+		};
+		// check to see if we have a stream operater, if not just print its name and id
+	private:
+		struct t_generic_dump {};
+		struct t_has_stream_operator : t_generic_dump {};
+		template<class Q = T>
+		typename std::enable_if<is_streamable<std::ostream, Q>::value>::type
+			generic_dump(std::ostream &os, const type &id, t_generic_dump)  const {
+			if (has<component>(id)) {
+				os << "\t" << name() << ": " << KULT_SERIALIZER_FN(get<component>(id)) << ",\n";
+			}
+		}
+		template<class Q = T>
+		void generic_dump(std::ostream &os, const type &id, t_has_stream_operator)  const {
+			if (has<component>(id)) {
+				os << "\t" << name() << ": " << id << ",\n";
+			}
+		}
+	public:
 		virtual void dump(std::ostream &os, const type &id) const override {
-			if (has<component>(id)) 
-				//generic_dump(os, id, special_());
-				generic_dump(os, id, special_());
+			if (has<component>(id)) generic_dump(os, id, t_has_stream_operator());
 		}
 		inline T &operator()(const type &id) {
 			return get<component>(id);

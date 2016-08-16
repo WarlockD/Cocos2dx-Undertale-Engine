@@ -6,7 +6,7 @@ using namespace sf;
 static UndertaleLib::UndertaleFile file;
 static std::unordered_map<size_t, std::unique_ptr<sf::Texture>> global_textures;
 static std::unordered_map<std::string, std::unique_ptr<sf::Shader>> global_shader_cache;
-std::unordered_map<size_t, std::weak_ptr<UFont>> UFont::_cache;
+
 
 
 
@@ -24,6 +24,7 @@ void UndertaleSprite::draw(sf::RenderTarget& target, sf::RenderStates states) co
 }
 struct UndertaleSpriteCache {
 	size_t index;
+	size_t texture_index;
 	UndertaleLib::Sprite usprite;
 	std::vector<sf::Vertex> verts;
 	sf::Vector2f size;
@@ -37,7 +38,9 @@ static const UndertaleSpriteCache& LookupSpriteCache(size_t index) {
 		it.usprite = file.LookupSprite(index);
 		it.size = sf::Vector2f(float(it.usprite.width()), float(it.usprite.height()));
 		it.index = index;
+		it.texture_index = it.usprite.frames()[0].texture_index;
 		for (auto uframe : it.usprite.frames()) {
+			assert(it.texture_index == uframe.texture_index); // should be the same for all
 			float left = static_cast<float>(uframe.offset_x);
 			float top = static_cast<float>(uframe.offset_y);
 			float right = static_cast<float>(uframe.offset_x + uframe.width);
@@ -76,7 +79,8 @@ const sf::Glyph& UFont::getGlyph(sf::Uint32 codePoint) const {
 }
 
 std::shared_ptr<UFont> UFont::LoadUndertaleFont(size_t index) {
-	auto& w_ptr = _cache[index];
+	static std::unordered_map<size_t, std::weak_ptr<UFont>> _cache;
+	auto w_ptr = _cache[index];
 	if (!w_ptr.expired()) return w_ptr.lock();
 	else {
 		auto ufont = file.LookupFont(index);
@@ -113,8 +117,14 @@ std::string replace_extension(const std::string& filename, const std::string& ne
 }
 namespace Global {
 	SpriteFrameCollection LoadSprite(size_t sprite_index) {
+		auto cache = LookupSpriteCache(sprite_index);
+		return SpriteFrameCollection(&Global::GetUndertaleTexture(cache.texture_index), cache.verts, cache.size);
+		/*
 		auto usprite = file.LookupSprite(sprite_index);
 		sf::Vector2f size = sf::Vector2f(float(usprite.width()), float(usprite.height()));
+		const sf::Texture* texture = &Global::GetUndertaleTexture(usprite.frames().at(0).texture_index);
+	
+	
 		std::vector<SpriteFrame> frames;
 		for (auto uframe : usprite.frames()) {
 			frames.emplace_back(
@@ -123,7 +133,7 @@ namespace Global {
 				sf::FloatRect(uframe.offset_x, uframe.offset_y, uframe.width, uframe.height)
 			);
 		}
-		return SpriteFrameCollection(frames, size);
+		*/
 	}
 
 	bool LoadUndertaleDataWin(const std::string& filename) {

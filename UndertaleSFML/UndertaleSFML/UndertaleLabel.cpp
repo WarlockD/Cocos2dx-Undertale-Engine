@@ -17,8 +17,19 @@ void UndertaleLabelBuilder::setTextOffset(const sf::Vector2f& v) {
 	if (_textVerts.size() >0) for (auto& vert : _textVerts) vert.position = (vert.position - _offset) + v;
 	_offset = v;
 }
+UndertaleLabelBuilder& UndertaleLabelBuilder::operator+=(const std::string& text) {
+	if (!_font) setFont(2);
+	for (char c : text) push_back(c);
+	return *this;
+}
+UndertaleLabelBuilder& UndertaleLabelBuilder::operator=(const std::string& text) {
+	if (!_font) setFont(2);
+	setText(text);
+	return *this;
+}
 void UndertaleLabelBuilder::clear() {
 	_textVerts.clear();
+	if (!_font) setFont(2);
 	_textBounds.y = _font ? _font->getFontSize() : 0.0f;
 	_textBounds.x = 0.0f;
 	_writing = _offset;
@@ -32,7 +43,9 @@ void UndertaleLabelBuilder::push_back(int a, const sf::Color& color) {
 	if (a == '\n') {
 		newline();
 	}
-	else {
+	else if (a == '\b') {
+		pop_back();
+	} else {
 		auto& glyph = _font->getGlyph(a);
 		float x = _writing.x +glyph.bounds.width / 2.0f; //+_linesOffsetX[letterInfo.lineIndex];
 		float y = _writing.y + _font->getFontSize() / 2.0f;// +glyph.bounds.height / 2;// +glyph.bounds.top;

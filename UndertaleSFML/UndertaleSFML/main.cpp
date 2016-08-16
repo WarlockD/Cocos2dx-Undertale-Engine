@@ -120,9 +120,14 @@ public:
 	}
 };
 kult::component<'body', Body> kbody;
-kult::component<'anim', Animation> kanimation;
+kult::component<'anim', StopWatch<float>> kanimation;
+kult::component<'vel', sf::Vector2f> kvelocity;
+kult::component<'pos', sf::Vector2f> kposition;
+kult::component<'fcol', SpriteFrameCollection> kframes;
+kult::component<'fsng', SpriteFrame> kframe;
+kult::component<'text', UndertaleLabelBuilder> ktext;
 //kult::component<'ani1', PtrComponent<Renderable2>> krenderable;
-kult::component<'test', pimpl_ptr<Renderable2>> krenderable;
+
 namespace ex = entityx;
 void gameLoop() {
 	sf::RenderWindow& window = global::getWindow();
@@ -130,12 +135,14 @@ void gameLoop() {
 	bool isPlaying = false;
 	auto font = UFont::LoadUndertaleFont(4);
 	sf::View view(sf::FloatRect(0, 0, 320, 240));
-	window.setView(view);
+//	window.setView(view);
 	auto writer = obj_dialoger::create();
 	//writer.setFont(4);
 	writer->setConfig();
 	writer->setText("* mind your p \\Yand\n\r q's and I");
 	writer->start_typing();
+	UndertaleLabel debug_label;
+	
 	sf::Font debug_font;
 	if (!debug_font.loadFromFile("LiberationSans-Regular.ttf")) {
 		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
@@ -143,42 +150,21 @@ void gameLoop() {
 	}
 	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
 	kult::entity etest;
-	etest[kanimation] = 3.4f;
+	etest[kanimation] = 0.5f;
 	
+	etest[kvelocity] = sf::Vector2f(1.0f, 0.0f);
+	etest[kframes] = raw_sprite;
+	etest[kbody].setPosition(10.0f, 100.0f);
 
-	etest[krenderable] = std::make_unique<SpriteFrameCollection>(raw_sprite);
-	etest[kbody].setPosition(0.0f, 0.0f);
+//	etest[kposition] = sf::Vector2f(10.0f, 100.0f);
+	etest[kbody].setScale(4.0f);
+	std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> draw_verts;
 
+	kult::entity debug_label_entity;
+	debug_label_entity[kbody].setPosition(0.0f, 0.0f);
+	//debug_label_entity[kbody].setScale(2.0f);
+	debug_label_entity[ktext] = "Happy Happy Joy joy";
 
-//	auto sprite = new SpriteFrameCollection(Global::LoadSprite(432));
-
-	sf::Sprite spr;
-	spr.setTexture(*raw_sprite.getTexture());
-	spr.setTextureRect(raw_sprite.getTextureRect());
-
-	Application app(window, debug_font);
-	ex::Entity entity = app.entities.create();
-
-	// "Physical" attributes.
-	auto body = entity.assign<Body>();
-	body->setPosition(100.0f, 100.0f);
-
-	entity.assign<const sf::Texture*>(raw_sprite.getTexture());
-	entity.assign<Mesh>(raw_sprite.getVerteics(), raw_sprite.getVerteicsCount()); 
-	entity.assign<Velocity>(0.5f, 0.0f);
-
-//	body->setRotation(50);
-	// Shape to apply to entity.
-	//auto test = entity.assign<PtrComponent<Renderable2>>(raw_sprite);
-//	test->reset(new SpriteFrameCollection(raw_sprite));
-	//auto anim = entity.assign<Animation>(0.25);
-	//anim = 0.25f;
-
-//	auto sprite = entity.assign<SpriteFrameCollection>(Global::LoadSprite(1986));
-//	auto test = entity.assign<sf::Sprite>(*raw_sprite.getTexture(), raw_sprite.getTextureRect());
-	//test->setPosition(100, 100);
-	//auto sprite_ptr = sprite.get();
-//	sprite_ptr->setImageIndex(1);
 	while (window.isOpen())
 	{
 		// Handle events
@@ -197,42 +183,77 @@ void gameLoop() {
 				break;
 			}
 		}
-		std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> draw_verts;
-		for (auto &entitys : kult::join(krenderable, kbody)) {
-			auto& r = entitys[krenderable];
-			auto& verts = draw_verts[r->getTexture()];
-			r->insert(verts, entitys[kbody].getTransform());
+		auto time = clock.getElapsedTime();
+		if (time.asMilliseconds() > 60/1000) { // 60 times a second
+			clock.restart();
+			draw_verts.clear();
+			
+			float dt = time.asSeconds();
+			// handle velocity system
+			for (auto &entitys : kult::join(kvelocity, kbody)) {
+				auto& velocity = entitys[kvelocity];
+				auto& body = entitys[kbody];
+				body.move(velocity*dt);
+				std::stringstream ss;
+				ss << body.getPosition();
+				debug_label.setText(ss.str());
+				debug_label_entity[ktext].setText(ss.str());
+			}
+			for (auto &entitys : kult::join(kvelocity, kposition)) {
+				auto& velocity = entitys[kvelocity];
+				auto& position = entitys[kposition];
+				position += velocity*dt;
+				std::stringstream ss;
+				ss << position;
+				debug_label.setText(ss.str());
+				debug_label_entity[ktext].setText(ss.str());
+			}
+			// animation system
+			for(auto &entitys : kult::join(kanimation, kframes)) {
+				auto& animation = entitys[kanimation];
+				auto& frames = entitys[kframes];
+				if (animation.test_then_reset(dt)) {
+					frames.setImageIndex(frames.getImageIndex()+1);
+				}
+			}
 
+
+			// handle rendering system
+			draw_verts.clear();
+			for (auto &entitys : kult::join(kframes, kbody)) {
+				auto& frame = entitys[kframes];
+				auto& verts = draw_verts[frame.getTexture()];
+				frame.insert(verts, entitys[kbody].getTransform());
+			}
+			for (auto &entitys : kult::join(kframes, kposition)) {
+				auto& frame = entitys[kframes];
+				sf::Vector2f pos = entitys[kposition];
+				pos.x = (int)(pos.x);
+				pos.y = (int)(pos.y);
+				auto& verts = draw_verts[frame.getTexture()];
+				frame.insert(verts, [pos](const sf::Vertex& v) {
+					sf::Vertex ret(v);
+					ret.position += pos;
+					return ret;
+				}); 
+			}
+			for (auto &entitys : kult::join(ktext, kbody)) {
+				auto& text = entitys[ktext];
+				auto& verts = draw_verts[&text.getTexture()];
+				text.insert(verts, entitys[kbody].getTransform());
+			}
 		}
+		// update as fast as we can?
 		window.clear();
+		sf::RenderStates states = sf::RenderStates::Default;
+		//window.draw(debug_label);
 		for (auto& kv : draw_verts) {
 			auto& verts = kv.second;
-			window.draw(verts.data(), 6, sf::PrimitiveType::Triangles, sf::RenderStates(kv.first));
+			states.texture = kv.first;
+			window.draw(verts.data(), verts.size(), sf::PrimitiveType::Triangles, states);
 		}
-	
-		/*
 		
-		auto time = clock.getElapsedTime();
-		if (time.asMilliseconds() > 500) {
-			//writer->update(time);
-			sprite_ptr->setImageIndex(sprite_ptr->getImageIndex() +1);
-			clock.restart();
-		}
-		*/
-		
-		sf::Time elapsed = clock.restart();
-	//	app.update(elapsed.asSeconds());
-		//window.draw(*sprite_ptr);
 		window.display();
-#if 0
-		auto time = clock.getElapsedTime();
-		if (time.asMilliseconds() > UpdateTime) {
-			writer->update(time);
-			clock.restart();
-		}
-		window.draw(*writer);
-		window.display();
-#endif
 	}
 }
 int main(int argc, const char* argv[]) {

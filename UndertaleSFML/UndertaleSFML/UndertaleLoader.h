@@ -5,7 +5,6 @@
 
 
 class UFont  : public std::enable_shared_from_this<UFont> {
-	static std::unordered_map<size_t, std::weak_ptr<UFont>> _cache;
 protected:
 	size_t _fontSize;
 	const sf::Texture* _texture;
