@@ -149,8 +149,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\ext\include\entityx\Entity.cc" />
+    <ClCompile Include="..\ext\include\entityx\Event.cc" />
+    <ClCompile Include="..\ext\include\entityx\help\Pool.cc" />
+    <ClCompile Include="..\ext\include\entityx\help\Timer.cc" />
+    <ClCompile Include="..\ext\include\entityx\System.cc" />
     <ClCompile Include="BatchSprite.cpp" />
     <ClCompile Include="Global.cpp" />
+    <ClCompile Include="kult.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="obj_face.cpp" />
     <ClCompile Include="obj_writer.cpp" />
@@ -160,7 +166,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BatchSprite.h" />
+    <ClInclude Include="Components.h" />
     <ClInclude Include="Global.h" />
+    <ClInclude Include="kult.hpp" />
     <ClInclude Include="obj_dialoger.h" />
     <ClInclude Include="obj_writer.h" />
     <ClInclude Include="UndertaleLabel.h" />

@@ -19,6 +19,9 @@
     <Filter Include="UndertaleObjects">
       <UniqueIdentifier>{7eb46093-9300-4fd4-aef6-f21d3674ac72}</UniqueIdentifier>
     </Filter>
+    <Filter Include="enityx">
+      <UniqueIdentifier>{f6615d88-4395-44b6-8236-6358893f708e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -45,6 +48,24 @@
     <ClCompile Include="obj_face.cpp">
       <Filter>UndertaleObjects</Filter>
     </ClCompile>
+    <ClCompile Include="kult.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\include\entityx\Entity.cc">
+      <Filter>enityx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\include\entityx\Event.cc">
+      <Filter>enityx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\include\entityx\System.cc">
+      <Filter>enityx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\include\entityx\help\Pool.cc">
+      <Filter>enityx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\include\entityx\help\Timer.cc">
+      <Filter>enityx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">
@@ -67,6 +88,12 @@
     </ClInclude>
     <ClInclude Include="obj_dialoger.h">
       <Filter>UndertaleObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="kult.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Components.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

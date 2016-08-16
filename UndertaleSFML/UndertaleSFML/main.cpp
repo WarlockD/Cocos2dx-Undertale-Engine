@@ -27,9 +27,103 @@ namespace global {
 		return *s_window;
 	}
 };
+struct Velocity  { 
+	sf::Vector2f velocity; 
+	explicit Velocity(float x, float y) : velocity(x, y) {}
+};
+// Render all Renderable entities and draw some informational text.
+class VelocitySystem :public ex::System<VelocitySystem> {
+private:
+	float last_update = 0.0f;
+	sf::RenderTarget &target;
+public:
+	explicit VelocitySystem(sf::RenderTarget &target) : target(target) {
+	}
+	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override {
+		last_update += dt;
+		if (last_update >= (1.0 / 30.0)) {
+			
+			es.each<Body, Velocity>([this](ex::Entity entity, Body &body, Velocity& velocity) {
+				body.move(velocity.velocity*last_update);
+			});
+			last_update = 0.0;
+		}
+	}
+};
+class RenderSystem :public ex::System<RenderSystem> {
+private:
+	double last_update = 0.0;
+	double frame_count = 0.0;
+	sf::RenderTarget &target;
+	sf::Text text;
+	std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> draw_verts;
+public:
+	explicit RenderSystem(sf::RenderTarget &target, sf::Font &font) : target(target) {
+		text.setFont(font);
+		text.setPosition(sf::Vector2f(2, 2));
+		text.setCharacterSize(9);
+		text.setColor(sf::Color::White);
+	}
+	
+	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override {
+		draw_verts.clear();
+		es.each<Body, Mesh,const sf::Texture*>([this](ex::Entity entity, Body &body, Mesh &mesh, const sf::Texture* texture) {
+			auto& verts = draw_verts[texture];
+			mesh.insert(verts, body.getTransform());
+		//	target.draw(verts.data(), 6, sf::PrimitiveType::Triangles, states);
+			//
+		});
+		for (auto& kv : draw_verts) {
+			auto& verts = kv.second;
+			
+			target.draw(verts.data(), verts.size(), sf::PrimitiveType::Triangles, sf::RenderStates(kv.first));
+		}
+
+		// , sf::RenderStates(body.getTransform()));
+		
+		last_update += dt;
+		frame_count++;
+		if (last_update >= 0.5) {
+			std::ostringstream out;
+			const double fps = frame_count / last_update;
+			out << es.size() << " entities (" << static_cast<int>(fps) << " fps)";
+			text.setString(out.str());
+			last_update = 0.0;
+			frame_count = 0.0;
+		}
+		target.draw(text);
+	}
+};
 
 
 constexpr size_t UpdateTime = 30 / 1000; // 30 frames a second
+
+class Application : public ex::EntityX {
+public:
+	explicit Application(sf::RenderTarget &target, sf::Font &font) {
+		//systems.add<SpawnSystem>(target, 500);
+		//systems.add<BodySystem>();
+		//systems.add<BounceSystem>(target);
+	//	systems.add<CollisionSystem>(target);
+	//	systems.add<ExplosionSystem>();
+	//	systems.add<ParticleSystem>();
+
+		
+		systems.add<VelocitySystem>(target);
+		systems.add<RenderSystem>(target, font);
+	//	systems.add<ParticleRenderSystem>(target);
+		systems.configure();
+	}
+
+	void update(ex::TimeDelta dt) {
+		systems.update_all(dt);
+	}
+};
+kult::component<'body', Body> kbody;
+kult::component<'anim', Animation> kanimation;
+//kult::component<'ani1', PtrComponent<Renderable2>> krenderable;
+kult::component<'test', pimpl_ptr<Renderable2>> krenderable;
+namespace ex = entityx;
 void gameLoop() {
 	sf::RenderWindow& window = global::getWindow();
 	sf::Clock clock;
@@ -42,6 +136,49 @@ void gameLoop() {
 	writer->setConfig();
 	writer->setText("* mind your p \\Yand\n\r q's and I");
 	writer->start_typing();
+	sf::Font debug_font;
+	if (!debug_font.loadFromFile("LiberationSans-Regular.ttf")) {
+		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
+		return;
+	}
+	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
+	kult::entity etest;
+	etest[kanimation] = 3.4f;
+	
+
+	etest[krenderable] = std::make_unique<SpriteFrameCollection>(raw_sprite);
+	etest[kbody].setPosition(0.0f, 0.0f);
+
+
+//	auto sprite = new SpriteFrameCollection(Global::LoadSprite(432));
+
+	sf::Sprite spr;
+	spr.setTexture(*raw_sprite.getTexture());
+	spr.setTextureRect(raw_sprite.getTextureRect());
+
+	Application app(window, debug_font);
+	ex::Entity entity = app.entities.create();
+
+	// "Physical" attributes.
+	auto body = entity.assign<Body>();
+	body->setPosition(100.0f, 100.0f);
+
+	entity.assign<const sf::Texture*>(raw_sprite.getTexture());
+	entity.assign<Mesh>(raw_sprite.getVerteics(), raw_sprite.getVerteicsCount()); 
+	entity.assign<Velocity>(0.5f, 0.0f);
+
+//	body->setRotation(50);
+	// Shape to apply to entity.
+	//auto test = entity.assign<PtrComponent<Renderable2>>(raw_sprite);
+//	test->reset(new SpriteFrameCollection(raw_sprite));
+	//auto anim = entity.assign<Animation>(0.25);
+	//anim = 0.25f;
+
+//	auto sprite = entity.assign<SpriteFrameCollection>(Global::LoadSprite(1986));
+//	auto test = entity.assign<sf::Sprite>(*raw_sprite.getTexture(), raw_sprite.getTextureRect());
+	//test->setPosition(100, 100);
+	//auto sprite_ptr = sprite.get();
+//	sprite_ptr->setImageIndex(1);
 	while (window.isOpen())
 	{
 		// Handle events
@@ -60,6 +197,34 @@ void gameLoop() {
 				break;
 			}
 		}
+		std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> draw_verts;
+		for (auto &entitys : kult::join(krenderable, kbody)) {
+			auto& r = entitys[krenderable];
+			auto& verts = draw_verts[r->getTexture()];
+			r->insert(verts, entitys[kbody].getTransform());
+
+		}
+		window.clear();
+		for (auto& kv : draw_verts) {
+			auto& verts = kv.second;
+			window.draw(verts.data(), 6, sf::PrimitiveType::Triangles, sf::RenderStates(kv.first));
+		}
+	
+		/*
+		
+		auto time = clock.getElapsedTime();
+		if (time.asMilliseconds() > 500) {
+			//writer->update(time);
+			sprite_ptr->setImageIndex(sprite_ptr->getImageIndex() +1);
+			clock.restart();
+		}
+		*/
+		
+		sf::Time elapsed = clock.restart();
+	//	app.update(elapsed.asSeconds());
+		//window.draw(*sprite_ptr);
+		window.display();
+#if 0
 		auto time = clock.getElapsedTime();
 		if (time.asMilliseconds() > UpdateTime) {
 			writer->update(time);
@@ -67,6 +232,7 @@ void gameLoop() {
 		}
 		window.draw(*writer);
 		window.display();
+#endif
 	}
 }
 int main(int argc, const char* argv[]) {

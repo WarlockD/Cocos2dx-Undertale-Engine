@@ -4,21 +4,15 @@ void obj_face::draw(sf::RenderTarget& target, sf::RenderStates states) const {
 	states.transform *= getTransform();
 	for (auto& s : _sprites) target.draw(s, states);
 }
-class obj_animation {
-	size_t _current;
-	size_t _frame_time;
-public:
+/*
 
-};
 class obj_face_torielblink : public Component<767, obj_face_torielblink, obj_face> {
 	size_t _current;
 	size_t _frame_time;
 	size_t _blink_delay;
 protected:
 	obj_face_torielblink() : _frame_time(0), _current(0), _blink_delay(2000) {}
-	void update(sf::Time dt) override {
-		if(dt.asMilliseconds())
-	}
+
 	void setEmotion(uint32_t i) override {
 		if (_emotion != i) {
 			_emotion = i;
@@ -63,15 +57,16 @@ protected:
 		}
 	}
 };
-
+*/
 std::unique_ptr<obj_face> obj_face::getFace(size_t index) {
 	std::unique_ptr<obj_face> obj;
-//	if (obj_face_torielblink::ID == index) 
+/*	if (obj_face_torielblink::ID == index) 
 		obj = obj_face_torielblink::create();
 		
 	if (obj) {
 		obj->_emotion = 10000;
 		obj->setEmotion(0); // force the switch
 	}
+	*/
 	return obj;
 }

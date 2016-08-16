@@ -1,8 +1,7 @@
 #pragma once
 
-#include <SFML\Graphics.hpp>
-#include <unordered_map>
-#include <memory>
+#include "Global.h"
+
 
 
 class UFont  : public std::enable_shared_from_this<UFont> {
@@ -28,8 +27,8 @@ class UndertaleSprite  : public sf::Drawable, public sf::Transformable {
 	
 protected:
 	sf::Vector2f _size;
-	uint16_t _index;
-	uint16_t _frame;
+	size_t _index;
+	size_t _frame;
 	sf::Color _color;
 	std::vector<sf::Vertex> _verts;
 	std::shared_ptr<sf::Texture> _texture;
@@ -48,7 +47,13 @@ public:
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const;
 };
 
+namespace enityx {
+	
+
+
+};
 namespace Global {
+	SpriteFrameCollection LoadSprite(size_t sprite_index);
 	bool LoadUndertaleDataWin(const std::string& filename);
 	const sf::Texture& GetUndertaleTexture(size_t index);
 	sf::Shader& LoadShader(const std::string& filename); // loads a shader, or from a cache
