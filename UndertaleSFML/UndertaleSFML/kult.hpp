@@ -39,6 +39,7 @@
 #define KULT_DEBUG(...)
 #define KULT_RELEASE(...) __VA_ARGS__
 #else
+#include <cassert>
 #define KULT_DEBUG(...)   __VA_ARGS__
 #define KULT_RELEASE(...)
 #endif
@@ -48,8 +49,9 @@ namespace kult {
 
 	template<typename V>             using set = std::unordered_set<V>; // std::set<V>;   // unordered_set
 	template<typename K, typename V> using map = std::unordered_map<K, V>; //std::map<K, V>; // unordered_map
+	
 	using type = unsigned;
-
+	using t_event = unsigned;
 	// kult::helpers
 
 	struct _can_copy {};
@@ -126,31 +128,89 @@ namespace kult {
 	// kult::entity
 
 	// forward declarations {
+	struct entity;
 	inline type purge(const type &);
 	inline std::string dump(const type &);
 	template<typename T> inline decltype(T::value_type) &get(const type &id);
 	template<typename T> inline decltype(T::value_type) &add(const type &id);
 	template<typename T> inline bool has(const type &id);
 	template<typename T> inline bool del(const type &id);
-	// }
 
+	typedef std::function<void(entity&)> event_func;
+
+	
 	struct entity {
+		static  map<t_event, set<entity*>>& regestered_events() {
+			static map<t_event, set<entity*>> statics;
+			return statics;
+		}
+		static void regester_entity(entity& e) {
+			auto & regestered = regestered_events();
+			for (auto& evt : e.events) regestered[evt.first].insert(&e);
+		}
+		static void unregester_entity(entity& e) {
+			auto & regestered = regestered_events();
+			for (auto& evt : e.events) regestered[evt.first].erase(&e);
+		}
+		static map<t_event, event_func>& event_funcs(const type& id) {
+			static map <type, map<t_event, event_func>> statics;
+			return statics.at(id);
+		}
+
+		map<t_event, event_func> & events;
+		const type id;
+	
+
 		static set<entity*> &all() { // all live instances are reflected here
 			static set<entity*> statics;
 			return statics;
 		}
+		void subscribe(const t_event& event_id, event_func func) {
+			auto &regestered = regestered_events();
+			regestered[event_id].insert(this);
+			auto it = events.find(event_id);
+			if (it == events.end())  
+				events.insert(std::make_pair(event_id, func));
+		}
+		void unsubscribe(const t_event& event_id) {
+			auto &regestered = regestered_events();
+			regestered[event_id].erase(this);
+			auto it = events.find(event_id);
+			if (it != events.end()) 
+				events.erase(it);
+		}
 
-		const type id;
-		entity(const type &id_ = kult::id()) : id(id_) {
-			all().insert(this);
+		static void emit(const t_event& event_id, entity& caller ) {
+			auto &regestered = regestered_events();
+			auto &it = regestered.find(event_id);
+			if (it != regestered.end()) {  
+				for (auto& e : it->second) {
+					if(&caller != e)
+					e->events[event_id](caller);
+				}
+			}
+		}
+		void emit(const t_event& event_id) { emit(event_id, *this); }
+		entity(const type &id_ = kult::id()) : id(id_), events(event_funcs(id_)) {
+			KULT_DEBUG(
+				assert(all().insert(this).second);
+			)
+				KULT_RELEASE(
+					all().insert(this);
+			)
+				regester_entity(*this);
 		}
 		~entity() {
+			auto& events = event_funcs(id);
+			for (auto it : events) unsubscribe(it.first);
+			unregester_entity(*this);
 			all().erase(this);
 		}
 
 		operator type const () const {
 			return id;
 		}
+
 		template<typename component>
 		decltype(component::value_type) &operator [](const component &t) const {
 			return kult::add<component>(id), kult::get<component>(id);
@@ -176,9 +236,13 @@ namespace kult {
 		}
 	};
 
+
 	inline set<entity*> entities() {
 		return entity::all();
 	}
+
+
+
 
 	// kult::component
 

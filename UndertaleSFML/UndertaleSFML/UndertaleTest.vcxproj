@@ -169,6 +169,8 @@
     <ClInclude Include="Components.h" />
     <ClInclude Include="Global.h" />
     <ClInclude Include="kult.hpp" />
+    <ClInclude Include="MessageDispatch.h" />
+    <ClInclude Include="MyEnitys.h" />
     <ClInclude Include="obj_dialoger.h" />
     <ClInclude Include="obj_writer.h" />
     <ClInclude Include="UndertaleLabel.h" />
