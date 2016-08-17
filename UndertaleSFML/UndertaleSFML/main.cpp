@@ -128,6 +128,45 @@ kult::component<'fsng', SpriteFrame> kframe;
 kult::component<'text', UndertaleLabelBuilder> ktext;
 //kult::component<'ani1', PtrComponent<Renderable2>> krenderable;
 
+kult::system<float> velocity_system([](float dt) {
+	for (auto &entitys : kult::join(kvelocity, kbody)) {
+		auto& velocity = entitys[kvelocity];
+		auto& body = entitys[kbody];
+		body.move(velocity*dt);
+	//	std::stringstream ss;
+	//	ss << body.getPosition();
+	//	debug_label.setText(ss.str());
+	//	debug_label_entity[ktext].setText(ss.str());
+	}
+});
+
+// animation system
+kult::system<float> animation_system([](float dt) {
+	for (auto &entitys : kult::join(kanimation, kframes)) {
+		auto& animation = entitys[kanimation];
+		auto& frames = entitys[kframes];
+		if (animation.test_then_reset(dt)) {
+			frames.setImageIndex(frames.getImageIndex() + 1);
+		}
+	}
+});
+typedef std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> t_dumb_batch;
+
+// rendering_system
+kult::system<t_dumb_batch&> rendering_system([](t_dumb_batch& batch) {
+	for (auto &entitys : kult::join(kframes, kbody)) {
+		auto& frame = entitys[kframes];
+		auto& verts = batch[frame.getTexture()];
+		frame.insert(verts, entitys[kbody].getTransform());
+	}
+	for (auto &entitys : kult::join(ktext, kbody)) {
+		auto& text = entitys[ktext];
+		auto& verts = batch[&text.getTexture()];
+		text.insert(verts, entitys[kbody].getTransform());
+	}
+});
+
+
 namespace ex = entityx;
 void gameLoop() {
 	sf::RenderWindow& window = global::getWindow();
@@ -158,7 +197,7 @@ void gameLoop() {
 
 //	etest[kposition] = sf::Vector2f(10.0f, 100.0f);
 	etest[kbody].setScale(4.0f);
-	std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> draw_verts;
+	t_dumb_batch draw_verts;
 
 	kult::entity debug_label_entity;
 	debug_label_entity[kbody].setPosition(0.0f, 0.0f);
@@ -189,59 +228,14 @@ void gameLoop() {
 			draw_verts.clear();
 			
 			float dt = time.asSeconds();
-			// handle velocity system
-			for (auto &entitys : kult::join(kvelocity, kbody)) {
-				auto& velocity = entitys[kvelocity];
-				auto& body = entitys[kbody];
-				body.move(velocity*dt);
-				std::stringstream ss;
-				ss << body.getPosition();
-				debug_label.setText(ss.str());
-				debug_label_entity[ktext].setText(ss.str());
-			}
-			for (auto &entitys : kult::join(kvelocity, kposition)) {
-				auto& velocity = entitys[kvelocity];
-				auto& position = entitys[kposition];
-				position += velocity*dt;
-				std::stringstream ss;
-				ss << position;
-				debug_label.setText(ss.str());
-				debug_label_entity[ktext].setText(ss.str());
-			}
-			// animation system
-			for(auto &entitys : kult::join(kanimation, kframes)) {
-				auto& animation = entitys[kanimation];
-				auto& frames = entitys[kframes];
-				if (animation.test_then_reset(dt)) {
-					frames.setImageIndex(frames.getImageIndex()+1);
-				}
-			}
+			velocity_system(dt);
+			animation_system(dt);
+
 
 
 			// handle rendering system
 			draw_verts.clear();
-			for (auto &entitys : kult::join(kframes, kbody)) {
-				auto& frame = entitys[kframes];
-				auto& verts = draw_verts[frame.getTexture()];
-				frame.insert(verts, entitys[kbody].getTransform());
-			}
-			for (auto &entitys : kult::join(kframes, kposition)) {
-				auto& frame = entitys[kframes];
-				sf::Vector2f pos = entitys[kposition];
-				pos.x = (int)(pos.x);
-				pos.y = (int)(pos.y);
-				auto& verts = draw_verts[frame.getTexture()];
-				frame.insert(verts, [pos](const sf::Vertex& v) {
-					sf::Vertex ret(v);
-					ret.position += pos;
-					return ret;
-				}); 
-			}
-			for (auto &entitys : kult::join(ktext, kbody)) {
-				auto& text = entitys[ktext];
-				auto& verts = draw_verts[&text.getTexture()];
-				text.insert(verts, entitys[kbody].getTransform());
-			}
+			rendering_system(draw_verts);
 		}
 		// update as fast as we can?
 		window.clear();

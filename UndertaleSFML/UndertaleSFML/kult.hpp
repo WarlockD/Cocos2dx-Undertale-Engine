@@ -154,7 +154,7 @@ namespace kult {
 		}
 		static map<t_event, event_func>& event_funcs(const type& id) {
 			static map <type, map<t_event, event_func>> statics;
-			return statics.at(id);
+			return statics[id];
 		}
 
 		map<t_event, event_func> & events;
