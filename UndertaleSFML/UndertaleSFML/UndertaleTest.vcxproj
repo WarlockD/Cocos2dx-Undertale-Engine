@@ -155,6 +155,7 @@
     <ClCompile Include="..\ext\include\entityx\help\Timer.cc" />
     <ClCompile Include="..\ext\include\entityx\System.cc" />
     <ClCompile Include="BatchSprite.cpp" />
+    <ClCompile Include="Components.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="kult.cpp" />
     <ClCompile Include="main.cpp" />

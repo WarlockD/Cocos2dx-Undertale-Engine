@@ -119,52 +119,8 @@ public:
 		systems.update_all(dt);
 	}
 };
-kult::component<'body', Body> kbody;
-kult::component<'anim', StopWatch<float>> kanimation;
-kult::component<'vel', sf::Vector2f> kvelocity;
-kult::component<'pos', sf::Vector2f> kposition;
-kult::component<'fcol', SpriteFrameCollection> kframes;
-kult::component<'fsng', SpriteFrame> kframe;
-kult::component<'text', UndertaleLabelBuilder> ktext;
-//kult::component<'ani1', PtrComponent<Renderable2>> krenderable;
 
-kult::system<float> velocity_system([](float dt) {
-	for (auto &entitys : kult::join(kvelocity, kbody)) {
-		auto& velocity = entitys[kvelocity];
-		auto& body = entitys[kbody];
-		body.move(velocity*dt);
-	//	std::stringstream ss;
-	//	ss << body.getPosition();
-	//	debug_label.setText(ss.str());
-	//	debug_label_entity[ktext].setText(ss.str());
-	}
-});
 
-// animation system
-kult::system<float> animation_system([](float dt) {
-	for (auto &entitys : kult::join(kanimation, kframes)) {
-		auto& animation = entitys[kanimation];
-		auto& frames = entitys[kframes];
-		if (animation.test_then_reset(dt)) {
-			frames.setImageIndex(frames.getImageIndex() + 1);
-		}
-	}
-});
-typedef std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> t_dumb_batch;
-
-// rendering_system
-kult::system<t_dumb_batch&> rendering_system([](t_dumb_batch& batch) {
-	for (auto &entitys : kult::join(kframes, kbody)) {
-		auto& frame = entitys[kframes];
-		auto& verts = batch[frame.getTexture()];
-		frame.insert(verts, entitys[kbody].getTransform());
-	}
-	for (auto &entitys : kult::join(ktext, kbody)) {
-		auto& text = entitys[ktext];
-		auto& verts = batch[&text.getTexture()];
-		text.insert(verts, entitys[kbody].getTransform());
-	}
-});
 
 
 namespace ex = entityx;
@@ -194,12 +150,17 @@ void gameLoop() {
 	etest[kvelocity] = sf::Vector2f(1.0f, 0.0f);
 	etest[kframes] = raw_sprite;
 	etest[kbody].setPosition(10.0f, 100.0f);
+	etest[kabstract] = RenderableDerivedTest();
+
+
 
 //	etest[kposition] = sf::Vector2f(10.0f, 100.0f);
 	etest[kbody].setScale(4.0f);
 	t_dumb_batch draw_verts;
 
 	kult::entity debug_label_entity;
+
+	kult::copy(debug_label_entity.id, etest.id);
 	debug_label_entity[kbody].setPosition(0.0f, 0.0f);
 	//debug_label_entity[kbody].setScale(2.0f);
 	debug_label_entity[ktext] = "Happy Happy Joy joy";

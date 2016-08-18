@@ -66,6 +66,9 @@
     <ClCompile Include="..\ext\include\entityx\help\Timer.cc">
       <Filter>enityx</Filter>
     </ClCompile>
+    <ClCompile Include="Components.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">

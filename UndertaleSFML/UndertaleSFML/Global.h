@@ -22,6 +22,15 @@ typedef std::function<void(int)> IntSetCallback;
 namespace global {
 	sf::RenderWindow& getWindow();
 	extern const std::string empty_string; // used for empty const std::string refrences
+
+
+	template<typename T> inline bool AlmostEqualRelative(T A, T B, T maxRelDiff) {
+		return A == B;
+	}
+	template<typename T> inline bool AlmostEqualRelative(T A, T B) {
+		return A == B;
+	}
+	template<float>
 	 inline bool AlmostEqualRelative(float A, float B, float maxRelDiff = FLT_EPSILON)
 	{
 		// Calculate the difference.
@@ -33,82 +42,99 @@ namespace global {
 		if (diff <= largest * maxRelDiff) return true;
 		return false;
 	}
-	 inline bool AlmostEqualRelative(const sf::Vector2f& l, const sf::Vector2f& r, float maxRelDiff = FLT_EPSILON) {
+	 template<sf::Vector2f>
+	 inline bool AlmostEqualRelative(const sf::Vector2f& l, const sf::Vector2f& r, const sf::Vector2f& maxRelDiff = FLT_EPSILON) {
 		 return AlmostEqualRelative(l.x, r.x, 0.00001) && AlmostEqualRelative(l.y, r.y, 0.00001);
 	 }
 };
+// This is the basic rendering class.  None of the verts are transformed, no position data, nothing.  Just the raw verts
+// has some simple helper functions
+struct Renderable {
+	virtual const sf::Texture* texture() const = 0;
+	virtual const sf::Vertex* data() const = 0;
+	virtual size_t size() const = 0;
+	virtual const sf::Vertex* begin() const { return data(); }
+	virtual const sf::Vertex* end() const { return data() + size(); }
+	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, begin(), end()); }
+	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t) const { for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); }
+	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace(at, t * v.position, color, v.texCoords); }
+	virtual void insert(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
+	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t) const { for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords); }
+	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace_back(t * v.position, color, v.texCoords); }
+	virtual ~Renderable() {}
+};
 
-class RawVertInterface {
-public:
-	virtual const sf::Vertex* getVerteics() const = 0;
-	virtual size_t getVerteicsCount() const = 0;
-	virtual sf::FloatRect getVerteicsBounds() const = 0;
-	void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, getVerteics(), getVerteics()+ getVerteicsCount()); }
-	void insert(std::vector<sf::Vertex>& verts) const { insert(verts, verts.end()); }
-	void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t) const {
-		for (size_t i = 0; i < getVerteicsCount(); i++) {
-			auto &v = getVerteics()[i];
-			verts.emplace_back(t * v.position, v.color, v.texCoords);
-		}
-	}
-	void copy(sf::Vertex* verts) const { 
-		const sf::Vertex* end = getVerteics() + (getVerteicsCount() * sizeof(sf::Vertex));
-		for (auto v = getVerteics(); v != end; v += sizeof(sf::Vertex)) {
-			verts->position = v->position;
-			verts->texCoords = v->texCoords; // so we don't override the color
-			verts += sizeof(sf::Vertex);
-		}
-		//std::copy(getVerteics(), getVerteics() + getVerteicsCount(), verts); 
-	}
-	void copy(sf::Vertex* verts, const sf::Transform& t) const {
-		const sf::Vertex* end = getVerteics() + (getVerteicsCount() * sizeof(sf::Vertex));
-		for (auto v = getVerteics(); v != end; v += sizeof(sf::Vertex)) {
-			verts->position = t.transformPoint(v->position);
-			verts->texCoords = v->texCoords; // so we don't override the color
-			verts += sizeof(sf::Vertex);
-		}
-		//std::copy(getVerteics(), getVerteics() + getVerteicsCount(), verts); 
-	}
-	virtual ~RawVertInterface() {}
-};
-class TextureInterface {
-public:
-	virtual const sf::Texture* getTexture() const = 0;
-	virtual ~TextureInterface() {}
-};
-class Renderable2 : public RawVertInterface, public TextureInterface, public sf::Drawable {
-public:
-	virtual ~Renderable2() {}
-	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override{
-		auto texture = getTexture();
-		if (texture) states.texture = texture;
-		target.draw(getVerteics(), getVerteicsCount(), sf::PrimitiveType::Triangles, states);
+// use this template class for a Renderable object to test drawing direct to sfml
+template<class C> class SFMLDrawable : public sf::Transformable, public sf::Drawable {
+	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
+		states.texture = = texture();
+		states.transform *= getTransform();
+		target.draw(data(), size(), sf::PrimitiveType::Triangles, states);
 	}
 };
+
+
 template <typename T>
-struct pimpl_ptr : public std::unique_ptr<T>
+class abstract_ptr : public std::unique_ptr<T>
 {
+	std::function<T*(const T&)> _create_copy;
+
+	template<class B, class = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T, B>::value, B>::type>
+	void SetCopyFunctions() {
+		_create_copy = [](const T& copy) { return new B(static_cast<const B&>(copy)); };
+	}
+public:
 	using std::unique_ptr<T>::unique_ptr;
-	pimpl_ptr() {};
+	abstract_ptr() {}
 
 	//	typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value && std::is_copy_assignable<T>, PtrComponent<Base>&>::type
 //	typename std::enable_if<std::is_copy_constructible<B>>::type
 		
 		//class = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value, PtrComponent<Base>&>::type>
-	template<class B, class = typename std::enable_if<std::is_copy_constructible<B>::value, B>::type>
-	pimpl_ptr(pimpl_ptr<B> const& other)
+	template<class B, class G=T, class = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<G, B>::value, B>::type>
+	abstract_ptr(abstract_ptr<B> const& other)
 	{
+		SetCopyFunctions<B>();
 		auto value = *other.get();
 		this->reset(new B(value));
 	}
-	template<class B, class = typename std::enable_if<std::is_copy_constructible<B>::value, B>::type>
-	pimpl_ptr<B>& operator=(pimpl_ptr<B> const& other)
+
+	abstract_ptr(abstract_ptr<T> const& other) : _create_copy(other._create_copy)
 	{
-		auto value = *other.get();
-		this->reset(new T(value));
+		if (_create_copy) this->reset(_create_copy(*other.get()));
+	}
+	abstract_ptr<T>& operator=(abstract_ptr<T> const& other)
+	{
+		_create_copy = other._create_copy;
+		if (_create_copy) this->reset(_create_copy(*other.get()));
+		return *this;
+	}
+
+	template<class B, class G = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T,B>::value, T>::type>
+	abstract_ptr(const B& other) {
+		SetCopyFunctions<B>(*this);
+		this->reset(new B(other));
+	}
+
+	template<class B>
+	typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T, B>::value, abstract_ptr<T>&>::type
+	 operator=(const B& other)
+	{
+		SetCopyFunctions<B>();
+		this->reset(new B(other));
+		return *this;
+	}
+
+	template<class B,  class = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T, B>::value, , T>::type>
+	abstract_ptr<T>& operator=(abstract_ptr<B> const& other)
+	{
+		SetCopyFunctions<B>();
+		this->reset(new B(&other.get()));
 		return *this;
 	}
 };
+
+
 
 template<class Base> class PtrComponent  {
 	std::unique_ptr<Base> _ptr;

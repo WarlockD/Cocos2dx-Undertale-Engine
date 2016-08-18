@@ -54,18 +54,18 @@ namespace kult {
 	using t_event = unsigned;
 	// kult::helpers
 
-	struct _can_copy {};
-	struct _can_move : public _can_copy {};
+	struct _has_default_constructor {};
+	struct _can_copy : public _has_default_constructor {};
 
 	template<class B>
-	typename std::enable_if<std::is_copy_assignable<B>::value>::type
-		inline _assign(B& l, B&, _can_copy) {
-		l = r;
+	typename std::enable_if<std::is_default_constructible<B>::value>::type
+		inline _assign(B& l, B&, _has_default_constructor) {
+		l = B();
 	}
 	template<class B>
-	typename std::enable_if<std::is_move_assignable<B>::value>::type
-		inline _assign(B& l, B& r, _can_move) {
-		l = std::move(r);
+	typename std::enable_if<std::is_copy_assignable<B>::value>::type
+		inline _assign(B& l, B& r, _can_copy) {
+		l = r;
 	}
 
 	
@@ -331,6 +331,7 @@ namespace kult {
 		any<T>().erase(id);
 		return !has<T>(id);
 	}
+
 	struct interface {
 		virtual ~interface() {}
 		virtual void purge(const type &) const = 0;
