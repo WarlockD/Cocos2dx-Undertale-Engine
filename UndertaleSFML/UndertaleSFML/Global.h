@@ -21,17 +21,10 @@ namespace ex = entityx;
 typedef std::function<void(int)> IntSetCallback;
 namespace global {
 	sf::RenderWindow& getWindow();
+	constexpr float smallest_pixel = 0.001f; // smallest movement of a pixel
 	extern const std::string empty_string; // used for empty const std::string refrences
 
-
-	template<typename T> inline bool AlmostEqualRelative(T A, T B, T maxRelDiff) {
-		return A == B;
-	}
-	template<typename T> inline bool AlmostEqualRelative(T A, T B) {
-		return A == B;
-	}
-	template<float>
-	 inline bool AlmostEqualRelative(float A, float B, float maxRelDiff = FLT_EPSILON)
+	inline bool AlmostEqualRelative(float A, float B)
 	{
 		// Calculate the difference.
 		float diff = std::fabs(A - B);
@@ -39,27 +32,42 @@ namespace global {
 		B = std::fabs(B);
 		// Find the largest
 		float largest = (B > A) ? B : A;
-		if (diff <= largest * maxRelDiff) return true;
+		if (diff <= largest * smallest_pixel) return true;
 		return false;
 	}
-	 template<sf::Vector2f>
-	 inline bool AlmostEqualRelative(const sf::Vector2f& l, const sf::Vector2f& r, const sf::Vector2f& maxRelDiff = FLT_EPSILON) {
-		 return AlmostEqualRelative(l.x, r.x, 0.00001) && AlmostEqualRelative(l.y, r.y, 0.00001);
+	 inline bool AlmostEqualRelative(const sf::Vector2f& l, const sf::Vector2f& r) {
+		 return AlmostEqualRelative(l.x, r.x) && AlmostEqualRelative(l.y, r.y);
 	 }
 };
 // This is the basic rendering class.  None of the verts are transformed, no position data, nothing.  Just the raw verts
 // has some simple helper functions
 struct Renderable {
+	typedef const sf::Vertex* const_iterator;
 	virtual const sf::Texture* texture() const = 0;
 	virtual const sf::Vertex* data() const = 0;
 	virtual size_t size() const = 0;
-	virtual const sf::Vertex* begin() const { return data(); }
-	virtual const sf::Vertex* end() const { return data() + size(); }
+	virtual const_iterator begin() const { return data(); }
+	virtual const_iterator end() const { return data() + size(); }
+	virtual sf::FloatRect bounds() const {
+		sf::Vector2f vmin;
+		sf::Vector2f vmax;
+		for (auto& vert : *this) {
+			auto& v = vert.position;
+			vmin.x = std::min(vmin.x, v.x);
+			vmin.y = std::min(vmin.y, v.y);
+			vmax.x = std::max(vmin.x, v.x);
+			vmax.y = std::max(vmin.y, v.y);
+		}
+		return sf::FloatRect(vmin, vmax - vmin);
+	}
+	virtual sf::FloatRect bounds(const sf::Transform&t) const { return t.transformRect(bounds()); }
 	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, begin(), end()); }
 	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t) const { for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); }
 	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace(at, t * v.position, color, v.texCoords); }
 	virtual void insert(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t) const { for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords); }
+	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t) const { 
+		for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords); 
+	}
 	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace_back(t * v.position, color, v.texCoords); }
 	virtual ~Renderable() {}
 };
@@ -136,101 +144,6 @@ public:
 
 
 
-template<class Base> class PtrComponent  {
-	std::unique_ptr<Base> _ptr;
-	//constexpr bool test1 = std::is_abstract<SpriteFrameCollection>::value;
-//	constexpr bool test2 = std::is_base_of<Renderable2, SpriteFrameCollection>::value;
-	//constexpr bool test3 = std::is_copy_constructible<SpriteFrameCollection>::value;
-public:
-	typedef std::unique_ptr<Base> ptr_type;
-	typedef PtrComponent<Base> my_type;
-	typedef Base* pointer;
-	typedef Base element_type;
-
-	PtrComponent() : _ptr(nullptr) {}
-	PtrComponent(PtrComponent&& move) : _ptr(std::move(move._ptr)) {}
-	PtrComponent& operator=(PtrComponent&& move) { std::swap(move._ptr, _ptr); return *this; }
-	// we cannot copy this class, but we need this here for the enity system
-	PtrComponent(const PtrComponent& copy) : _ptr(nullptr) { assert(false); }
-	PtrComponent& operator=(const PtrComponent& copy) { _ptr.reset(); assert(false); return *this; }
-
-//	template<typename T, typename = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<T, Base>::value>::type>
-	template<class T> PtrComponent(T* v) : _ptr(v) {  }
-//	template<typename T, typename = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<T, Base>::value>::type>
-//	PtrComponent(T* ptr) :std::unique_ptr<Base>(ptr) {}
-	//template<typename T, typename = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<T, Base>::value && std::is_copy_constructible<T>>::type>
-	template<class T,
-	class = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value, PtrComponent<Base>&>::type>
-	PtrComponent(const T& copy) :_ptr(new T(copy)) {}
-	//template<class T>
-	//	class = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<T, Base>::value && std::is_copy_constructible<T>>::type>
-	//PtrComponent(T&& move) : _ptr(new T(move)) {}
-	//typename std::enable_if<std::is_base_of<Renderable2,C>::value, RenderableComponent>
-	template <class D, typename ... Args>
-	static PtrComponent make_unique(Args && ... args) {
-		D* raw_ptr = new D(std::forward<Args>(args) ...);
-		return PtrComponent(raw_ptr);
-	}
-	explicit operator bool() const noexcept { return _ptr->get() != nullptr; }
-	pointer operator->() const noexcept { return _ptr.get(); }
-	// however, we CAN copy the class to here
-//	template<typename T, typename = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<T, Base>::value && std::is_copy_constructible<T>,T>::type>
-
-	template<class T>
-//	typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value && std::is_copy_assignable<T>, PtrComponent<Base>&>::type
-	typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value ,  PtrComponent<Base>&>::type
-	operator=(const T& copy) {  
-		_ptr.reset(new T(copy)); 
-		return *this; 
-	}
-	//template<class T>
-	//template<typename T, typename = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<T, Base>::value && std::is_move_constructible<T>, my_type&>::type
-	//operator=(T&& move) { reset(new T(std::move(move))); return *this; }
-};
-
-
-template<typename T, typename TCI=T::const_iterator> class VertsInterface
-{
-public: // trates
-	typedef T t_verts;
-	typedef TCI const_iterator;
-public:
-	virtual const_iterator begin() const = 0; 
-	virtual const_iterator end() const = 0; 
-	inline void insert(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
-	inline void insert(std::vector<sf::Vertex>& verts, const sf::Transform& transform) const {
-		for (auto it = begin(); it != end(); it++) {
-			verts.emplace_back(transform * it->position, it->color, it->texCoords);
-		}
-	}
-	inline void insert(std::vector<sf::Vertex>& verts, const sf::Transform& transform, const sf::Color& color) const {
-		for (auto it = begin(); it != end(); it++) {
-			verts.emplace_back(transform * it->position, color, it->texCoords);
-		}
-	}
-	inline void insert(std::vector<sf::Vertex>& verts, std::function<sf::Vertex(const sf::Vertex&v)> func) const {
-		for (auto it = begin(); it != end(); it++) {
-			verts.emplace_back(func(*it));
-		}
-	}
-};
-
-class SpriteFrame  : public VertsInterface<std::array<sf::Vertex, 6>> {
-	const sf::Texture* _texture;
-	sf::IntRect _textureRect;
-	sf::FloatRect _bounds;
-	t_verts _verts;
-public:
-	SpriteFrame() : _texture(nullptr) {}
-	SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds);
-	SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts);  // build from triangles
-	// we want to default to triangles for compatablity with opengles
-	const sf::IntRect& textureRect() const { return _textureRect; }
-	const sf::Texture* getTexture() const  { return _texture; }
-	const sf::FloatRect& getBounds() const  { return _bounds; }
-	const_iterator begin() const override { return _verts.begin();}
-	const_iterator end() const override { return _verts.end(); }
-};
 
 template<typename T> class StopWatch {
 public:
@@ -263,29 +176,57 @@ public:
 		if (test()) { reset(); return true; }
 		else return false;
 	}
-	
-
-	
 };
-class SpriteFrameCollection :  public VertsInterface<std::vector<sf::Vertex>, SpriteFrame::const_iterator> {
+class Mesh : public Renderable {
+	std::vector<sf::Vertex> _verts;
+	const sf::Texture* _texture;
+public:
+	Mesh() : _texture(nullptr) {}
+	Mesh(const sf::Texture* texture, const std::vector<sf::Vertex>& verts) : _texture(texture) , _verts(verts) {}
+	Mesh(const sf::Texture* texture, std::vector<sf::Vertex>&& verts) : _texture(texture), _verts(std::move(verts)) {}
+	virtual const sf::Texture* texture() const override { return _texture; }
+	virtual const sf::Vertex* data() const override { return _verts.data(); }
+	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
+};
+
+class SpriteFrame : public Renderable {
+	const sf::Texture* _texture;
+	sf::IntRect _textureRect;
+	sf::FloatRect _bounds;
+	std::array<sf::Vertex, 6> _verts;
+public:
+	SpriteFrame() : _texture(nullptr) {}
+	SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds);
+	SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts);  // build from triangles
+																		// we want to default to triangles for compatablity with opengles
+	const sf::IntRect& textureRect() const { return _textureRect; }
+	sf::FloatRect bounds() const override { return _bounds; }
+	// interface 
+	virtual const sf::Texture* texture() const override { return _texture; }
+	virtual const sf::Vertex* data() const override { return _verts.data(); }
+	virtual size_t size() const override { return _verts.size(); }
+};
+
+class SpriteFrameCollection : public Renderable {
 private:
-	t_verts _frames;
+	std::vector<sf::Vertex> _frames;
 	const sf::Vertex* _current;
 	size_t _image_index;
 	sf::Vector2f _size;
 	const sf::Texture* _texture;
 public:
 	SpriteFrameCollection() : _texture(nullptr), _current(nullptr),_image_index(0) {}
-	SpriteFrameCollection(const sf::Texture* texture, const t_verts& frames, sf::Vector2f& size) : _frames(frames), _current(frames.data()), _image_index(0),_size(size), _texture(texture) {}
-	SpriteFrameCollection(const sf::Texture* texture, t_verts&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _current(_frames.data()), _image_index(0), _size(size), _texture(texture) {}
+	SpriteFrameCollection(const sf::Texture* texture, const std::vector<sf::Vertex>& frames, sf::Vector2f& size) : _frames(frames), _current(_frames.data()), _image_index(0),_size(size), _texture(texture) {}
+	SpriteFrameCollection(const sf::Texture* texture, std::vector<sf::Vertex>&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _current(_frames.data()), _image_index(0), _size(size), _texture(texture) {}
 	size_t getImageIndex() const { return _image_index; }
 	void setImageIndex(size_t image_index) { _image_index = image_index % (_frames.size() / 6); _current = _frames.data() + (_image_index * 6); }	
 	// cheat and use the iliterator from an array
 	SpriteFrame getSpriteFrame() const { return SpriteFrame(_texture, _current); }
-	const_iterator begin() const override { return const_iterator(_current, 0); }
-	const_iterator end() const override { return const_iterator(_current, 6); }
-	const sf::Texture* getTexture() const  { return _texture; }
-	const sf::Vector2f& getFrameSize() const { return _size; }
+	virtual const sf::Texture* texture() const override { return _texture; }
+	virtual const sf::Vertex* data() const override { return _current; }
+	virtual size_t size() const override { return 6; } // we only return the current frame
+	sf::FloatRect bounds() const override { return sf::FloatRect(sf::Vector2f(), _size); }
+	size_t total_size() const { return _frames.size(); }
 };
 
 class LockingObject {
@@ -379,43 +320,6 @@ inline std::ostream& operator<<(std::ostream& os, const Animation& a) {
 	os << "Speed(" << a.getSpeed() << ")";
 	return os;
 }
-class Mesh : public LockingObject, public RawVertInterface {
-protected:
-	std::vector<sf::Vertex> _verts;
-public:
-	Mesh() {} 
-	Mesh(size_t size) : _verts(size) {} // auto alocate empty mesch
-	Mesh(std::vector<sf::Vertex>&& verts) : _verts(verts) {}
-	Mesh(const std::vector<sf::Vertex>& verts) : _verts(verts) {}
-	Mesh(const sf::Vertex* ptr, size_t count) : _verts(ptr, ptr+count) {}
-	Mesh(std::vector<sf::Vertex>&& verts, const sf::Transform& t) : _verts(verts) { transformPositions(t); }
-	Mesh(const std::vector<sf::Vertex>& verts, const sf::Transform& t) : _verts(verts) { transformPositions(t); }
-	Mesh(const Mesh& copy, const sf::Transform& t);
-	virtual ~Mesh() {}
-	void push_back(const sf::Vertex& v) { _verts.push_back(v); }
-	void push_back(const std::vector<sf::Vertex>& v);
-	void push_back(const Mesh& mesh);
-	void clear() { _verts.clear(); }
-	inline sf::Vertex& operator[](size_t i) { return _verts[i]; }
-	inline const sf::Vertex& operator[](size_t i) const { return _verts[i]; }
-	const std::vector<sf::Vertex>& getVerteicsVector() const { return _verts; }
-	std::vector<sf::Vertex>& getVerteicsVector()  { return _verts; }
-	void transformPositions(const sf::Transform& t);
-	// interface
-	const sf::Vertex* getVerteics() const override { return _verts.data(); }
-	size_t getVerteicsCount() const override { return _verts.size(); }
-	sf::FloatRect getVerteicsBounds() const override;
-	Mesh& operator +=(const Mesh& right) {
-		push_back(right);
-		return *this;
-	}
-	Mesh operator +(const Mesh& right) const{
-		Mesh mesh;
-		mesh.push_back(*this);
-		mesh.push_back(right);
-		return mesh;
-	}
-};
 
 
 

@@ -34,7 +34,7 @@ struct TEXTTYPE {
 	TEXTTYPE() : typer(4), myfont(2), mycolor(16777215), writingx(20), writingy(20), writingxend(290), shake(0), textspeed(1), txtsound(101), spacing(8), vspacing(18) {}
 };
 
-class obj_writer : public UndertaleLabelBuilder, public sf::Transformable, public sf::Drawable,  public Component<782, obj_writer> {
+class obj_writer : public UndertaleLabel, public sf::Transformable, public sf::Drawable,  public Component<782, obj_writer> {
 protected:
 	virtual void faceCallback(int v) {}
 	virtual void emotionCallback(int v) {}
@@ -79,14 +79,14 @@ public:
 		_nextLetterDelay = 0;
 		_frameTime = sf::Time::Zero;
 		_currentColor = _color;
-		UndertaleLabelBuilder::clear();
+		UndertaleLabel::clear();
 	}
 	virtual void push_back(int a, const sf::Color& color = sf::Color::White) override {
-		UndertaleLabelBuilder::push_back(a, color);
+		UndertaleLabel::push_back(a, color);
 		_vertCopy.insert(_vertCopy.end(), _textVerts.end()-6, _textVerts.end());
 	}
 	virtual void pop_back() {
-		UndertaleLabelBuilder::pop_back();
+		UndertaleLabel::pop_back();
 		_vertCopy.resize(_vertCopy.size() - 6);
 	}
 	virtual void update(sf::Time dt) override;

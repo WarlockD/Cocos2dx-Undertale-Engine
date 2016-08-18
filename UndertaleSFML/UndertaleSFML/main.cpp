@@ -1,6 +1,9 @@
 #include "Global.h"
+#include "Components.h"
 #include "UndertaleLoader.h"
 #include "obj_dialoger.h"
+#include "UndertaleLabel.h"
+
 #include <cassert>
 
 #pragma comment(lib, "winmm.lib")
@@ -50,50 +53,6 @@ public:
 		}
 	}
 };
-class RenderSystem :public ex::System<RenderSystem> {
-private:
-	double last_update = 0.0;
-	double frame_count = 0.0;
-	sf::RenderTarget &target;
-	sf::Text text;
-	std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> draw_verts;
-public:
-	explicit RenderSystem(sf::RenderTarget &target, sf::Font &font) : target(target) {
-		text.setFont(font);
-		text.setPosition(sf::Vector2f(2, 2));
-		text.setCharacterSize(9);
-		text.setColor(sf::Color::White);
-	}
-	
-	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override {
-		draw_verts.clear();
-		es.each<Body, Mesh,const sf::Texture*>([this](ex::Entity entity, Body &body, Mesh &mesh, const sf::Texture* texture) {
-			auto& verts = draw_verts[texture];
-			mesh.insert(verts, body.getTransform());
-		//	target.draw(verts.data(), 6, sf::PrimitiveType::Triangles, states);
-			//
-		});
-		for (auto& kv : draw_verts) {
-			auto& verts = kv.second;
-			
-			target.draw(verts.data(), verts.size(), sf::PrimitiveType::Triangles, sf::RenderStates(kv.first));
-		}
-
-		// , sf::RenderStates(body.getTransform()));
-		
-		last_update += dt;
-		frame_count++;
-		if (last_update >= 0.5) {
-			std::ostringstream out;
-			const double fps = frame_count / last_update;
-			out << es.size() << " entities (" << static_cast<int>(fps) << " fps)";
-			text.setString(out.str());
-			last_update = 0.0;
-			frame_count = 0.0;
-		}
-		target.draw(text);
-	}
-};
 
 
 constexpr size_t UpdateTime = 30 / 1000; // 30 frames a second
@@ -110,7 +69,7 @@ public:
 
 		
 		systems.add<VelocitySystem>(target);
-		systems.add<RenderSystem>(target, font);
+		//systems.add<RenderSystem>(target, font);
 	//	systems.add<ParticleRenderSystem>(target);
 		systems.configure();
 	}
@@ -129,7 +88,7 @@ void gameLoop() {
 	sf::Clock clock;
 	bool isPlaying = false;
 	auto font = UFont::LoadUndertaleFont(4);
-	sf::View view(sf::FloatRect(0, 0, 320, 240));
+	sf::View view(sf::FloatRect(0, 0, 640, 480));
 //	window.setView(view);
 	auto writer = obj_dialoger::create();
 	//writer.setFont(4);
@@ -144,27 +103,20 @@ void gameLoop() {
 		return;
 	}
 	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
-	kult::entity etest;
-	etest[kanimation] = 0.5f;
-	
-	etest[kvelocity] = sf::Vector2f(1.0f, 0.0f);
-	etest[kframes] = raw_sprite;
-	etest[kbody].setPosition(10.0f, 100.0f);
-	etest[kabstract] = RenderableDerivedTest();
+	Systems::t_dumb_batch batch;
 
+	Engine::USprite sprite0;
+	Engine::USprite sprite1;
 
+	sprite1.setSprite(1986);
+	sprite1.body().setScale(2.0f,2.0f);
+	sprite1.body().setPosition(50.0f, 50.0f);
+	sprite0.setSprite(1987);
+	sprite0.body().setScale(2.0f, 2.0f);
+	sprite0.body().setPosition(50.0f, 150.0f);
 
-//	etest[kposition] = sf::Vector2f(10.0f, 100.0f);
-	etest[kbody].setScale(4.0f);
-	t_dumb_batch draw_verts;
-
-	kult::entity debug_label_entity;
-
-	kult::copy(debug_label_entity.id, etest.id);
-	debug_label_entity[kbody].setPosition(0.0f, 0.0f);
-	//debug_label_entity[kbody].setScale(2.0f);
-	debug_label_entity[ktext] = "Happy Happy Joy joy";
-
+	sprite0[Components::velocity] = sf::Vector2f(1.0f, 0.0f);
+	sprite1[Components::animation] = 0.25;
 	while (window.isOpen())
 	{
 		// Handle events
@@ -186,23 +138,23 @@ void gameLoop() {
 		auto time = clock.getElapsedTime();
 		if (time.asMilliseconds() > 60/1000) { // 60 times a second
 			clock.restart();
-			draw_verts.clear();
+			
 			
 			float dt = time.asSeconds();
-			velocity_system(dt);
-			animation_system(dt);
+			Systems::velocity_system(dt);
+			Systems::animation_system(dt);
 
 
 
 			// handle rendering system
-			draw_verts.clear();
-			rendering_system(draw_verts);
+			batch.clear();
+			Systems::rendering_system(batch);
 		}
 		// update as fast as we can?
 		window.clear();
 		sf::RenderStates states = sf::RenderStates::Default;
 		//window.draw(debug_label);
-		for (auto& kv : draw_verts) {
+		for (auto& kv : batch) {
 			auto& verts = kv.second;
 			states.texture = kv.first;
 			window.draw(verts.data(), verts.size(), sf::PrimitiveType::Triangles, states);

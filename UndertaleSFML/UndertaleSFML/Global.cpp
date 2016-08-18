@@ -8,18 +8,6 @@
 using namespace sf;
 
 
-void Mesh::push_back(const std::vector<sf::Vertex>& v) {
-	auto lock = safeLock();
-	_verts.insert(_verts.end(), v.begin(), v.end());
-}
-void Mesh::push_back(const Mesh& mesh) {
-	auto mlock = mesh.safeLock();
-	push_back(mesh.getVerteicsVector());
-}
-Mesh::Mesh(const Mesh& copy, const sf::Transform& t) : _verts(copy._verts) {
-	transformPositions(t);
-}
-
 SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds) :_texture(texture), _textureRect(textureRect), _bounds(bounds) {
 	float left = bounds.left;
 	float top = bounds.top;
@@ -50,42 +38,6 @@ SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts) :
 };  // build from triangles
 
 
-sf::FloatRect Mesh::getVerteicsBounds() const {
-	auto lock = safeLock();
-	if (!_verts.empty())
-	{
-		float left = _verts[0].position.x;
-		float top = _verts[0].position.y;
-		float right = _verts[0].position.x;
-		float bottom = _verts[0].position.y;
-		for (const auto& v : _verts) {
-			sf::Vector2f position = v.position;
-			// Update left and right
-			if (position.x < left)
-				left = position.x;
-			else if (position.x > right)
-				right = position.x;
-
-			// Update top and bottom
-			if (position.y < top)
-				top = position.y;
-			else if (position.y > bottom)
-				bottom = position.y;
-		}
-		return sf::FloatRect(left, top, right - left, bottom - top);
-	}
-	else
-	{
-		// Array is empty
-		return sf::FloatRect();
-	}
-}
-void Mesh::transformPositions(const sf::Transform& trasform) {
-	auto lock = safeLock();
-	if (!_verts.empty()) {
-		for (auto& v : _verts) v.position = trasform.transformPoint(v.position);
-	}
-}
 Body::Body() : LockingObject(), _transform(sf::Transform::Identity),_position(), _origin(), _scale(1.0f,1.0f), _rotation(0), _changed(false), _transformNeedUpdate(true) {}
 void Body::setPosition(const sf::Vector2f& v) { 
 	auto lock = safeLock();

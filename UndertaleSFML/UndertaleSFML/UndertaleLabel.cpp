@@ -2,44 +2,44 @@
 
 using namespace sf;
 
-UndertaleLabelBuilder::UndertaleLabelBuilder() : _writing(0.0f, 0.0f), _textBounds(0.0f, 0.0f), _offset(0.0f, 0.0f) {
+UndertaleLabel::UndertaleLabel() : _writing(0.0f, 0.0f), _textBounds(0.0f, 0.0f), _offset(0.0f, 0.0f) {
 	_textVerts.reserve(6 * 40);
 }
-void UndertaleLabelBuilder::setText(const std::string& text) {
+void UndertaleLabel::setText(const std::string& text) {
 	clear();
 	for (char c : text) push_back(c);
 }
-void UndertaleLabelBuilder::setFont(size_t index) {
+void UndertaleLabel::setFont(size_t index) {
 	_font = UFont::LoadUndertaleFont(index);
 	clear();
 }
-void UndertaleLabelBuilder::setTextOffset(const sf::Vector2f& v) {
+void UndertaleLabel::setTextOffset(const sf::Vector2f& v) {
 	if (_textVerts.size() >0) for (auto& vert : _textVerts) vert.position = (vert.position - _offset) + v;
 	_offset = v;
 }
-UndertaleLabelBuilder& UndertaleLabelBuilder::operator+=(const std::string& text) {
+UndertaleLabel& UndertaleLabel::operator+=(const std::string& text) {
 	if (!_font) setFont(2);
 	for (char c : text) push_back(c);
 	return *this;
 }
-UndertaleLabelBuilder& UndertaleLabelBuilder::operator=(const std::string& text) {
+UndertaleLabel& UndertaleLabel::operator=(const std::string& text) {
 	if (!_font) setFont(2);
 	setText(text);
 	return *this;
 }
-void UndertaleLabelBuilder::clear() {
+void UndertaleLabel::clear() {
 	_textVerts.clear();
 	if (!_font) setFont(2);
 	_textBounds.y = _font ? _font->getFontSize() : 0.0f;
 	_textBounds.x = 0.0f;
 	_writing = _offset;
 }
-void UndertaleLabelBuilder::newline() {
+void UndertaleLabel::newline() {
 	_writing.y += _font->getFontSize() + 2;
 	_textBounds.y += _font->getFontSize() + 2;
 	_writing.x = _offset.x;
 }
-void UndertaleLabelBuilder::push_back(int a, const sf::Color& color) {
+void UndertaleLabel::push_back(int a, const sf::Color& color) {
 	if (a == '\n') {
 		newline();
 	}
@@ -73,14 +73,7 @@ void UndertaleLabelBuilder::push_back(int a, const sf::Color& color) {
 		_textBounds.x += std::max(_textBounds.x, _writing.x);
 	}
 }
-void UndertaleLabelBuilder::pop_back() {
+void UndertaleLabel::pop_back() {
 	if(_textVerts.size() > 0) _textVerts.resize(_textVerts.size() - 6);
 }
 
-void UndertaleLabel::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-	if (_font && _textVerts.size() > 0) {
-		states.transform *= getTransform();
-		states.texture = &_font->getTexture();
-		target.draw(_textVerts.data(), _textVerts.size(), sf::PrimitiveType::Triangles, states);
-	}
-}
