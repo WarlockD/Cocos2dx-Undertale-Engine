@@ -48,9 +48,6 @@
     <ClCompile Include="obj_face.cpp">
       <Filter>UndertaleObjects</Filter>
     </ClCompile>
-    <ClCompile Include="kult.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\ext\include\entityx\Entity.cc">
       <Filter>enityx</Filter>
     </ClCompile>
@@ -92,16 +89,10 @@
     <ClInclude Include="obj_dialoger.h">
       <Filter>UndertaleObjects</Filter>
     </ClInclude>
-    <ClInclude Include="kult.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Components.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MessageDispatch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MyEnitys.h">
+    <ClInclude Include="Drawables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

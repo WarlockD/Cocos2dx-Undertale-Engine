@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Global.h"
-
+#include "Drawables.h"
 
 
 class UFont  : public std::enable_shared_from_this<UFont> {
@@ -46,13 +46,23 @@ public:
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const;
 };
 
-namespace enityx {
+class SpriteEnity : public ex::Entity {
 	
-
-
+	size_t _sprite_index;
+	Body* _body;
+	SpriteEnity(ex::EntityManager *manager, Entity::Id id) : ex::Entity(manager, id) { }
+public:
+	virtual ~SpriteEnity();
+	static SpriteEnity create(size_t sprite_index);
+	void setSpriteIndex(size_t sprite_index);
+	size_t getSpriteIndex() const { return _sprite_index; }
+	Body& operator*() const { return *_body; }
+	Body* operator->()  { return _body; } 
 };
 namespace Global {
 	SpriteFrameCollection LoadSprite(size_t sprite_index);
+	
+
 	bool LoadUndertaleDataWin(const std::string& filename);
 	const sf::Texture& GetUndertaleTexture(size_t index);
 	sf::Shader& LoadShader(const std::string& filename); // loads a shader, or from a cache

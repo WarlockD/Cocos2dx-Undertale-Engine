@@ -115,6 +115,24 @@ std::string replace_extension(const std::string& filename, const std::string& ne
 	if (lastdot == std::string::npos) return filename;
 	return filename.substr(0, lastdot) + "." + new_extension;
 }
+
+SpriteEnity::~SpriteEnity() { destroy(); }
+SpriteEnity SpriteEnity::create(size_t sprite_index) {
+	ex::Entity sprite_id = global::getEntities().create();
+	// don't want to invalidate the sprite entry
+	SpriteEnity sprite(&global::getEntities(), sprite_id.id());
+	sprite.setSpriteIndex(sprite_index);
+	sprite._sprite_index = 0;
+	sprite._body = sprite.assign<Body>().get();
+	return sprite;
+}
+void SpriteEnity::setSpriteIndex(size_t sprite_index) {
+	if (_sprite_index != sprite_index) {
+		auto cache = LookupSpriteCache(sprite_index);
+		assign<SpriteFrameCollection>(&Global::GetUndertaleTexture(cache.texture_index), cache.verts, cache.size);
+	}
+}
+
 namespace Global {
 	SpriteFrameCollection LoadSprite(size_t sprite_index) {
 		auto cache = LookupSpriteCache(sprite_index);

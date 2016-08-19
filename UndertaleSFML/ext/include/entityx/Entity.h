@@ -213,6 +213,17 @@ public:
   bool operator != (const ComponentHandle<C> &other) const {
     return !(*this == other);
   }
+  typename std::enable_if<std::is_copy_assignable<ComponentType>::value, ComponentHandle&>::type 
+	  operator=(const ComponentType& copy) {
+	  if (valid()) *get() = copy;
+	  return *this;
+  }
+  typename std::enable_if<std::is_move_assignable<ComponentType>::value, ComponentHandle&>::type
+	  operator=(ComponentType&& move) {
+	  if (valid()) *get() = std::move(move);
+	  return *this;
+  }
+
 
 private:
   friend class EntityManager;

@@ -1,4 +1,5 @@
 #include "Global.h"
+#include "Drawables.h"
 #include <array>
 #include <chrono>
 
@@ -7,6 +8,35 @@
 #endif
 using namespace sf;
 
+namespace global {
+	void InsertRectangle(sf::Vertex * verts, const sf::FloatRect& rect, sf::Color fill_color) {
+		float left = rect.left;
+		float top = rect.top;
+		float right = rect.left + rect.width;
+		float bottom = rect.top + rect.height;
+
+		float u1 = static_cast<float>(0);
+		float v1 = static_cast<float>(0);
+		float u2 = static_cast<float>(1);
+		float v2 = static_cast<float>(1);
+		// Add a quad for the current character
+		*verts++ = (Vertex(Vector2f(left, top), fill_color, Vector2f(u1, v1)));
+		*verts++ = (Vertex(Vector2f(right, top), fill_color, Vector2f(u2, v1)));
+		*verts++ = (Vertex(Vector2f(left, bottom), fill_color, Vector2f(u1, v2)));
+		*verts++ = (Vertex(Vector2f(left, bottom), fill_color, Vector2f(u1, v2)));
+		*verts++ = (Vertex(Vector2f(right, top), fill_color, Vector2f(u2, v1)));
+		*verts++ = (Vertex(Vector2f(right, bottom), fill_color, Vector2f(u2, v2)));
+	}
+	std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color) {
+		std::array<sf::Vertex, 6> verts;
+		InsertRectangle(verts.data(), rect, fill_color);
+		return verts;
+	}
+	void InsertRectangle(std::vector<sf::Vertex>& verts, const sf::FloatRect& rect, sf::Color fill_color) {
+		verts.resize(verts.size() + 6);
+		InsertRectangle(verts.data()-6, rect, fill_color);
+	}
+}
 
 SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds) :_texture(texture), _textureRect(textureRect), _bounds(bounds) {
 	float left = bounds.left;

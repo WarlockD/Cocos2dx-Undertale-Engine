@@ -21,6 +21,9 @@ namespace ex = entityx;
 typedef std::function<void(int)> IntSetCallback;
 namespace global {
 	sf::RenderWindow& getWindow();
+	ex::EventManager& getEventManager();
+	ex::EntityManager& getEntities();
+
 	constexpr float smallest_pixel = 0.001f; // smallest movement of a pixel
 	extern const std::string empty_string; // used for empty const std::string refrences
 
@@ -38,49 +41,11 @@ namespace global {
 	 inline bool AlmostEqualRelative(const sf::Vector2f& l, const sf::Vector2f& r) {
 		 return AlmostEqualRelative(l.x, r.x) && AlmostEqualRelative(l.y, r.y);
 	 }
-};
-// This is the basic rendering class.  None of the verts are transformed, no position data, nothing.  Just the raw verts
-// has some simple helper functions
-struct Renderable {
-	typedef const sf::Vertex* const_iterator;
-	virtual const sf::Texture* texture() const = 0;
-	virtual const sf::Vertex* data() const = 0;
-	virtual size_t size() const = 0;
-	virtual const_iterator begin() const { return data(); }
-	virtual const_iterator end() const { return data() + size(); }
-	virtual sf::FloatRect bounds() const {
-		sf::Vector2f vmin;
-		sf::Vector2f vmax;
-		for (auto& vert : *this) {
-			auto& v = vert.position;
-			vmin.x = std::min(vmin.x, v.x);
-			vmin.y = std::min(vmin.y, v.y);
-			vmax.x = std::max(vmin.x, v.x);
-			vmax.y = std::max(vmin.y, v.y);
-		}
-		return sf::FloatRect(vmin, vmax - vmin);
-	}
-	virtual sf::FloatRect bounds(const sf::Transform&t) const { return t.transformRect(bounds()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, begin(), end()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t) const { for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); }
-	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace(at, t * v.position, color, v.texCoords); }
-	virtual void insert(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t) const { 
-		for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords); 
-	}
-	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace_back(t * v.position, color, v.texCoords); }
-	virtual ~Renderable() {}
-};
 
-// use this template class for a Renderable object to test drawing direct to sfml
-template<class C> class SFMLDrawable : public sf::Transformable, public sf::Drawable {
-	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
-		states.texture = = texture();
-		states.transform *= getTransform();
-		target.draw(data(), size(), sf::PrimitiveType::Triangles, states);
-	}
+	 std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color);
+	 void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color);
+	 void InsertRectangle(std::vector<sf::Vertex>& verts, const sf::FloatRect& rect, sf::Color fill_color);
 };
-
 
 template <typename T>
 class abstract_ptr : public std::unique_ptr<T>
@@ -154,8 +119,8 @@ protected:
 	Type _toAmount;
 	Type _current;
 public:
-	StopWatch() : _toAmount(Zero), _current(Zero) {}
-	StopWatch(Type init) : _toAmount(init), _current(Zero) {}
+	explicit StopWatch() : _toAmount(Zero), _current(Zero) {}
+	explicit StopWatch(Type init) : _toAmount(init), _current(Zero) {}
 	template<class B, class = typename std::enable_if<std::is_convertible<B, T>::value, B>::type>
 	void setTime(B v) { _toAmount = static_cast<T>(v); }
 	template<class B, class = typename std::enable_if<std::is_convertible<B, T>::value, B>::type>
@@ -176,57 +141,6 @@ public:
 		if (test()) { reset(); return true; }
 		else return false;
 	}
-};
-class Mesh : public Renderable {
-	std::vector<sf::Vertex> _verts;
-	const sf::Texture* _texture;
-public:
-	Mesh() : _texture(nullptr) {}
-	Mesh(const sf::Texture* texture, const std::vector<sf::Vertex>& verts) : _texture(texture) , _verts(verts) {}
-	Mesh(const sf::Texture* texture, std::vector<sf::Vertex>&& verts) : _texture(texture), _verts(std::move(verts)) {}
-	virtual const sf::Texture* texture() const override { return _texture; }
-	virtual const sf::Vertex* data() const override { return _verts.data(); }
-	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
-};
-
-class SpriteFrame : public Renderable {
-	const sf::Texture* _texture;
-	sf::IntRect _textureRect;
-	sf::FloatRect _bounds;
-	std::array<sf::Vertex, 6> _verts;
-public:
-	SpriteFrame() : _texture(nullptr) {}
-	SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds);
-	SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts);  // build from triangles
-																		// we want to default to triangles for compatablity with opengles
-	const sf::IntRect& textureRect() const { return _textureRect; }
-	sf::FloatRect bounds() const override { return _bounds; }
-	// interface 
-	virtual const sf::Texture* texture() const override { return _texture; }
-	virtual const sf::Vertex* data() const override { return _verts.data(); }
-	virtual size_t size() const override { return _verts.size(); }
-};
-
-class SpriteFrameCollection : public Renderable {
-private:
-	std::vector<sf::Vertex> _frames;
-	const sf::Vertex* _current;
-	size_t _image_index;
-	sf::Vector2f _size;
-	const sf::Texture* _texture;
-public:
-	SpriteFrameCollection() : _texture(nullptr), _current(nullptr),_image_index(0) {}
-	SpriteFrameCollection(const sf::Texture* texture, const std::vector<sf::Vertex>& frames, sf::Vector2f& size) : _frames(frames), _current(_frames.data()), _image_index(0),_size(size), _texture(texture) {}
-	SpriteFrameCollection(const sf::Texture* texture, std::vector<sf::Vertex>&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _current(_frames.data()), _image_index(0), _size(size), _texture(texture) {}
-	size_t getImageIndex() const { return _image_index; }
-	void setImageIndex(size_t image_index) { _image_index = image_index % (_frames.size() / 6); _current = _frames.data() + (_image_index * 6); }	
-	// cheat and use the iliterator from an array
-	SpriteFrame getSpriteFrame() const { return SpriteFrame(_texture, _current); }
-	virtual const sf::Texture* texture() const override { return _texture; }
-	virtual const sf::Vertex* data() const override { return _current; }
-	virtual size_t size() const override { return 6; } // we only return the current frame
-	sf::FloatRect bounds() const override { return sf::FloatRect(sf::Vector2f(), _size); }
-	size_t total_size() const { return _frames.size(); }
 };
 
 class LockingObject {
@@ -257,83 +171,75 @@ public:
 	// to make it simple just do auto lock = safeLock()
 	SafetyLock safeLock() const { return SafetyLock(*this); }
 };
+
+
 inline std::ostream& operator<<(std::ostream& os, const sf::Vector2f& v) {
 	os << std::fixed << std::setprecision(3) << '('  << v.x << ',' << v.y << ')';
 	return os;
 }
-class Body : public LockingObject {
-	sf::Vector2f _position;
-	sf::Vector2f _origin;
-	sf::Vector2f _scale;
-	float _rotation;
-	bool _changed;
-	mutable bool _transformNeedUpdate;
-	mutable sf::Transform _transform;
-public:
-	Body();
-	void setPosition(const sf::Vector2f& v);
-	void setPosition(float x, float y) { setPosition(sf::Vector2f(x, y)); }
-	void setOrigin(const sf::Vector2f& v);
-	void setOrigin(float x, float y) { setOrigin(sf::Vector2f(x, y)); }
-	void setScale(const sf::Vector2f& v);
-	void setScale(float x, float y) { setScale(sf::Vector2f(x, y)); }
-	void setScale(float x) { setScale(sf::Vector2f(x, x)); }
-	void setRotation(float angle);
-	void move(const sf::Vector2f& v) {setPosition(getPosition() + v); }
-	const sf::Vector2f& getPosition() const { return _position; }
-	const sf::Vector2f& getOrigin() const { return _origin; }
-	const sf::Vector2f& getScale() const { return _scale; }
-	float getRotation() const { return _rotation; }
-	bool hasChanged() const { return _changed; }
-	void resetChanged() { _changed = false; }
-	const sf::Transform& getTransform() const;
 
-};
-inline std::ostream& operator<<(std::ostream& os, const Body& body) {
-	os << "Position" << body.getPosition() << " ,Origin" << body.getOrigin() << " ,Scale" << body.getScale() << ", Rotation(" << body.getRotation() << ")";
-	return os;
-}
-class Animation {
-	float _speed;
-	float _last;
+template<class T>
+class LightWeightRef {
 public:
-	Animation() : _speed(0), _last(0) {}
-	void setSpeed(float speed) { _speed = speed; }
-	float getSpeed() const {
-		return _speed;
-	}
-	Animation& operator=(float f) {
-		_speed = f;
-		_last = 0.0f;
+	typedef LightWeightRef<T> light_weight_type;
+	typedef T element_type;
+	typedef T* pointer;
+	typedef const T* const_pointer;
+private:
+	pointer _ref;
+public:
+	LightWeightRef() : _ref(nullptr) {}
+	template<class C> explicit LightWeightRef(C* ptr) : _ref(ptr) {}
+	template<class C> explicit LightWeightRef(C& ptr) : _ref(&ptr) {}
+	
+	//explicit LightWeightRef(pointer* ptr) : _ref(ptr) {}
+	//explicit LightWeightRef(pointer& ptr) : _ref(&ptr) {}
+	virtual ~LightWeightRef() { _ref = nullptr; }
+	pointer get() { return _ref; }
+	element_type& operator*() const { return *get(); }
+	pointer operator->() const { return _ref; }
+	explicit operator bool() const { return _ref != nullptr; }
+
+	//template<class C> explicit LightWeightRef(C* ptr) : _ref(ptr) {}
+	//template<class C> explicit LightWeightRef(C& ptr) : _ref(&ptr) {}
+	template<class B, class = typename std::enable_if<std::is_base_of<T, B>::value, , T>::type>
+	LightWeightRef<T>& operator=(const LightWeightRef<B>& other) {
+		_ref = other._ref;
 		return *this;
 	}
-	bool checkFrame(float dt) {
-		_last += dt;
-		if (_last + 0.01 > _speed) {
-			_last = 0.0;
-			return true;
-		}
-		return false;
+	template<class B, class = typename std::enable_if<std::is_base_of<T, B>::value, , T>::type>
+	LightWeightRef<T>& operator=(LightWeightRef<B>&& other) {
+		_ref = other._ref;
+		other._ref = nullptr;
+		return *this;
 	}
+
+	inline LightWeightRef& operator=(pointer ptr) { _ref = ptr; return *this; }
+	inline LightWeightRef& operator=(element_type& ref) { _ref = &ptr; return *this; }
+
+	class WeakRef {
+		light_weight_type& _ref;
+	public:
+		WeakRef(light_weight_type& ref) : _ref(ref) {}
+		inline operator bool() const { return _ref._ref != nullptr; }
+		const const_pointer*  operator->() const { return _ref; }
+	};
+	inline WeakRef weakRef() const { return WeakRef(*this); }
 };
-inline std::ostream& operator<<(std::ostream& os, const Animation& a) {
-	os << "Speed(" << a.getSpeed() << ")";
-	return os;
-}
 
 
-
-
-
-// Emitted when two entities collide.
-struct TransformChanged {
-	TransformChanged(ex::Entity enity, ex::Entity right) : left(left), right(right) {}
-
-	ex::Entity left, right;
-};
 
 #if 0
-
+// http://stackoverflow.com/questions/87372/check-if-a-class-has-a-member-function-of-a-given-signature
+// really nice idea, works well too
+template<typename T>
+struct HasUpdateMethod
+{
+	template<typename U, void(U::*)(float)> struct SFINAE {};
+	template<typename U> static char Test(SFINAE<U, &U::update>*);
+	template<typename U> static int Test(...);
+	static const bool value = sizeof(Test<T>(0)) == sizeof(char);
+};
 namespace SmalleEntiySystem {
 
 

@@ -1,94 +1,77 @@
 #include "Components.h"
 #include "UndertaleLoader.h"
+#include <map>
 
-namespace Components {
-	kult::component<'name', std::string> name;
-	kult::component<'desc', std::string> description;
-	kult::component<'matx', sf::Transformable> transform;
-	kult::component<'body', Body> body;
-	kult::component<'vel', sf::Vector2f> velocity;
-	kult::component<'cfrm', SpriteFrameCollection> frames;
-	kult::component<'sfrm', SpriteFrame> frame;
-	kult::component<'anim', StopWatch<float>> animation;
-	kult::component<'rend', RenderableRef> render;
-};
-namespace Systems {
-	kult::system<float> velocity_system([](float dt) {
-		for (auto &entitys : kult::join(Components::velocity, Components::transform)) {
-			auto& velocity = entitys[Components::velocity];
-			auto& body = entitys[Components::transform];
-			body.move(velocity*dt);
-		}
+
+void RenderSystem::OrderedVerts::draw(sf::RenderTarget& target, sf::RenderStates states) const {
+	for (auto& b : batch) {
+		states.texture = b.first;
+		target.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
+	}
+}
+RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target) {
+	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
+		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
+		exit(1);
+	}
+	text.setFont(_font);
+	text.setPosition(sf::Vector2f(2, 2));
+	text.setCharacterSize(18);
+	text.setColor(sf::Color::White);
+}
+void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
+	sortedVerts.clear();
+	es.each<Body, RenderableRef>([this](ex::Entity entity, Body& body, RenderableRef &renderable) {
+		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
+		auto& verts = (sortedVerts[layer])[(renderable->texture()];
+		renderable->insert(verts, body.getTransform());
 	});
+	size_t draw_count = 0;
+	sf::RenderStates states = sf::RenderStates::Default;
+	for (auto& sv : sortedVerts) {
+		for (auto& b : sv.second) {
+			draw_count++;
+			states.texture = b.first;
+			target.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
+		}
+	}
 
-	// animation system
-	kult::system<float> animation_system([](float dt) {
-		for (auto &entitys : kult::join(Components::animation, Components::frames)) {
-			auto& animation = entitys[Components::animation];
-			auto& frames = entitys[Components::frames];
-			if (animation.test_then_reset(dt)) {
+	last_update += dt;
+	frame_count++;
+	if (last_update >= 0.5) {
+		std::ostringstream out;
+		const double fps = frame_count / last_update;
+		out << es.size() << " entities (" << static_cast<int>(fps) << " fps)" << std::endl;
+		out << "draws " << draw_count;
+		text.setString(out.str());
+		last_update = 0.0;
+		frame_count = 0.0;
+	}
+	target.draw(text);
+}
+
+void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
+
+	es.each<SpriteFrameCollection, Animation>([this,dt](ex::Entity entity, SpriteFrameCollection& frames, Animation &animation) {
+		if (animation.watch.test_then_reset(dt)) {
+			if(animation.reverse)
+				frames.setImageIndex(frames.getImageIndex() - 1);
+			else
 				frames.setImageIndex(frames.getImageIndex() + 1);
-			}
+
 		}
 	});
+}
 
-	// animation system
-	kult::system<float> collision_system([](float dt) {
-		std::unordered_map<kult::entity*, sf::FloatRect> rects;
-		for (auto &entitys : kult::join(Components::bounds, Components::transform)) {
-			const auto& bounds = entitys[Components::bounds];
-			auto& transform = entitys[Components::transform].getTransform();
-			rects[&entitys] = transform.transformRect(bounds);
-		}
-		// now we serch the map
-		for (auto a : rects) {
-			for (auto b : rects) {
-				if (a != b && a.second.intersects(b.second.intersects)) {
-					a.first->emit(CollisionEvent);
-				}
-			}
-		}
+void VelocitySystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
+	es.each<Body, Velocity>([this, dt](ex::Entity entity, Body& body, Velocity &velocity) {
+		body.setPosition(body.getPosition() + (velocity.velocity * dt));
 	});
+}
 
-
-	
-	typedef std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> t_dumb_batch;
-
-	// rendering_system
-	kult::system<t_dumb_batch&> rendering_system([](t_dumb_batch& batch) {
-		// majority of sprites use this
-		for (auto &entitys : kult::join(Components::render, Components::transform)) {
-			auto& frame = entitys[Components::render];
-			auto& verts = batch[frame->texture()];
-			frame->insert(verts, entitys[Components::transform].getTransform());
-		}
-	});
-
-
-
-};
-
-namespace Engine {
-
-	constexpr size_t SpriteEnity = 10000;
-	/*
-
-	class USprite : kult::entity {
-		size_t _sprite_index;
-		sf::Transformable* _body;
-		SpriteFrameCollection* _frames;
-	public:
-	*/
-	USprite::USprite() : kult::entity() , _sprite_index(0), _frames(nullptr) {
-		_body = &(*this)[Components::transform];
-	}
-	void USprite::setSprite(size_t sprite_index) {
-		if (sprite_index != _sprite_index) {
-			if (!kult::has<SpriteFrameCollection>(id)) {
-				_frames = &(*this)[Components::frames];
-				(*this)[Components::render] = _frames;
-			}
-			*_frames = Global::LoadSprite(sprite_index);
-		}
-	}
-};
+Application::Application(sf::RenderTarget &target) {
+	systems.add<VelocitySystem>(target);
+	systems.add<AnimationSystem>(target);
+	systems.add<RenderSystem>(target);
+	systems.configure();
+}

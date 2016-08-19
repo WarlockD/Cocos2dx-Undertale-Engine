@@ -22,64 +22,18 @@
 #pragma comment(lib, "sfml-graphics-s-d.lib")
 #pragma comment(lib, "sfml-window-s-d.lib")
 
-sf::RenderWindow* s_window = nullptr; // global window
+static std::unique_ptr<sf::RenderWindow> s_window;// global window
+static std::unique_ptr<ex::EntityX> s_app;
 
 namespace global {
 	sf::RenderWindow& getWindow() {
 		assert(s_window);
 		return *s_window;
 	}
+	ex::EventManager& getEventManager() { return s_app->events; }
+	ex::EntityManager& getEntities() { return s_app->entities; }
+	ex::SystemManager& getSystems() { return s_app->systems; }
 };
-struct Velocity  { 
-	sf::Vector2f velocity; 
-	explicit Velocity(float x, float y) : velocity(x, y) {}
-};
-// Render all Renderable entities and draw some informational text.
-class VelocitySystem :public ex::System<VelocitySystem> {
-private:
-	float last_update = 0.0f;
-	sf::RenderTarget &target;
-public:
-	explicit VelocitySystem(sf::RenderTarget &target) : target(target) {
-	}
-	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override {
-		last_update += dt;
-		if (last_update >= (1.0 / 30.0)) {
-			
-			es.each<Body, Velocity>([this](ex::Entity entity, Body &body, Velocity& velocity) {
-				body.move(velocity.velocity*last_update);
-			});
-			last_update = 0.0;
-		}
-	}
-};
-
-
-constexpr size_t UpdateTime = 30 / 1000; // 30 frames a second
-
-class Application : public ex::EntityX {
-public:
-	explicit Application(sf::RenderTarget &target, sf::Font &font) {
-		//systems.add<SpawnSystem>(target, 500);
-		//systems.add<BodySystem>();
-		//systems.add<BounceSystem>(target);
-	//	systems.add<CollisionSystem>(target);
-	//	systems.add<ExplosionSystem>();
-	//	systems.add<ParticleSystem>();
-
-		
-		systems.add<VelocitySystem>(target);
-		//systems.add<RenderSystem>(target, font);
-	//	systems.add<ParticleRenderSystem>(target);
-		systems.configure();
-	}
-
-	void update(ex::TimeDelta dt) {
-		systems.update_all(dt);
-	}
-};
-
-
 
 
 namespace ex = entityx;
@@ -97,26 +51,36 @@ void gameLoop() {
 	writer->start_typing();
 	UndertaleLabel debug_label;
 	
-	sf::Font debug_font;
-	if (!debug_font.loadFromFile("LiberationSans-Regular.ttf")) {
-		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
-		return;
-	}
 	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
-	Systems::t_dumb_batch batch;
 
-	Engine::USprite sprite0;
-	Engine::USprite sprite1;
+	auto& systems = global::getSystems();
+	//SpriteEnity teste = SpriteEnity::create(1986)
 
-	sprite1.setSprite(1986);
-	sprite1.body().setScale(2.0f,2.0f);
-	sprite1.body().setPosition(50.0f, 50.0f);
-	sprite0.setSprite(1987);
-	sprite0.body().setScale(2.0f, 2.0f);
-	sprite0.body().setPosition(50.0f, 150.0f);
+	ex::Entity sprite = global::getEntities().create();
+	sprite.assign<SpriteFrameCollection>(raw_sprite);
+	sprite.assign<Body>();
+	sprite.component<Body>()->setPosition(20, 50);
+	sprite.component<Body>()->setScale(2.0, 2.0);
+	sprite.assign<RenderableRef>(sprite.component<SpriteFrameCollection>().get());
+	sprite.assign<Animation>(0.25f);
 
-	sprite0[Components::velocity] = sf::Vector2f(1.0f, 0.0f);
-	sprite1[Components::animation] = 0.25;
+	ex::Entity sprite2 = global::getEntities().create_from_copy(sprite);
+	sprite2.component<Body>()->setPosition(20, 80);
+	sprite2.component<SpriteFrameCollection>() = Global::LoadSprite(1982);
+	sprite2.component<Body>()->setPosition(20, 60);
+	sprite2.component<Body>()->setScale(2.0, 2.0);
+	sprite2.component<RenderableRef>() = RenderableRef(sprite2.component<SpriteFrameCollection>().get());
+	//sprite2.component<Animation>() = Animation(0.25f;
+
+	// don't want to invalidate the sprite entry
+	//SpriteEnity sprite(&global::getEntities(), sprite_id.id());
+	//sprite.setSpriteIndex(sprite_index);
+	///sprite._sprite_index = 0;
+	//sprite._body = sprite.assign<Body>().get();
+	//return sprite;
+
+
+	//teste->setPosition(20, 20);
 	while (window.isOpen())
 	{
 		// Handle events
@@ -125,41 +89,17 @@ void gameLoop() {
 		{
 			switch (event.type) {
 			case sf::Event::Closed:
-				window.close();
 				return;
 			case sf::Event::KeyPressed:
 				if (event.key.code == sf::Keyboard::Escape) {
-					window.close();
 					return;
 				}
 				break;
 			}
 		}
-		auto time = clock.getElapsedTime();
-		if (time.asMilliseconds() > 60/1000) { // 60 times a second
-			clock.restart();
-			
-			
-			float dt = time.asSeconds();
-			Systems::velocity_system(dt);
-			Systems::animation_system(dt);
-
-
-
-			// handle rendering system
-			batch.clear();
-			Systems::rendering_system(batch);
-		}
-		// update as fast as we can?
 		window.clear();
-		sf::RenderStates states = sf::RenderStates::Default;
-		//window.draw(debug_label);
-		for (auto& kv : batch) {
-			auto& verts = kv.second;
-			states.texture = kv.first;
-			window.draw(verts.data(), verts.size(), sf::PrimitiveType::Triangles, states);
-		}
-		
+		sf::Time elapsed = clock.restart();
+		systems.update_all(elapsed.asSeconds());
 		window.display();
 	}
 }
@@ -171,12 +111,16 @@ int main(int argc, const char* argv[]) {
 	const int gameHeight = 600;
 
 	// Create the window of the application
-	s_window = new sf::RenderWindow(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close);
+	s_window.reset(new sf::RenderWindow(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close));
+	s_app.reset(new Application(*s_window));
 	gameLoop();
 	// we got to run this to delete all the loaded textures we have or visual studio blows a fit
+	s_window->close();
 	Global::DestroyEveything();
-	delete s_window;
-	s_window = nullptr;
-	
+
+	s_app.release();
+	s_window.release();
+
+
 	return 0;
 }
