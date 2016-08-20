@@ -48,67 +48,6 @@ namespace global {
 	 void InsertRectangle(std::vector<sf::Vertex>& verts, const sf::FloatRect& rect, sf::Color fill_color);
 };
 
-template <typename T>
-class abstract_ptr : public std::unique_ptr<T>
-{
-	std::function<T*(const T&)> _create_copy;
-
-	template<class B, class = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T, B>::value, B>::type>
-	void SetCopyFunctions() {
-		_create_copy = [](const T& copy) { return new B(static_cast<const B&>(copy)); };
-	}
-public:
-	using std::unique_ptr<T>::unique_ptr;
-	abstract_ptr() {}
-
-	//	typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value && std::is_copy_assignable<T>, PtrComponent<Base>&>::type
-//	typename std::enable_if<std::is_copy_constructible<B>>::type
-		
-		//class = typename std::enable_if<!std::is_abstract<T>::value && std::is_base_of<Base, T>::value, PtrComponent<Base>&>::type>
-	template<class B, class G=T, class = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<G, B>::value, B>::type>
-	abstract_ptr(abstract_ptr<B> const& other)
-	{
-		SetCopyFunctions<B>();
-		auto value = *other.get();
-		this->reset(new B(value));
-	}
-
-	abstract_ptr(abstract_ptr<T> const& other) : _create_copy(other._create_copy)
-	{
-		if (_create_copy) this->reset(_create_copy(*other.get()));
-	}
-	abstract_ptr<T>& operator=(abstract_ptr<T> const& other)
-	{
-		_create_copy = other._create_copy;
-		if (_create_copy) this->reset(_create_copy(*other.get()));
-		return *this;
-	}
-
-	template<class B, class G = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T,B>::value, T>::type>
-	abstract_ptr(const B& other) {
-		SetCopyFunctions<B>(*this);
-		this->reset(new B(other));
-	}
-
-	template<class B>
-	typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T, B>::value, abstract_ptr<T>&>::type
-	 operator=(const B& other)
-	{
-		SetCopyFunctions<B>();
-		this->reset(new B(other));
-		return *this;
-	}
-
-	template<class B,  class = typename std::enable_if<std::is_copy_constructible<B>::value && std::is_base_of<T, B>::value, , T>::type>
-	abstract_ptr<T>& operator=(abstract_ptr<B> const& other)
-	{
-		SetCopyFunctions<B>();
-		this->reset(new B(&other.get()));
-		return *this;
-	}
-};
-
-
 
 
 template<typename T> class StopWatch {

@@ -9,6 +9,7 @@ struct Bounds {
 
 struct Velocity {
 	explicit Velocity(sf::Vector2f velocity) :velocity(velocity) {}
+	explicit Velocity() :velocity(0.0f,0.0f) {}
 	sf::Vector2f velocity;
 };
 
@@ -17,13 +18,48 @@ struct Layer {
 	int layer;
 };
 
+struct SystemEvent : public ex::Event<SystemEvent> {
+	sf::Event event;
+	explicit SystemEvent() : event() {}
+	explicit SystemEvent(const sf::Event& event) : event(event) {}
+};
+class Player : public SpriteFrameBase, public ex::Receiver<Player> {
+	enum class  PlayerFacing : char {
+		DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
+	};
+	SpriteFrameCollection _sprites[4];
+	PlayerFacing _facing;
+	int health;
+	int status;
+	bool in_overworld;
+	int _direction;
+	ex::Entity _enity;
+public:
+	virtual const sf::Vertex*  ptr() const { return _sprites[(char)_facing].ptr(); }
+	const sf::Texture* texture() const override final { return _sprites[(char)_facing].texture(); }
+	Player() {} // does NOTHING  use load
+	virtual ~Player();
+	virtual bool load_resources(ex::EntityX& app);
+	virtual void receive(const SystemEvent &event);
+};
 
 
-struct Animation {
-	explicit Animation(float fps, bool reverse) :watch(fps), reverse(reverse) {}
-	explicit Animation(float fps) :watch(fps), reverse(false) {}
-	StopWatch<float> watch;
-	bool reverse = false;
+class Animation {
+	StopWatch<float> _watch;
+	bool _reverse;
+public:
+	explicit Animation(float fps, bool reverse) :  _watch(std::fabs(fps)), _reverse(reverse) {}
+	explicit Animation(float fps) :  _watch(std::fabs(fps)), _reverse(fps > 0.0f ? false : true) {}
+	bool update(Renderable& renderable, float dt);
+};
+
+class PlayerOverWorldSystem : public ex::System<PlayerOverWorldSystem> {
+	sf::RenderTarget &target;
+	ex::EntityX& app;
+	Player _player;
+public:
+	explicit PlayerOverWorldSystem(ex::EntityX& app, sf::RenderTarget &target);
+	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override;
 };
 
 class RenderSystem : public ex::System<RenderSystem> {

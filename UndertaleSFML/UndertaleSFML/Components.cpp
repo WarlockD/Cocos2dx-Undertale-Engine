@@ -5,6 +5,52 @@
 
 using namespace sf;
 
+
+PlayerOverWorldSystem::PlayerOverWorldSystem(ex::EntityX& app,sf::RenderTarget &target) : target(target), app(app) {
+	_player.load_resources(app);
+}
+void PlayerOverWorldSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt)  {
+
+}
+bool Player::load_resources(ex::EntityX& app) {
+	app.events.subscribe<SystemEvent>(*this);
+	_enity = app.entities.create();
+	_enity.assign<Body>();
+	_enity.assign<RenderableRef>(*this);
+	_enity.assign<Velocity>();
+	_facing = PlayerFacing::DOWN;
+
+	_sprites[0] = Global::LoadSprite(1043);
+	_sprites[1] = Global::LoadSprite(1045);
+	_sprites[3] = Global::LoadSprite(1044);
+	_sprites[4] = Global::LoadSprite(1046);
+	return true;
+}
+Player::~Player() {
+	if (_enity.valid()) {
+		global::getEventManager().unsubscribe<SystemEvent>(*this);
+		_enity.destroy();
+	}
+}
+void Player::receive(const SystemEvent &sevent) {
+	auto& event = sevent.event;
+	switch (event.type) {
+	case sf::Event::EventType::KeyPressed:
+		switch (event.key.code) {
+		case sf::Keyboard::Key::A:
+			_enity.component<Velocity>()->velocity.x = -5.0f; 
+			_facing = PlayerFacing::LEFT;
+			break;
+		case sf::Keyboard::Key::D:
+			_enity.component<Velocity>()->velocity.x = 5.0f;
+			_facing = PlayerFacing::RIGHT;
+			break;
+		}
+	};
+}
+
+
+
 RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lines(sf::PrimitiveType::Lines) {
 	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
 		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
@@ -15,13 +61,19 @@ RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lin
 	text.setCharacterSize(18);
 	text.setColor(sf::Color::White);
 }
+
+bool Animation::update(Renderable& renderable, float dt) {
+	if (_watch.test_then_reset(dt)) 
+		return _reverse ? renderable.prev_frame() : renderable.next_frame();
+	return true; // we havn't gotten to the next frame yet so just assume true
+}
 /*as a fall back to line()*/
 void line_raw(double x1, double y1, double x2, double y2,
 	double w,
 	double Cr, double Cg, double Cb,
 	double, double, double, bool)
 {
-	glLineWidth(w);
+	glLineWidth((float)w);
 	float line_vertex[] =
 	{
 		x1,y1,
@@ -51,8 +103,8 @@ void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness
 	// Add a quad for the current character
 	verts.append(Vertex(Vector2f(left, top), color)); verts.append(Vertex(Vector2f(left, bottom), color));
 	verts.append(Vertex(Vector2f(left, top), color)); verts.append(Vertex(Vector2f(right, top), color));
-	verts.append(Vertex(Vector2f(right, top), color)); verts.append(Vertex(Vector2f(right, bottom), color));
-	verts.append(Vertex(Vector2f(right, top), color)); verts.append(Vertex(Vector2f(left, top), color));
+	verts.append(Vertex(Vector2f(right, bottom), color)); verts.append(Vertex(Vector2f(left, bottom), color));
+	verts.append(Vertex(Vector2f(right, bottom), color)); verts.append(Vertex(Vector2f(right, top), color));
 }
 void draw_box(const sf::FloatRect& rect,  float thickness = 4.0f, const sf::Color color = sf::Color::Green) {
 	glLineWidth(thickness);
@@ -72,14 +124,15 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 	
 	sortedVerts.clear();
 	debug_lines.clear();
-	es.each<Body, RenderableRef>([this](ex::Entity entity, Body& body, RenderableRef &renderable) {
+	es.each<Body, RenderableRef>([this](ex::Entity entity, Body& body, RenderableRef &renderable_ref) {
 		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
 		const auto& transform = body.getTransform();
-		auto& verts = (sortedVerts[layer])[renderable->texture()];
-		renderable->insert(verts, transform);
-		if (draw_all_boxes || renderable->debug_draw_box) {
-			draw_box(debug_lines, transform.transformRect(renderable->bounds()));
+		Renderable& renderable = renderable_ref;
+		auto& verts = (sortedVerts[layer])[renderable.texture()];
+		renderable.insert(verts, transform);
+		if (draw_all_boxes || renderable.debug_draw_box) {
+			draw_box(debug_lines, transform.transformRect(renderable.bounds()));
 		}
 	});
 	size_t draw_count = 0;
@@ -94,7 +147,7 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 	}
 	//target.popGLStates();
 	if(debug_lines.getVertexCount() > 0) {
-		glLineWidth(3.0f);
+		//glLineWidth(3.0f);
 		target.draw(debug_lines);
 	}
 
@@ -113,15 +166,10 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 }
 
 void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
-
-	es.each<SpriteFrameCollection, Animation>([this,dt](ex::Entity entity, SpriteFrameCollection& frames, Animation &animation) {
-		if (animation.watch.test_then_reset(dt)) {
-			if(animation.reverse)
-				frames.setImageIndex(frames.getImageIndex() - 1);
-			else
-				frames.setImageIndex(frames.getImageIndex() + 1);
-
-		}
+	
+	es.each<RenderableRef, Animation>([this,dt](ex::Entity entity, RenderableRef &renderable_ref, Animation &animation) {
+		if (!animation.update(renderable_ref, dt)) entity.remove<Animation>();
+	
 	});
 }
 
@@ -132,6 +180,7 @@ void VelocitySystem::update(ex::EntityManager &es, ex::EventManager &events, ex:
 }
 
 Application::Application(sf::RenderTarget &target) {
+	systems.add<PlayerOverWorldSystem>(*this,target);
 	systems.add<VelocitySystem>(target);
 	systems.add<AnimationSystem>(target);
 	systems.add<RenderSystem>(target);

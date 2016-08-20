@@ -29,6 +29,7 @@ struct UndertaleSpriteCache {
 	std::vector<sf::Vertex> verts;
 	sf::Vector2f size;
 	UndertaleSpriteCache() : index(0) {}
+	const std::vector<sf::Vertex>& getVerts() const { return verts; }
 };
 static std::unordered_map<size_t, UndertaleSpriteCache> s_spriteCache;
 
@@ -129,14 +130,14 @@ SpriteEnity SpriteEnity::create(size_t sprite_index) {
 void SpriteEnity::setSpriteIndex(size_t sprite_index) {
 	if (_sprite_index != sprite_index) {
 		auto cache = LookupSpriteCache(sprite_index);
-		assign<SpriteFrameCollection>(&Global::GetUndertaleTexture(cache.texture_index), cache.verts, cache.size);
+		assign<SpriteFrameCollection>(&Global::GetUndertaleTexture(cache.texture_index), cache.getVerts(), cache.size);
 	}
 }
 
 namespace Global {
 	SpriteFrameCollection LoadSprite(size_t sprite_index) {
 		auto cache = LookupSpriteCache(sprite_index);
-		return SpriteFrameCollection(&Global::GetUndertaleTexture(cache.texture_index), cache.verts, cache.size);
+		return SpriteFrameCollection(&Global::GetUndertaleTexture(cache.texture_index), cache.getVerts(), cache.size);
 		/*
 		auto usprite = file.LookupSprite(sprite_index);
 		sf::Vector2f size = sf::Vector2f(float(usprite.width()), float(usprite.height()));

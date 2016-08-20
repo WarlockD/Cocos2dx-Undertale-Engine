@@ -3,12 +3,20 @@
 
 // This is the basic rendering class.  None of the verts are transformed, no position data, nothing.  Just the raw verts
 // has some simple helper functions
+
+
 struct Renderable {
 	bool debug_draw_box = false;
 	// starting to get the hang of templates
 	// traites and other good bits
 	std::vector<sf::Vertex> test;
-
+	typedef sf::Vertex element_type;
+	typedef size_t size_type;
+	typedef ptrdiff_t difference_type;
+	typedef element_type* element_pointer;
+	typedef element_type& element_reference;
+	typedef const element_type* const_element_pointer;
+	typedef const element_type& const_element_reference;
 	class const_iterator : public std::iterator<std::bidirectional_iterator_tag,sf::Vertex> {
 	public:
 		typedef std::bidirectional_iterator_tag iterator_category;
@@ -66,6 +74,8 @@ protected: // protected interface
 	virtual iterator end()  { return iterator(*this, (int)size()); }
 	// Interface
 public:
+	virtual bool next_frame() { return false; }; // This interface just tells the Renderable to do next frame
+	virtual bool prev_frame() { return false; }; // This interface just tells the Renderable to do prev frame
 	virtual const sf::Texture* texture() const = 0;
 	virtual size_t size() const = 0;
 	virtual const sf::Vertex& at(size_t index) const = 0;
@@ -112,6 +122,7 @@ template<class C> class SFMLDrawable : public sf::Transformable, public sf::Draw
 
 typedef std::reference_wrapper<Renderable> RenderableRef;
 
+
 class Mesh : public Renderable {
 	std::vector<sf::Vertex> _verts;
 	const sf::Texture* _texture;
@@ -126,45 +137,54 @@ public:
 	Mesh(const std::vector<sf::Vertex>& verts) : _texture(nullptr), _verts(verts) {}
 	Mesh(const std::vector<sf::Vertex>&& verts) : _texture(nullptr), _verts(std::move(verts)) {}
 };
-class SpriteFrameRef : public Renderable {
-protected:
-	sf::Vertex* _ptr;
-	const sf::Texture* _texture;
-	explicit SpriteFrameRef(const sf::Texture* texture, sf::Vertex* ptr) : _texture(texture), _ptr(ptr) {}
+class SpriteFrameBase : public Renderable {
 public:
-	virtual const sf::Vertex& at(size_t i) const override { return _ptr[i]; }
-	virtual const sf::Texture* texture() const override { return _texture; }
-	virtual size_t size() const override { return 6; }
-	sf::FloatRect bounds() const override { return sf::FloatRect(_ptr[0].position, _ptr[5].position- _ptr[0].position); }
-	sf::IntRect texRect() const { return sf::IntRect(sf::FloatRect(_ptr[0].texCoords, _ptr[5].texCoords - _ptr[0].texCoords));}
-	sf::Color color() const { return _ptr[0].color; }
-	std::reference_wrapper<SpriteFrameRef> ref() { return std::ref(*this); }
-	std::reference_wrapper<const SpriteFrameRef> ref() const { return std::ref(*this); }
+	const sf::Vertex& at(size_t i) const override final { return ptr()[i]; }
+	size_t size() const override final { return 6; }
+	virtual sf::FloatRect bounds() const override  { return sf::FloatRect(at(0).position, at(5).position- at(0).position); }
+	sf::IntRect texRect() const { return sf::IntRect(sf::FloatRect(at(0).texCoords, at(5).texCoords - at(0).texCoords));}
+	sf::Color color() const { return ptr()[0].color; }
+	std::reference_wrapper<SpriteFrameBase> ref() { return std::ref(*this); }
+	std::reference_wrapper<const SpriteFrameBase> ref() const { return std::ref(*this); }
+	virtual const sf::Vertex* ptr() const = 0;
+	virtual ~SpriteFrameBase() {}
 };
 
-class SpriteFrame : public SpriteFrameRef {
+class SpriteFrame : public SpriteFrameBase {
 	std::array<sf::Vertex, 6> _verts;
+	const sf::Texture* _texture;
 public:
-	SpriteFrame() : SpriteFrameRef(nullptr,_verts.data()) {}
-	explicit SpriteFrame(const sf::Texture* texture, const sf::Vertex* vert) : SpriteFrameRef(texture, _verts.data()) { std::copy(vert, vert + 6, _verts.begin()); }
+	const sf::Texture* texture() const override final { return _texture; }
+	const sf::Vertex* ptr() const override final { return _verts.data(); }
+	SpriteFrame() : _texture(nullptr) {}
+	explicit SpriteFrame(const sf::Texture* texture, const sf::Vertex* vert) : _texture(texture) { std::copy(vert, vert + 6, _verts.begin()); }
 	explicit SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds);
 };
 
-class SpriteFrameCollection : public SpriteFrameRef {
+class SpriteFrameCollection : public SpriteFrameBase  {
 private:
 	std::vector<sf::Vertex> _frames;
+	const sf::Texture* _texture;
+	Renderable::element_pointer _current;
 	size_t _image_index;
 	sf::Vector2f _size;
 public:
-	virtual const sf::Texture* texture() const override { return _texture; }
-	sf::FloatRect bounds() const override { return sf::FloatRect(sf::Vector2f(), _size); }
-	explicit SpriteFrameCollection() : SpriteFrameRef(nullptr,_frames.data()), _image_index(0), _size(0,0) {}
-	explicit SpriteFrameCollection(const sf::Texture* texture, const std::vector<sf::Vertex>& frames, sf::Vector2f& size) : SpriteFrameRef(texture, _frames.data()), _frames(frames), _image_index(0), _size(size) {}
-	explicit SpriteFrameCollection(const sf::Texture* texture, std::vector<sf::Vertex>&& frames, sf::Vector2f& size) : SpriteFrameRef(texture, _frames.data()), _frames(std::move(frames)), _image_index(0), _size(size) {}
-	size_t getImageIndex() const { return _image_index; }
-	void setImageIndex(size_t image_index) { _image_index = image_index % (_frames.size() / 6); _ptr = &_frames[_image_index * 6]; }
+	explicit SpriteFrameCollection() : _frames(),_texture(nullptr), _image_index(0), _size(0, 0) {}
+	explicit SpriteFrameCollection(const sf::Texture* texture, const std::vector<sf::Vertex>& frames, sf::Vector2f& size) : _texture(texture), _image_index(0), _size(0, 0) {
+		assert(frames.size() >= 6); // we need atleast one frame
+		_frames.reserve(frames.size());
+		_frames.insert(_frames.begin(), frames.begin(), frames.end());
+		_current = _frames.data();
+	}
+	const sf::Texture* texture() const override final { return _texture; }
+	const sf::Vertex*  ptr() const override final { return _current; }
+	bool next_frame() override final { setImageIndex(getImageIndex() + 1); return true; }
+	bool prev_frame() override final { setImageIndex(getImageIndex() - 1); return true; }
+	sf::FloatRect bounds() const override final { return sf::FloatRect(sf::Vector2f(), _size); }
+size_t getImageIndex() const { return _image_index; }
+	void setImageIndex(size_t image_index) { _image_index = image_index % (_frames.size() / 6); _current = &_frames[_image_index * 6]; }
 	// cheat and use the iliterator from an array
-	SpriteFrame copy_frame() const { return SpriteFrame(_texture, _ptr); }
+	SpriteFrame frame_copy() const { return SpriteFrame(_texture, ptr()); }
 	size_t total_frames() const { return _frames.size()/6; }
 };
 

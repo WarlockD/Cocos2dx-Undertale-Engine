@@ -38,7 +38,7 @@ namespace global {
 	}
 }
 
-SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds) : SpriteFrameRef(texture, _verts.data()) {
+SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds) : _texture(texture) {
 	float left = bounds.left;
 	float top = bounds.top;
 	float right = bounds.left + bounds.width;

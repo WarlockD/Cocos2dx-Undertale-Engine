@@ -39,6 +39,8 @@ namespace global {
 namespace ex = entityx;
 void gameLoop() {
 	sf::RenderWindow& window = global::getWindow();
+	auto& systems = global::getSystems();
+	auto& events = global::getEventManager();
 	sf::Clock clock;
 	bool isPlaying = false;
 	auto font = UFont::LoadUndertaleFont(4);
@@ -53,7 +55,7 @@ void gameLoop() {
 	
 	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
 	SpriteFrameCollection raw_sprite2 = Global::LoadSprite(1982);
-	auto& systems = global::getSystems();
+
 	//SpriteEnity teste = SpriteEnity::create(1986)
 
 	ex::Entity sprite = global::getEntities().create();
@@ -68,7 +70,7 @@ void gameLoop() {
 	sprite2.component<Body>()->setPosition(20, 80);
 	sprite2.component<Body>()->setPosition(20, 60);
 	sprite2.component<Body>()->setScale(2.0, 2.0);
-	sprite.assign<RenderableRef>(raw_sprite2);
+	sprite2.assign<RenderableRef>(raw_sprite2);
 
 	//sprite2.component<Animation>() = Animation(0.25f;
 
@@ -96,6 +98,7 @@ void gameLoop() {
 				}
 				break;
 			}
+			events.emit<SystemEvent>(event);
 		}
 		window.clear();
 		sf::Time elapsed = clock.restart();

@@ -182,6 +182,7 @@ public:
  */
 template <typename C, typename EM>
 class ComponentHandle {
+
 public:
   typedef C ComponentType;
 
@@ -223,6 +224,7 @@ public:
 	  if (valid()) *get() = std::move(move);
 	  return *this;
   }
+
 
 
 private:
