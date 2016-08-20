@@ -18,6 +18,7 @@ struct Layer {
 };
 
 
+
 struct Animation {
 	explicit Animation(float fps, bool reverse) :watch(fps), reverse(reverse) {}
 	explicit Animation(float fps) :watch(fps), reverse(false) {}
@@ -28,7 +29,9 @@ struct Animation {
 class RenderSystem : public ex::System<RenderSystem> {
 	typedef std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> t_dumb_batch;
 	typedef std::vector<sf::Vertex> vert_vector;
+	typedef std::vector<sf::FloatRect> t_debug_boxes;
 	std::map<int, t_dumb_batch> sortedVerts;
+	sf::VertexArray debug_lines;
 	float last_update = 0.0;
 	float frame_count = 0.0;
 	sf::RenderTarget &target;

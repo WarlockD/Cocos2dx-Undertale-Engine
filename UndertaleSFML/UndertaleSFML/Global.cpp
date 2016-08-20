@@ -38,7 +38,7 @@ namespace global {
 	}
 }
 
-SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds) :_texture(texture), _textureRect(textureRect), _bounds(bounds) {
+SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds) : SpriteFrameRef(texture, _verts.data()) {
 	float left = bounds.left;
 	float top = bounds.top;
 	float right = bounds.left + bounds.width;
@@ -57,15 +57,6 @@ SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureR
 	*verts++ = (Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
 	*verts++ = (Vertex(Vector2f(right, bottom), sf::Color::White, Vector2f(u2, v2)));
 }
-
-SpriteFrame::SpriteFrame(const sf::Texture* texture, const sf::Vertex*  verts) :
-	_texture(texture), 
-	_textureRect(static_cast<int>(verts[0].texCoords.x), static_cast<int>(verts[0].texCoords.y), 
-		static_cast<int>(verts[5].texCoords.x- verts[0].texCoords.x), static_cast<int>(verts[5].texCoords.y- verts[0].texCoords.y)),
-	_bounds(verts[0].position, verts[5].position - verts[0].position)
-	{
-	std::copy(verts, verts + 6, _verts.begin());
-};  // build from triangles
 
 
 Body::Body() : LockingObject(), _transform(sf::Transform::Identity),_position(), _origin(), _scale(1.0f,1.0f), _rotation(0), _changed(false), _transformNeedUpdate(true) {}

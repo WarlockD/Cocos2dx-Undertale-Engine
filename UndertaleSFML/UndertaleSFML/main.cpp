@@ -44,32 +44,32 @@ void gameLoop() {
 	auto font = UFont::LoadUndertaleFont(4);
 	sf::View view(sf::FloatRect(0, 0, 640, 480));
 //	window.setView(view);
-	auto writer = obj_dialoger::create();
+//	auto writer = obj_dialoger::create();
 	//writer.setFont(4);
-	writer->setConfig();
-	writer->setText("* mind your p \\Yand\n\r q's and I");
-	writer->start_typing();
-	UndertaleLabel debug_label;
+//	writer->setConfig();
+//	writer->setText("* mind your p \\Yand\n\r q's and I");
+//	writer->start_typing();
+//	//UndertaleLabel debug_label;
 	
 	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
-
+	SpriteFrameCollection raw_sprite2 = Global::LoadSprite(1982);
 	auto& systems = global::getSystems();
 	//SpriteEnity teste = SpriteEnity::create(1986)
 
 	ex::Entity sprite = global::getEntities().create();
-	sprite.assign<SpriteFrameCollection>(raw_sprite);
 	sprite.assign<Body>();
 	sprite.component<Body>()->setPosition(20, 50);
 	sprite.component<Body>()->setScale(2.0, 2.0);
-	sprite.assign<RenderableRef>(sprite.component<SpriteFrameCollection>().get());
+	sprite.assign<RenderableRef>(raw_sprite);
 	sprite.assign<Animation>(0.25f);
 
-	ex::Entity sprite2 = global::getEntities().create_from_copy(sprite);
+	ex::Entity sprite2 = global::getEntities().create();
+	sprite2.assign<Body>();
 	sprite2.component<Body>()->setPosition(20, 80);
-	sprite2.component<SpriteFrameCollection>() = Global::LoadSprite(1982);
 	sprite2.component<Body>()->setPosition(20, 60);
 	sprite2.component<Body>()->setScale(2.0, 2.0);
-	sprite2.component<RenderableRef>() = RenderableRef(sprite2.component<SpriteFrameCollection>().get());
+	sprite.assign<RenderableRef>(raw_sprite2);
+
 	//sprite2.component<Animation>() = Animation(0.25f;
 
 	// don't want to invalidate the sprite entry

@@ -32,7 +32,7 @@ void obj_writer::draw(sf::RenderTarget& target, sf::RenderStates states) const {
 void obj_writer::update(sf::Time dt) {
 	if (!_isTyping) return;
 	_frameTime += dt;
-	if (_frameTime.asMilliseconds() > _nextLetterDelay) {
+	if (_frameTime.asMilliseconds() > (int)_nextLetterDelay) {
 		_nextLetterDelay = 100;
 		_frameTime = sf::Time::Zero;
 		while (_pos != _text.end()) {

@@ -1,15 +1,11 @@
 #include "Components.h"
 #include "UndertaleLoader.h"
+#include <SFML/OpenGL.hpp>
 #include <map>
 
+using namespace sf;
 
-void RenderSystem::OrderedVerts::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-	for (auto& b : batch) {
-		states.texture = b.first;
-		target.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
-	}
-}
-RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target) {
+RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lines(sf::PrimitiveType::Lines) {
 	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
 		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
 		exit(1);
@@ -19,21 +15,87 @@ RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target) {
 	text.setCharacterSize(18);
 	text.setColor(sf::Color::White);
 }
+/*as a fall back to line()*/
+void line_raw(double x1, double y1, double x2, double y2,
+	double w,
+	double Cr, double Cg, double Cb,
+	double, double, double, bool)
+{
+	glLineWidth(w);
+	float line_vertex[] =
+	{
+		x1,y1,
+		x2,y2
+	};
+	float line_color[] =
+	{
+		Cr,Cg,Cb,
+		Cr,Cg,Cb
+	};
+	// Bind no texture
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glMatrixMode(GL_TEXTURE);
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+
+	glVertexPointer(2, GL_FLOAT, 0, line_vertex);
+	glColorPointer(3, GL_FLOAT, 0, line_color);
+	glDrawArrays(GL_LINES, 0, 2);
+}
+
+void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness = 4.0f, const sf::Color color = sf::Color::Green) {
+	float left = rect.left;
+	float top = rect.top;
+	float right = rect.left + rect.width;
+	float bottom = rect.top + rect.height;
+	// Add a quad for the current character
+	verts.append(Vertex(Vector2f(left, top), color)); verts.append(Vertex(Vector2f(left, bottom), color));
+	verts.append(Vertex(Vector2f(left, top), color)); verts.append(Vertex(Vector2f(right, top), color));
+	verts.append(Vertex(Vector2f(right, top), color)); verts.append(Vertex(Vector2f(right, bottom), color));
+	verts.append(Vertex(Vector2f(right, top), color)); verts.append(Vertex(Vector2f(left, top), color));
+}
+void draw_box(const sf::FloatRect& rect,  float thickness = 4.0f, const sf::Color color = sf::Color::Green) {
+	glLineWidth(thickness);
+	sf::VertexArray array(sf::PrimitiveType::Lines);
+	float line_vertex[] =
+	{
+		rect.left,rect.top, rect.left,rect.height-rect.top,
+		rect.left,rect.top, rect.width-rect.left, rect.top,
+		rect.width-rect.left,rect.height-rect.top,rect.left,rect.height - rect.top,
+		rect.width-rect.left,rect.height-rect.top,rect.width-rect.left, rect.top,
+	};
+	sf::Color line_color[] = { color, color,color, color, color, color,color, color };
+
+
+}
 void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
+	
 	sortedVerts.clear();
+	debug_lines.clear();
 	es.each<Body, RenderableRef>([this](ex::Entity entity, Body& body, RenderableRef &renderable) {
+		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
-		auto& verts = (sortedVerts[layer])[(renderable->texture()];
-		renderable->insert(verts, body.getTransform());
+		const auto& transform = body.getTransform();
+		auto& verts = (sortedVerts[layer])[renderable->texture()];
+		renderable->insert(verts, transform);
+		if (draw_all_boxes || renderable->debug_draw_box) {
+			draw_box(debug_lines, transform.transformRect(renderable->bounds()));
+		}
 	});
 	size_t draw_count = 0;
 	sf::RenderStates states = sf::RenderStates::Default;
+	//target.pushGLStates();
 	for (auto& sv : sortedVerts) {
 		for (auto& b : sv.second) {
 			draw_count++;
 			states.texture = b.first;
 			target.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
 		}
+	}
+	//target.popGLStates();
+	if(debug_lines.getVertexCount() > 0) {
+		glLineWidth(3.0f);
+		target.draw(debug_lines);
 	}
 
 	last_update += dt;

@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <memory>
 #include <functional>
+#include <type_traits>
 #include <SFML\Graphics.hpp>
 #include <map>  // Component-entity system in 16 lines of C++11. 2013 rlyeh, MIT licensed
 #include <set>  // Code fragment from kult engine     -    https://github.com/r-lyeh/kult
