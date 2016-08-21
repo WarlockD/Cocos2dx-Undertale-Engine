@@ -156,6 +156,7 @@
     <ClCompile Include="..\ext\include\entityx\System.cc" />
     <ClCompile Include="BatchSprite.cpp" />
     <ClCompile Include="Components.cpp" />
+    <ClCompile Include="Drawables.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="obj_face.cpp" />

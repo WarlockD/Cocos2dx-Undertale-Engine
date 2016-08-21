@@ -22,45 +22,48 @@ public:
 	float getLineSpacing() const;
 };
 
-class UndertaleSprite  : public sf::Drawable, public sf::Transformable {
-	
-protected:
-	sf::Vector2f _size;
-	size_t _index;
-	size_t _frame;
-	sf::Color _color;
-	std::vector<sf::Vertex> _verts;
-	std::shared_ptr<sf::Texture> _texture;
+
+
+class UndertaleSprite  : public SpriteFrameBase {
 public:
-	void loadFrame(size_t index, size_t frame = 0);
-	UndertaleSprite() : _index(0), _frame(0) {}
-	UndertaleSprite(size_t index, size_t frame = 0) { loadFrame(index, frame); }
-	const sf::Color& getColor() const { return _color; }
-	void setColor(const sf::Color& color);
-	size_t getSpriteIndex() const { return _index;}
-	size_t getImageIndex() const { return _frame/6; }
-	size_t getFrameCount() const { return _verts.size()/6; }
-	void setImageIndex(size_t frame) { _frame = frame*6; }
-	const sf::Vector2f& getSize() const { return _size; }
-	const sf::Texture& getTexture() const { return *_texture.get(); }
-	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const;
+	class UndertaleSpriteData : std::enable_shared_from_this<UndertaleSpriteData> {
+	protected:
+		sf::Vector2f _size;
+		size_t _index;
+		std::vector<sf::Vertex> _verts;
+		const sf::Texture* _texture;
+		UndertaleSpriteData() : _index(0), _texture(nullptr) {}
+	public:
+		typedef std::shared_ptr<UndertaleSpriteData> type;
+		type ptr() { return shared_from_this(); }
+		static type LoadSprite(size_t sprite_index);
+		inline const sf::Vertex* frame(size_t i) const { return _verts.data() + (i * 6); }
+		inline size_t frame_count() const { return _verts.size() / 6; }
+		inline const sf::Texture* texture() const { return _texture; }
+		inline size_t index() const { return _index; }
+		inline const sf::Vector2f size() const { return _size; }
+	};
+	UndertaleSpriteData::type _sprite;
+	size_t _image_index;
+public:
+	UndertaleSprite() : _image_index(0), _sprite(nullptr) {}
+	UndertaleSprite(size_t index) : _image_index(0), _sprite(UndertaleSpriteData::LoadSprite(index)) {}
+	// interface
+	const sf::Texture* texture() const override final { return _sprite->texture(); }
+	const sf::Vertex* ptr() const override final { return _sprite->frame(_image_index); }
+	sf::FloatRect bounds() const override final { return sf::FloatRect(sf::Vector2f(),_sprite->size()); }
+	// sprite stuff
+	bool valid() const { return (bool)_sprite; }
+	size_t sprite_index() const { return _sprite ? _sprite->index() : 0; }
+	void sprite_index(size_t index) { if (sprite_index() != index) _sprite = UndertaleSpriteData::LoadSprite(index); }
+	size_t image_index() const { return _image_index; }
+	void image_index(size_t index) { _image_index = index % _sprite->frame_count(); }
+	virtual bool next_frame() { image_index(_image_index + 1);  return true; }; // This interface just tells the Renderable to do next frame
+	virtual bool prev_frame() { image_index(_image_index - 1); return true; }; // This interface just tells the Renderable to do prev frame
 };
 
-class SpriteEnity : public ex::Entity {
-	
-	size_t _sprite_index;
-	Body* _body;
-	SpriteEnity(ex::EntityManager *manager, Entity::Id id) : ex::Entity(manager, id) { }
-public:
-	virtual ~SpriteEnity();
-	static SpriteEnity create(size_t sprite_index);
-	void setSpriteIndex(size_t sprite_index);
-	size_t getSpriteIndex() const { return _sprite_index; }
-	Body& operator*() const { return *_body; }
-	Body* operator->()  { return _body; } 
-};
 namespace Global {
-	SpriteFrameCollection LoadSprite(size_t sprite_index);
+	
 	
 
 	bool LoadUndertaleDataWin(const std::string& filename);

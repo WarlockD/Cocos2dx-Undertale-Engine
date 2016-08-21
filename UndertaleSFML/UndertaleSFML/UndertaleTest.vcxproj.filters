@@ -66,6 +66,9 @@
     <ClCompile Include="Components.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="Drawables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">

@@ -2,7 +2,7 @@
 
 void obj_face::draw(sf::RenderTarget& target, sf::RenderStates states) const {
 	states.transform *= getTransform();
-	for (auto& s : _sprites) target.draw(s, states);
+//	for (auto& s : _sprites) target.draw(s, states);
 }
 /*
 

@@ -53,8 +53,8 @@ void gameLoop() {
 //	writer->start_typing();
 //	//UndertaleLabel debug_label;
 	
-	SpriteFrameCollection raw_sprite = Global::LoadSprite(1986);
-	SpriteFrameCollection raw_sprite2 = Global::LoadSprite(1982);
+	UndertaleSprite raw_sprite(1986); 
+	UndertaleSprite raw_sprite2(1982);
 
 	//SpriteEnity teste = SpriteEnity::create(1986)
 

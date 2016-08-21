@@ -1,6 +1,7 @@
 #pragma once
 #include "Global.h"
 #include "Drawables.h"
+#include "UndertaleLoader.h"
 
 struct Bounds {
 	explicit Bounds(sf::FloatRect bounds) :bounds(bounds) {}
@@ -27,7 +28,7 @@ class Player : public SpriteFrameBase, public ex::Receiver<Player> {
 	enum class  PlayerFacing : char {
 		DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
 	};
-	SpriteFrameCollection _sprites[4];
+	std::array<UndertaleSprite, 4> _sprites;
 	PlayerFacing _facing;
 	int health;
 	int status;

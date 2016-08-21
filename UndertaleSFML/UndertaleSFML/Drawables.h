@@ -1,10 +1,13 @@
 #pragma once
 #include "Global.h"
 
-// This is the basic rendering class.  None of the verts are transformed, no position data, nothing.  Just the raw verts
-// has some simple helper functions
 
-
+namespace global {
+	void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness = 4.0f, const sf::Color color = sf::Color::Green);
+	RawVertices create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
+	void insert_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
+	void insert_hair_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, sf::Color color);
+};
 struct Renderable {
 	bool debug_draw_box = false;
 	// starting to get the hang of templates
@@ -158,34 +161,46 @@ public:
 	const sf::Vertex* ptr() const override final { return _verts.data(); }
 	SpriteFrame() : _texture(nullptr) {}
 	explicit SpriteFrame(const sf::Texture* texture, const sf::Vertex* vert) : _texture(texture) { std::copy(vert, vert + 6, _verts.begin()); }
-	explicit SpriteFrame(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::FloatRect& bounds);
+	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Color& color = sf::Color::White); // if you just want a box, you can use this to get the verts
+	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::Color& color = sf::Color::White);
+	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::IntRect& textureRect, const sf::Color& color = sf::Color::White);
 };
 
 class SpriteFrameCollection : public SpriteFrameBase  {
 private:
-	std::vector<sf::Vertex> _frames;
-	const sf::Texture* _texture;
-	Renderable::element_pointer _current;
+	std::vector<SpriteFrame> _frames;
 	size_t _image_index;
 	sf::Vector2f _size;
 public:
-	explicit SpriteFrameCollection() : _frames(),_texture(nullptr), _image_index(0), _size(0, 0) {}
-	explicit SpriteFrameCollection(const sf::Texture* texture, const std::vector<sf::Vertex>& frames, sf::Vector2f& size) : _texture(texture), _image_index(0), _size(0, 0) {
-		assert(frames.size() >= 6); // we need atleast one frame
-		_frames.reserve(frames.size());
-		_frames.insert(_frames.begin(), frames.begin(), frames.end());
-		_current = _frames.data();
+	explicit SpriteFrameCollection() : _frames(), _image_index(0), _size(0, 0) {}
+	explicit SpriteFrameCollection(const std::vector<SpriteFrame>& frames, sf::Vector2f& size) : _frames(frames), _image_index(0), _size(size) {}
+	explicit SpriteFrameCollection(const std::vector<SpriteFrame>& frames) : _frames(frames), _image_index(0) {
+		auto bounds = SpriteFrameBase::bounds();
+		_size = sf::Vector2f(bounds.width, bounds.height);
 	}
-	const sf::Texture* texture() const override final { return _texture; }
-	const sf::Vertex*  ptr() const override final { return _current; }
-	bool next_frame() override final { setImageIndex(getImageIndex() + 1); return true; }
-	bool prev_frame() override final { setImageIndex(getImageIndex() - 1); return true; }
+	explicit SpriteFrameCollection(std::vector<SpriteFrame>&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _image_index(0), _size(size) {}
+	explicit SpriteFrameCollection(std::vector<SpriteFrame>&& frames) : _frames(std::move(frames)), _image_index(0) {
+		auto bounds = SpriteFrameBase::bounds();
+		_size = sf::Vector2f(bounds.width, bounds.height);
+	}
+	// interface
+	const sf::Texture* texture() const override final { return _frames[_image_index].texture(); }
+	const sf::Vertex*  ptr() const override final { return _frames[_image_index].ptr(); }
 	sf::FloatRect bounds() const override final { return sf::FloatRect(sf::Vector2f(), _size); }
-size_t getImageIndex() const { return _image_index; }
-	void setImageIndex(size_t image_index) { _image_index = image_index % (_frames.size() / 6); _current = &_frames[_image_index * 6]; }
+	// custom stuff
+	size_t image_index() const { return _image_index; }
+	void image_index(size_t index) { _image_index = index % _frames.size(); }
+	bool next_frame() override final { image_index(image_index() + 1); return true; }
+	bool prev_frame() override final { image_index(image_index() - 1); return true; }
+	void push_back(const SpriteFrame& frame) { _frames.push_back(frame); }
+	SpriteFrameCollection& operator+=(const SpriteFrame& frame){_frames.push_back(frame); return *this; }
+	SpriteFrameCollection& operator=(const std::vector<SpriteFrame>& frames) { _frames = frames; return *this; }
+	SpriteFrameCollection& operator=(std::vector<SpriteFrame>&& frames) { _frames = std::move(frames); return *this; }
+	void clear() { _frames.clear(); }
+	void bounds(sf::Vector2f size) { _size = size; }
 	// cheat and use the iliterator from an array
-	SpriteFrame frame_copy() const { return SpriteFrame(_texture, ptr()); }
-	size_t total_frames() const { return _frames.size()/6; }
+	const SpriteFrame& current_frame() const { return _frames[_image_index]; }
+	size_t total_frames() const { return _frames.size(); }
 };
 
 

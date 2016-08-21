@@ -20,10 +20,10 @@ bool Player::load_resources(ex::EntityX& app) {
 	_enity.assign<Velocity>();
 	_facing = PlayerFacing::DOWN;
 
-	_sprites[0] = Global::LoadSprite(1043);
-	_sprites[1] = Global::LoadSprite(1045);
-	_sprites[3] = Global::LoadSprite(1044);
-	_sprites[4] = Global::LoadSprite(1046);
+	_sprites[0].sprite_index(1043); 
+	_sprites[1].sprite_index(1045); 
+	_sprites[2].sprite_index(1044); 
+	_sprites[3].sprite_index(1046);
 	return true;
 }
 Player::~Player() {
@@ -120,10 +120,24 @@ void draw_box(const sf::FloatRect& rect,  float thickness = 4.0f, const sf::Colo
 
 
 }
+RawVertices createTest() {
+	sf::VertexArray test(sf::PrimitiveType::TrianglesStrip);
+	RawVertices vect;
+	global::insert_line(test, sf::Vector2f(100.0f, 100.0f), sf::Vector2f(200.0f, 200.0f), 10.0f, sf::Color::Cyan);
+	vect.push_back(test);
+	test.clear();
+	global::insert_hair_line(test, sf::Vector2f(150.0f, 150.0f), sf::Vector2f(50.0f, 50.0f), sf::Color::Green);
+	vect.push_back(test);
+	test.clear();
+	return vect;
+}
+RawVertices test = createTest();
+
 void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
 	
 	sortedVerts.clear();
 	debug_lines.clear();
+
 	es.each<Body, RenderableRef>([this](ex::Entity entity, Body& body, RenderableRef &renderable_ref) {
 		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
@@ -137,6 +151,8 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 	});
 	size_t draw_count = 0;
 	sf::RenderStates states = sf::RenderStates::Default;
+	
+	
 	//target.pushGLStates();
 	for (auto& sv : sortedVerts) {
 		for (auto& b : sv.second) {
@@ -150,7 +166,8 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 		//glLineWidth(3.0f);
 		target.draw(debug_lines);
 	}
-
+	target.draw(test);
+	//target.draw(line(100.0f, 100.0f, 150.0f, 400.0f, 10.f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, false));
 	last_update += dt;
 	frame_count++;
 	if (last_update >= 0.5) {

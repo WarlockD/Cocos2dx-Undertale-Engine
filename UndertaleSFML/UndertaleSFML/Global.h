@@ -18,8 +18,56 @@
 #include <entityx/entityx.h>
 namespace ex = entityx;
 
+// This is the basic rendering class.  None of the verts are transformed, no position data, nothing.  Just the raw verts
+// has some simple helper functions
+// I just have been using std::vector<sf::vertex> eveywhere os might as well subclass it
+class RawVertices :  public sf::Drawable {
+public:
+	typedef std::vector<sf::Vertex> vector;
+	typedef typename vector::size_type size_type;
+	typedef typename vector::value_type value_type;
+	typedef typename vector::difference_type difference_type;
+	typedef typename vector::const_iterator const_iterator;
+	typedef typename vector::iterator iterator;
+	typedef typename vector::const_pointer const_pointer;
+	typedef typename vector::const_reference const_reference;
+	typedef typename vector::pointer pointer;
+	typedef typename vector::reference reference;
+	RawVertices() { }
+	explicit RawVertices(const vector& verts) : _verts(verts) {}
+	explicit RawVertices(vector&& verts) : _verts(std::move(verts)) {}
+	explicit RawVertices(const sf::VertexArray& verts) { insert(begin(), verts); }
+	iterator begin() { return _verts.begin(); }
+	iterator end() { return _verts.end(); }
+	const_iterator begin() const { return _verts.begin(); }
+	const_iterator end() const { return _verts.end(); }
+	reference operator[](size_t index) { return _verts[index]; }
+	const_reference operator[](size_t index) const { return _verts[index]; }
+	size_t size() const { return _verts.size(); }
+	pointer data() { return _verts.data(); }
+	void resize(size_type size) { _verts.resize(size); }
+	void reserve(size_type size) { _verts.reserve(size); }
+	const_pointer data() const { return _verts.data(); }
+	void push_back(const value_type& v) { _verts.push_back(v); }
+	void push_back(const sf::VertexArray& verts) { insert(end(), verts); }
+	void push_back(const vector& verts) { _verts.insert(_verts.end(), verts.begin(), verts.end()); }
+	void push_back(const RawVertices& verts) { _verts.insert(_verts.end(), verts._verts.begin(),verts._verts.end()); }
+	void clear() { _verts.clear(); }
+	void insert(const_iterator where, const value_type& v) { _verts.insert(where, v); }
+	void insert(const_iterator where, const RawVertices& v) { _verts.insert(where, v._verts.begin(), v._verts.end()); }
+	void insert(const_iterator where, const sf::VertexArray& verts);
+	RawVertices& operator=(vector&& v) { _verts = std::move(v); return *this; }
+	RawVertices& operator=(const vector& v) { _verts = v; return *this; }
+	RawVertices& operator=(const sf::VertexArray& v) { _verts.clear(); push_back(v); return *this; }
+	RawVertices& operator+=(const vector& v) { push_back(v); return *this; }
+	RawVertices& operator+=(const sf::VertexArray& v) { push_back(v); return *this; }
+	RawVertices& operator+=(const RawVertices& v) { push_back(v); return *this; }
+	RawVertices& operator+=(const value_type& v) { push_back(v); return *this; }
+protected:
+	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const;
+	vector _verts;
+};
 
-typedef std::function<void(int)> IntSetCallback;
 namespace global {
 	sf::RenderWindow& getWindow();
 	ex::EventManager& getEventManager();
@@ -44,8 +92,9 @@ namespace global {
 	 }
 
 	 std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color);
-	 void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color);
-	 void InsertRectangle(std::vector<sf::Vertex>& verts, const sf::FloatRect& rect, sf::Color fill_color);
+	 void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles); 
+	 void InsertRectangle(RawVertices& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	 void InsertRectangle(sf::VertexArray& verts, const sf::FloatRect& rect, sf::Color fill_color);// convert
 };
 
 
@@ -220,96 +269,6 @@ namespace SmalleEntiySystem {
 
 
 
-
-class ComponentBase {
-public:
-	typedef std::unique_ptr<ComponentBase> ptr_type;
-	static constexpr int ID = -1;
-	static constexpr int ParentID = -1;
-	virtual void update(sf::Time dt) {}
-	virtual ~ComponentBase() { }
-};
-template<int _ID, class D,class P = ComponentBase> class Component : public P {
-public:
-	typedef D type;
-	typedef P parent_type;
-	typedef std::unique_ptr<type> ptr_type;
-	typedef std::unique_ptr<parent_type> ptr_parent_type;
-	static constexpr int ID = _ID;
-	static constexpr int ParentID = P::ID;
-	static ptr_type create() { return std::make_unique<D>(); }
-	static ptr_type create(const D& copy) { return std::make_unique<D>(copy); }
-	ptr_type clone() const { return create(static_cast<const D&>(*this)); }
-	virtual void update(sf::Time dt) override { P::update(dt); }
-};
-
-class ComponentContainer {
-	typedef std::unordered_multimap<size_t, std::unique_ptr<ComponentBase>> container;
-	typedef container::iterator iterator;
-	typedef container::const_iterator const_iterator;
-	typedef std::pair<iterator, iterator> range_iterator;
-	container _list;
-public: // can't be copyied
-	ComponentContainer() {}
-	ComponentContainer(const ComponentContainer& copy) = delete;
-	ComponentContainer& operator=(const ComponentContainer& copy) = delete;
-	ComponentContainer(ComponentContainer&& move) = default;
-	ComponentContainer& operator=(ComponentContainer&& move) = default;
-	~ComponentContainer() {}
-
-	bool exists(size_t id) const { return _list.find(id) != _list.end(); }
-	size_t count(size_t id) const { return _list.bucket_size(_list.bucket(id)); }
-	std::pair<iterator, iterator> equal_range(size_t id) { return _list.equal_range(id); }
-	std::pair<const_iterator, const_iterator> equal_range(size_t id) const { return _list.equal_range(id); }
-
-	template<class T>
-	typename std::enable_if<std::is_base_of<ComponentBase, T*>::value>::type
-	findone(size_t id) const { 
-		assert(T::ID == id);
-		auto it = _list.find(id);
-		if(it != _list.end()) return static_cast<T*>(_list.begin(index)->second.get());
-		else return nullptr;
-	}
-	template<class T>
-	typename std::enable_if<std::is_base_of<ComponentBase, std::vector<T*>>::value>::type
-		findmany(size_t id) const {
-		assert(T::ID == id);
-		std::vector<T*> many;
-		auto range = _list.equal_range(id);
-		for (auto it = range.first; it != range.second; it++) 
-			many.push_back(static_cast<T*>(it->second.get()));
-		return many;
-	}
-	template<class T>
-	typename std::enable_if<std::is_base_of<ComponentBase, T*>::value>::type
-		create() {
-		auto ptr = T::create();
-		return return static_cast<T*>(_list.emplace(T::ID, ptr)->second.get());
-	}
-	iterator find(size_t id)  { return _list.find(id); }
-	const_iterator find(size_t id) const { return _list.find(id); }
-	void erase(size_t id) { _list.erase(id); }
-	iterator begin() { return _list.begin(); }
-	const_iterator begin() const { return _list.begin(); }
-	iterator end() { return _list.end(); }
-	const_iterator end() const { return _list.end(); }
-	size_t size() const { return _list.size(); }
-
-};
-class GameObject {
-public:
-	
-	std::unordered_multimap<size_t, size_t> _lookp; // lookup
-	std::vector<std::unique_ptr<ComponentBase>> _order;
-};
-class Node : public sf::Transformable, public sf::Drawable {
-	std::vector<Node*> _children;
-	Node* _parent;
-public:
-	void AddChild(Node* child) { }
-	Node() : _parent(nullptr) {}
-	virtual ~Node() {}
-};
 
 namespace console {
 

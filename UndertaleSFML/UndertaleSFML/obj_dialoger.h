@@ -1,10 +1,10 @@
 #pragma once
 #include "obj_writer.h"
 
-class sprite_component : public sf::Sprite, public Component<2, sprite_component> {
+class sprite_component : public sf::Sprite {
 
 };
-class obj_dialoger : public  Component<779, obj_dialoger, obj_writer> {
+class obj_dialoger : public  obj_writer {
 	static sf::View _dialog_vew;
 	std::vector<sf::Sprite> _face;
 	sf::RectangleShape _blackInside;

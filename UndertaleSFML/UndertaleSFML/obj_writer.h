@@ -2,7 +2,7 @@
 #include "Global.h"
 #include "UndertaleLabel.h"
 
-class obj_face : public sf::Transformable, public sf::Drawable, public Component<774, obj_face> {
+class obj_face : public sf::Transformable, public sf::Drawable  {
 protected:
 	uint32_t _face;
 	uint32_t _emotion;
@@ -34,7 +34,7 @@ struct TEXTTYPE {
 	TEXTTYPE() : typer(4), myfont(2), mycolor(16777215), writingx(20), writingy(20), writingxend(290), shake(0), textspeed(1), txtsound(101), spacing(8), vspacing(18) {}
 };
 
-class obj_writer : public UndertaleLabel, public sf::Transformable, public sf::Drawable,  public Component<782, obj_writer> {
+class obj_writer : public UndertaleLabel, public sf::Transformable, public sf::Drawable  {
 protected:
 	virtual void faceCallback(int v) {}
 	virtual void emotionCallback(int v) {}
@@ -89,6 +89,6 @@ public:
 		UndertaleLabel::pop_back();
 		_vertCopy.resize(_vertCopy.size() - 6);
 	}
-	virtual void update(sf::Time dt) override;
+	virtual void update(sf::Time dt) ;
 	
 };
