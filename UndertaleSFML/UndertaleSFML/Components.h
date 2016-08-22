@@ -19,6 +19,38 @@ struct Layer {
 	int layer;
 };
 
+class RenderableCache : public sf::Drawable, public ChangedCass {
+	const Renderable& _renderable;
+	const ChangedCass* _renderable_can_change;
+	const Body* _body;
+	RawVertices<sf::Triangles> cache;
+	bool if_changed_reset() const {
+		if ((_body && _body->changed()) || (_renderable_can_change && _renderable_can_change->changed())) {
+			if (_renderable_can_change) _renderable_can_change->changed(false);
+			_body->changed(false);
+			return true;
+		}
+		else return false;
+	}
+public:
+	explicit RenderableCache(const Renderable& ref) : _renderable(ref) , _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)),_body(nullptr) {}
+	explicit RenderableCache(const Renderable& ref, const Body& body) : _renderable(ref), _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)), _body(nullptr) {}
+
+	const RawVertices<sf::Triangles>& get_verts() {
+		return cache;
+	}
+
+protected: // mainly used for debug or just to draw by itself
+	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const {
+		states.texture = _renderable.texture();
+
+		if(_body) states.transform *= _body->getTransform();
+		
+		target.draw(cache.data(),cache.size(),cache.primitive_type(),states);
+
+	}
+};
+
 struct SystemEvent : public ex::Event<SystemEvent> {
 	sf::Event event;
 	explicit SystemEvent() : event() {}
@@ -61,6 +93,7 @@ class PlayerOverWorldSystem : public ex::System<PlayerOverWorldSystem> {
 public:
 	explicit PlayerOverWorldSystem(ex::EntityX& app, sf::RenderTarget &target);
 	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override;
+	void init(ex::EntityX& app) { _player.load_resources(app); }
 };
 
 class RenderSystem : public ex::System<RenderSystem> {
@@ -98,6 +131,7 @@ public:
 class Application : public ex::EntityX {
 public:
 	explicit Application(sf::RenderTarget &target);
+	void init(ex::EntityX& app); ;
 	void update(ex::TimeDelta dt) { systems.update_all(dt); }
 };
 

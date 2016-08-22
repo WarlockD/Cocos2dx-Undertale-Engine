@@ -23,7 +23,7 @@
 #pragma comment(lib, "sfml-window-s-d.lib")
 
 static std::unique_ptr<sf::RenderWindow> s_window;// global window
-static std::unique_ptr<ex::EntityX> s_app;
+static std::unique_ptr<Application> s_app;
 
 namespace global {
 	sf::RenderWindow& getWindow() {
@@ -62,16 +62,17 @@ void gameLoop() {
 	sprite.assign<Body>();
 	sprite.component<Body>()->setPosition(20, 50);
 	sprite.component<Body>()->setScale(2.0, 2.0);
-	sprite.assign<RenderableRef>(raw_sprite);
-	sprite.assign<Animation>(0.25f);
+	//sprite.assign<RenderableRef>(raw_sprite);
+//	sprite.assign<LightRenderable>(raw_sprite);
+	//sprite.assign<Animation>(0.25f);
 
 	ex::Entity sprite2 = global::getEntities().create();
 	sprite2.assign<Body>();
 	sprite2.component<Body>()->setPosition(20, 80);
 	sprite2.component<Body>()->setPosition(20, 60);
 	sprite2.component<Body>()->setScale(2.0, 2.0);
-	sprite2.assign<RenderableRef>(raw_sprite2);
-
+	//sprite2.assign<RenderableRef>(raw_sprite2);
+//	sprite2.assign<LightRenderable>(raw_sprite);
 	//sprite2.component<Animation>() = Animation(0.25f;
 
 	// don't want to invalidate the sprite entry
@@ -81,7 +82,7 @@ void gameLoop() {
 	//sprite._body = sprite.assign<Body>().get();
 	//return sprite;
 
-
+	s_app->init(*s_app.get());
 	//teste->setPosition(20, 20);
 	while (window.isOpen())
 	{

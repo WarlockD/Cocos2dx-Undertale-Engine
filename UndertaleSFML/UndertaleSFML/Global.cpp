@@ -8,41 +8,96 @@
 #endif
 using namespace sf;
 
+namespace {
 
+
+};
+namespace global {
+	void convert(
+		const std::vector<sf::Vertex>& from, sf::PrimitiveType from_type,
+		std::vector<sf::Vertex>& to, sf::PrimitiveType to_type, bool clear) {
+		if (from_type == to_type) {
+			if (clear) to = from; else to.insert(to.end(),from.begin(),from.end());
+		}
+		else {
+			if (clear) to.clear();
+			// FUCK MEE
+			assert(false);
+		}
+	}
+
+	std::vector<sf::Vertex> convert(const std::vector<sf::Vertex>& from, sf::PrimitiveType from_type, sf::PrimitiveType to_type) {
+		std::vector<sf::Vertex> to;
+		convert(from, from_type, to, to_type);
+		return to;
+	}
+	void convert(const sf::VertexArray& from, std::vector<sf::Vertex>& to, sf::PrimitiveType to_type, bool clear) {
+		if (from.getPrimitiveType() == to_type) {
+			const sf::Vertex* bptr = &from[0];
+			const sf::Vertex* eptr = bptr + from.getVertexCount();
+			if (clear) to.assign(bptr,eptr); else to.insert(to.end(), bptr,eptr);
+		}
+		else {
+			if (clear) to.clear();
+			// FUCK MEE
+			assert(false);
+		}
+	}
+	std::vector<sf::Vertex> convert(const sf::VertexArray& from, sf::PrimitiveType to_type) {
+		std::vector<sf::Vertex> to;
+		convert(from, to, to_type);
+		return to;
+	}
+};
 
 const std::string global::empty_string;
+struct VertexRef;
+namespace cvt_triangles {
+	struct Vertex;
+	struct Triangle {
+		Vertex *FinalVert;
+	};
+	struct Edge {
+		Vertex *V2;
+		int Count;
+		int TriangleCount;
+		Triangle *Triangles;
+	};
+	struct Vertex {
+		
+		size_t hash;  // vertex hash
+		sf::Vertex V;
+		size_t count;
+		std::vector<size_t> PointsToMe;
+		std::vector<size_t> Edges;
+		Vertex *next;
+		Vertex(const sf::Vertex& v) : V(v), count(1), next(nullptr), hash(std::hash<sf::Vertex>()(v)) {}
+	};
+	struct vertex_hasher {
+		constexpr size_t operator()(const Vertex& v)  const { return v.hash; }
+	};
+	struct vertex_equals {
+		constexpr bool operator()(const Vertex& l, const Vertex& r)  const { return almost_equal_to<sf::Vertex>()(l.V, r.V); }
+	};
+	struct Book {
+		typedef std::unordered_set<Vertex, vertex_hasher, vertex_equals> vertex_container;
+		typedef vertex_container::iterator iterator;
 
-void RawVertices::insert(const_iterator where, const sf::VertexArray& verts) {
-	const size_t v_size = verts.getVertexCount();
-	const sf::Vertex* bptr = &verts[0];
-	const sf::Vertex* eptr = bptr + v_size;
-	switch (verts.getPrimitiveType()) {
-	case sf::PrimitiveType::Triangles:
-		reserve(size() + v_size);
-		_verts.insert(where, bptr, eptr);
-		break;
-	case sf::PrimitiveType::TrianglesStrip:
-		reserve(size() + ((v_size - 2) * 3));
-		for (size_t v = 0; v < v_size - 2; v++) {
-			if (v & 1) {
-				_verts.push_back(verts[v]);
-				_verts.push_back(verts[v + 2]);
-				_verts.push_back(verts[v + 1]);
-			}
-			else {
-				_verts.push_back(verts[v]);
-				_verts.push_back(verts[v + 1]);
-				_verts.push_back(verts[v + 2]);
-			}
-		}
-		break;
-	default:
-		assert(false);
-	}	
-}
-void RawVertices::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-	if(size()>0) target.draw(data(), size(), sf::PrimitiveType::Triangles, states);
-}
+		std::unordered_set<Vertex, vertex_hasher> _vertexs;
+		//iterator incVertex(const sf::Vertex& v) {
+			//std::pair<iterator, bool>  it = _vertexs.emplace(v);
+		//	if (!it.second) {
+		//		(*it.first).count++;
+		//	}
+		//}
+	};
+};
+
+
+
+
+
+
 // all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
 class basic_debugbuf : public std::streambuf {
 protected:

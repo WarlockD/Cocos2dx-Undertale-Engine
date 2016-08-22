@@ -4,15 +4,17 @@
 
 namespace global {
 	void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness = 4.0f, const sf::Color color = sf::Color::Green);
-	RawVertices create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
+	RawVertices<sf::PrimitiveType::TrianglesStrip> create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
 	void insert_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
-	void insert_hair_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, sf::Color color);
+	void insert_hair_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color);
 };
-struct Renderable {
+
+
+
+struct Renderable  {
 	bool debug_draw_box = false;
 	// starting to get the hang of templates
 	// traites and other good bits
-	std::vector<sf::Vertex> test;
 	typedef sf::Vertex element_type;
 	typedef size_t size_type;
 	typedef ptrdiff_t difference_type;
@@ -20,55 +22,9 @@ struct Renderable {
 	typedef element_type& element_reference;
 	typedef const element_type* const_element_pointer;
 	typedef const element_type& const_element_reference;
-	class const_iterator : public std::iterator<std::bidirectional_iterator_tag,sf::Vertex> {
-	public:
-		typedef std::bidirectional_iterator_tag iterator_category;
-		typedef const sf::Vertex value_type;
-		typedef size_t size_type;
-		typedef ptrdiff_t difference_type;
-		typedef const sf::Vertex*pointer;
-		typedef const sf::Vertex& reference;
-		//typedef const pointer const_pointer;
-		//typedef const reference const_reference;
-		inline const_iterator &operator ++() { ++_pos; return *this; }
-		inline const_iterator &operator --() { --_pos;; return *this; }
-		inline const_iterator operator ++(int) { ++_pos; return *this; }
-		inline const_iterator operator --(int) { --_pos;; return *this; }
-		inline bool operator ==(const const_iterator &other) const { return _pos == other._pos; }
-		inline bool operator !=(const const_iterator &other) const { return _pos != other._pos; }
-		inline bool operator <(const const_iterator &other) const { return _pos< other._pos; }
-		inline bool operator >(const const_iterator &other) const { return _pos> other._pos; }
-		inline bool operator <=(const const_iterator &other) const { return _pos <= other._pos; }
-		inline bool operator >=(const const_iterator &other) const { return _pos >= other._pos; }
-		inline const_iterator & operator +(const difference_type &add) const { const_iterator copy(*this); copy += add; return copy; }
-		inline const_iterator & operator -(const difference_type &add) const { const_iterator copy(*this); copy -= add; return copy; }
-		inline const_iterator & operator +=(const difference_type &add) { _pos += add; return *this; }
-		inline const_iterator & operator -=(const difference_type &add) { _pos -= add; return *this; }
-		inline reference operator*() const { return _ref[_pos]; }
-		inline pointer operator->() const { return &_ref[_pos]; }
-		const_iterator(const Renderable& ref, difference_type pos) : _pos(pos), _ref(ref) {}
-	protected:
-		difference_type _pos;
-		const Renderable& _ref;
-	};
-	class iterator : public const_iterator {
-	public:
-		typedef std::random_access_iterator_tag iterator_category;
-		typedef sf::Vertex value_type;
-		typedef size_t size_type;
-		typedef ptrdiff_t difference_type;
-		typedef sf::Vertex *pointer;
-		typedef sf::Vertex& reference;
-		typedef const sf::Vertex* const_pointer;
-		typedef const sf::Vertex& const_reference;
-		// I still beleve using const_cast is a hack, but I want my iterator to be inhertertable
-		inline reference operator*()  { return const_cast<reference>(_ref[_pos]); }
-		inline pointer operator->()  { return const_cast<pointer>(&_ref[_pos]); }
-		iterator(const Renderable& ref, difference_type pos) : const_iterator(ref,pos) {}
-	};
-
+	typedef generic_iterator<Renderable, sf::Vertex> iterator;
+	typedef generic_iterator<const Renderable, const sf::Vertex> const_iterator;
 protected: // protected interface
-	virtual bool hasChanged() const { return true; } // defaults to always trasform this thing
 	virtual int depth() const { return 0; } // used for depth sorting
 											// sent by the engine in an atempt to optimize draw calls by recreating the texture
 											// not sure if I will use
@@ -77,8 +33,7 @@ protected: // protected interface
 	virtual iterator end()  { return iterator(*this, (int)size()); }
 	// Interface
 public:
-	virtual bool next_frame() { return false; }; // This interface just tells the Renderable to do next frame
-	virtual bool prev_frame() { return false; }; // This interface just tells the Renderable to do prev frame
+
 	virtual const sf::Texture* texture() const = 0;
 	virtual size_t size() const = 0;
 	virtual const sf::Vertex& at(size_t index) const = 0;
@@ -140,7 +95,7 @@ public:
 	Mesh(const std::vector<sf::Vertex>& verts) : _texture(nullptr), _verts(verts) {}
 	Mesh(const std::vector<sf::Vertex>&& verts) : _texture(nullptr), _verts(std::move(verts)) {}
 };
-class SpriteFrameBase : public Renderable {
+class SpriteFrameBase : public Renderable ,public sf::Drawable , public ChangedCass {
 public:
 	const sf::Vertex& at(size_t i) const override final { return ptr()[i]; }
 	size_t size() const override final { return 6; }
@@ -151,6 +106,14 @@ public:
 	std::reference_wrapper<const SpriteFrameBase> ref() const { return std::ref(*this); }
 	virtual const sf::Vertex* ptr() const = 0;
 	virtual ~SpriteFrameBase() {}
+	// return false if no more frames
+	virtual bool next_frame() { return false; }; // This interface just tells the sprite to do next frame
+	virtual bool prev_frame() { return false; }; // This interface just tells the sprite to do prev frame
+	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
+		states.texture = texture();
+		//states.transform *= getTransform();
+		target.draw(ptr(), size(), sf::PrimitiveType::Triangles, states);
+	}
 };
 
 class SpriteFrame : public SpriteFrameBase {
@@ -190,8 +153,8 @@ public:
 	// custom stuff
 	size_t image_index() const { return _image_index; }
 	void image_index(size_t index) { _image_index = index % _frames.size(); }
-	bool next_frame() override final { image_index(image_index() + 1); return true; }
-	bool prev_frame() override final { image_index(image_index() - 1); return true; }
+	bool next_frame() override final { image_index(image_index() + 1); _changed = true;  return true; }
+	bool prev_frame() override final { image_index(image_index() - 1); _changed = true; return true; }
 	void push_back(const SpriteFrame& frame) { _frames.push_back(frame); }
 	SpriteFrameCollection& operator+=(const SpriteFrame& frame){_frames.push_back(frame); return *this; }
 	SpriteFrameCollection& operator=(const std::vector<SpriteFrame>& frames) { _frames = frames; return *this; }
@@ -204,12 +167,11 @@ public:
 };
 
 
-class Body : public LockingObject {
+class Body : public LockingObject , public ChangedCass {
 	sf::Vector2f _position;
 	sf::Vector2f _origin;
 	sf::Vector2f _scale;
 	float _rotation;
-	bool _changed;
 	mutable bool _transformNeedUpdate;
 	mutable sf::Transform _transform;
 public:
@@ -227,8 +189,6 @@ public:
 	const sf::Vector2f& getOrigin() const { return _origin; }
 	const sf::Vector2f& getScale() const { return _scale; }
 	float getRotation() const { return _rotation; }
-	bool hasChanged() const { return _changed; }
-	void resetChanged() { _changed = false; }
 	const sf::Transform& getTransform() const;
 };
 inline std::ostream& operator<<(std::ostream& os, const Body& body) {

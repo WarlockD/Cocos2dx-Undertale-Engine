@@ -214,6 +214,7 @@ public:
   bool operator != (const ComponentHandle<C> &other) const {
     return !(*this == other);
   }
+#if 0
   typename std::enable_if<std::is_copy_assignable<ComponentType>::value, ComponentHandle&>::type 
 	  operator=(const ComponentType& copy) {
 	  if (valid()) *get() = copy;
@@ -225,7 +226,7 @@ public:
 	  return *this;
   }
 
-
+#endif
 
 private:
   friend class EntityManager;
