@@ -67,7 +67,7 @@ namespace global {
 		InsertRectangle(verts.data(), rect, fill_color);
 		return verts;
 	}
-	void InsertRectangle(RawTriangles& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type) {
+	void InsertRectangle(RawVertices& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type) {
 		const size_t pos = verts.size();
 		verts.resize(pos + type == sf::PrimitiveType::Triangles ? 6 : 4);
 		InsertRectangle(verts.data() + pos, rect, fill_color,type);
@@ -96,14 +96,13 @@ namespace global {
 		uint8_t shade = static_cast<uint8_t>(amount * 255.0f);
 		return sf::Color(shade, shade, shade, shade);
 	}
-	RawVertices<sf::PrimitiveType::TrianglesStrip> create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color) {
-		sf::VertexArray verts;
+	RawVertices create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color) {
+		RawVertices verts;
 		insert_line(verts, v1, v2, w, color);
-		return RawVertices<sf::PrimitiveType::TrianglesStrip>(verts);
+		return verts;
 	}
-	void insert_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float w,sf::Color color)		
+	void insert_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float w,sf::Color color)
 	{
-		assert(verts.getPrimitiveType() == sf::PrimitiveType::TrianglesStrip);
 		float t; float R; float f = w- static_cast<int>(w);
 		float A = 1.0f;
 		sf::Color alpha(color);
@@ -111,26 +110,26 @@ namespace global {
 		//determine parameters t,R
 		/*   */
 		if (w >= 0.0 && w < 1.0) {
-			t = 0.05f; R = 0.48f + 0.32*f;
+			t = 0.05f; R = 0.48f + 0.32f*f;
 			noalpha.a = static_cast<unsigned char>((((float)color.a / 255.0f) * f) * 255);
 		}
-		else if (w >= 1.0 && w < 2.0) {
-			t = 0.05f + f*0.33f; R = 0.768 + 0.312*f;
+		else if (w >= 1.0f && w < 2.0f) {
+			t = 0.05f + f*0.33f; R = 0.768f + 0.312f*f;
 		}
-		else if (w >= 2.0 && w < 3.0) {
+		else if (w >= 2.0f && w < 3.0f) {
 			t = 0.38f + f*0.58f; R = 1.08f;
 		}
-		else if (w >= 3.0 && w < 4.0) {
+		else if (w >= 3.0f && w < 4.0f) {
 			t = 0.96f + f*0.48f; R = 1.08f;
 		}
-		else if (w >= 4.0 && w < 5.0) {
+		else if (w >= 4.0f && w < 5.0f) {
 			t = 1.44f + f*0.46f; R = 1.08f;
 		}
-		else if (w >= 5.0 && w < 6.0) {
+		else if (w >= 5.0f && w < 6.0f) {
 			t = 1.9f + f*0.6f; R = 1.08f;
 		}
-		else if (w >= 6.0) {
-			float ff = w - 6.0;
+		else if (w >= 6.0f) {
+			float ff = w - 6.0f;
 			t = 2.5f + ff*0.50f; R = 1.08f;
 		}
 
@@ -138,7 +137,7 @@ namespace global {
 		sf::Vector2f tv;//core thinkness of a line
 		sf::Vector2f Rv;//fading edge of a line
 		sf::Vector2f cv;//cap of a line
-		const float ALW = 0.01;
+		const float ALW = 0.01f;
 		sf::Vector2f dv = v2 - v1;
 		if (std::fabsf(dv.x) < ALW) {
 			//vertical
@@ -194,7 +193,7 @@ namespace global {
 			else { //calculate to exact
 				dv.x = v1.y - v2.y;
 				dv.y = v2.x - v1.x;
-				float L = std::sqrtf(dv.x*dv.x + dv.y*dv.y);
+				const float L = std::sqrtf(dv.x*dv.x + dv.y*dv.y);
 				dv /= L;
 				cv = sf::Vector2f(-dv.y, dv.x);
 				tv = dv * t;
@@ -203,38 +202,40 @@ namespace global {
 		}
 		v1 += cv * 0.5f;
 		v2 -= cv * 0.5f;
-		
+		RawVertices strip(sf::PrimitiveType::TrianglesStrip);
+		strip.reserve(w >= 3 ? 12 : 8);
 		//draw the line by triangle strip
-		verts.append(sf::Vertex(v1 - tv - Rv - cv, noalpha)); //fading edge1
-		verts.append(sf::Vertex(v2 - tv - Rv + cv, noalpha));
-		verts.append(sf::Vertex(v1 - tv - cv, alpha));	  //core
-		verts.append(sf::Vertex(v2 - tv + cv, alpha));
-		verts.append(sf::Vertex(v1 + tv - cv, alpha));
-		verts.append(sf::Vertex(v2 + tv + cv, alpha));
-		verts.append(sf::Vertex(v1 + tv + Rv - cv, noalpha)); //fading edge2
-		verts.append(sf::Vertex(v2 + tv + Rv + cv, noalpha));
+		strip.emplace_back(v1 - tv - Rv - cv, noalpha); //fading edge1
+		strip.emplace_back(v2 - tv - Rv + cv, noalpha);
+		strip.emplace_back(v1 - tv - cv, alpha);	  //core
+		strip.emplace_back(v2 - tv + cv, alpha);
+		strip.emplace_back(v1 + tv - cv, alpha);
+		strip.emplace_back(v2 + tv + cv, alpha);
+		strip.emplace_back(v1 + tv + Rv - cv, noalpha); //fading edge2
+		strip.emplace_back(v2 + tv + Rv + cv, noalpha);
 		//cap
 
 		if (w >= 3) {
-			verts.append(sf::Vertex(v1 - tv - Rv - cv, noalpha)); //cap1
-			verts.append(sf::Vertex(v1 - tv - Rv, noalpha));
-			verts.append(sf::Vertex(v1 - tv - cv,  alpha));
-			verts.append(sf::Vertex(v1 + tv + Rv,  noalpha));
-			verts.append(sf::Vertex(v1 + tv - cv,  alpha));
-			verts.append(sf::Vertex(v1 + tv + Rv - cv,  noalpha));
+			strip.emplace_back(v1 - tv - Rv - cv, noalpha); //cap1
+			strip.emplace_back(v1 - tv - Rv, noalpha);
+			strip.emplace_back(v1 - tv - cv,  alpha);
+			strip.emplace_back(v1 + tv + Rv,  noalpha);
+			strip.emplace_back(v1 + tv - cv,  alpha);
+			strip.emplace_back(v1 + tv + Rv - cv,  noalpha);
 
-			verts.append(sf::Vertex(v2 - tv - Rv + cv,  noalpha)); //cap2
-			verts.append(sf::Vertex(v2 - tv - Rv,  noalpha));
-			verts.append(sf::Vertex(v2 - tv + cv,  alpha));
-			verts.append(sf::Vertex(v2 + tv + Rv,  noalpha));
-			verts.append(sf::Vertex(v2 + tv + cv,  alpha));
-			verts.append(sf::Vertex(v2 + tv + Rv + cv,  noalpha));
+			strip.emplace_back(v2 - tv - Rv + cv,  noalpha); //cap2
+			strip.emplace_back(v2 - tv - Rv,  noalpha);
+			strip.emplace_back(v2 - tv + cv,  alpha);
+			strip.emplace_back(v2 + tv + Rv,  noalpha);
+			strip.emplace_back(v2 + tv + cv,  alpha);
+			strip.emplace_back(v2 + tv + Rv + cv,  noalpha);
 		}
+		verts += strip;
 	}
-	void insert_hair_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color) {
+	void insert_hair_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color) {
 		//float t = width;
-		double t = 0.05; double R = 0.768;
-		const float ALW = 0.01;
+		float t = 0.05f; float R = 0.768f;
+		const float ALW = 0.01f;
 		sf::Vector2f tv, Rv, dv = v2 - v1;
 		//determine angle of the line to horizontal
 		if (std::fabsf(dv.x) < ALW) {
@@ -270,64 +271,17 @@ namespace global {
 		}
 		sf::Color alpha(color.r, color.g, color.b, 255);
 		sf::Color noalpha(color.r, color.g, color.b, 0);
-		//draw the line by triangle strip
-		verts.append(sf::Vertex(v1 - tv - Rv, noalpha)); //fading edge1
-		verts.append(sf::Vertex(v2 - tv - Rv, noalpha));
-		verts.append(sf::Vertex(v1 - tv , alpha));	  //core
-		verts.append(sf::Vertex(v2 - tv , alpha));
-		verts.append(sf::Vertex(v1 + tv , alpha));
-		verts.append(sf::Vertex(v2 + tv, alpha));
-		verts.append(sf::Vertex(v1 + tv + Rv, noalpha)); //fading edge2
-		verts.append(sf::Vertex(v2 + tv + Rv, noalpha));
-	}
-	void insert_hair_line_old(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, sf::Color color) {
-		float t = 0.05; float R = 0.768; float C = 0.0;
-		const float ALW = 0.01;
-		sf::Vector2f tv, Rv, dv = v2 - v1;
-		//determine angle of the line to horizontal
-		if (std::fabsf(dv.x) < ALW) {
-			//vertical
-			tv.x = 0.5f;
-		}
-		else if (std::fabsf(dv.y) < ALW) {
-			//horizontal
-			tv.y = 0.5f;
-
-		}
-		else {
-			float m = dv.y / dv.x;
-			if (m > -0.4142 && m <= 0.4142) {
-				// -22.5< angle <= 22.5, approximate to 0 (degree)
-				tv = sf::Vector2f(t*0.1f, t);
-				Rv = sf::Vector2f(R*0.6f, R);
-			}
-			else if (m > 0.4142 && m <= 2.4142) {
-				// 22.5< angle <= 67.5, approximate to 45 (degree)
-				tv = sf::Vector2f(t*-0.7071f, t*0.7071f);
-				Rv = sf::Vector2f(R*-0.7071f, R*0.7071f);
-			}
-			else if (m > 2.4142 || m <= -2.4142) {
-				// 67.5 < angle <=112.5, approximate to 90 (degree)
-				tv = sf::Vector2f(t, t*0.1f);
-				Rv = sf::Vector2f(R, R*0.6f);
-			}
-			else if (m > -2.4142 && m < -0.4142) {
-				// 112.5 < angle < 157.5, approximate to 135 (degree)
-				tv = sf::Vector2f(t*0.7071f, t*0.7071f);
-				Rv = sf::Vector2f(R*0.7071f, R*0.7071f);
-			}
-		}
-		sf::Color alpha(color.r, color.g, color.b,  255);
-		sf::Color noalpha(color.r, color.g, color.b, 0);
-		//draw the line by triangle strip
-		verts.append(sf::Vertex(v1 - tv - Rv, noalpha)); //fading edge1
-		verts.append(sf::Vertex(v2 - tv - Rv, noalpha));
-		verts.append(sf::Vertex(v1 - tv, alpha));	  //core
-		verts.append(sf::Vertex(v2 - tv, alpha));
-		verts.append(sf::Vertex(v1 + tv, alpha));
-		verts.append(sf::Vertex(v2 + tv, alpha));
-		verts.append(sf::Vertex(v1 + tv + Rv, noalpha)); //fading edge2
-		verts.append(sf::Vertex(v2 + tv + Rv, noalpha));
+		RawVertices strip(sf::PrimitiveType::TrianglesStrip);
+		strip.reserve(8);
+		strip.emplace_back(v1 - tv - Rv, noalpha); //fading edge1
+		strip.emplace_back(v2 - tv - Rv, noalpha);
+		strip.emplace_back(v1 - tv, alpha);	  //core
+		strip.emplace_back(v2 - tv, alpha);
+		strip.emplace_back(v1 + tv, alpha);
+		strip.emplace_back(v2 + tv, alpha);
+		strip.emplace_back(v1 + tv + Rv, noalpha); //fading edge2
+		strip.emplace_back(v2 + tv + Rv, noalpha);
+		verts += strip;
 	}
 };
 
@@ -357,24 +311,24 @@ Body::Body() : LockingObject(), _transform(sf::Transform::Identity), _position()
 void Body::setPosition(const sf::Vector2f& v) {
 	auto lock = safeLock();
 	if (!global::AlmostEqualRelative(v, _position)) {
-		_position = v; _transformNeedUpdate = _changed = true;
+		_position = v; _transformNeedUpdate = true; changed(true);
 	}
 }
 void Body::setOrigin(const sf::Vector2f& v) {
 	auto lock = safeLock();
-	if (!global::AlmostEqualRelative(v, _origin)) { _origin = v; _transformNeedUpdate = _changed = true; }
+	if (!global::AlmostEqualRelative(v, _origin)) { _origin = v; _transformNeedUpdate  = true; changed(true);}
 }
 
 void Body::setScale(const sf::Vector2f& v) {
 	auto lock = safeLock();
-	if (!global::AlmostEqualRelative(v, _scale)) { _scale = v; _transformNeedUpdate = _changed = true; }
+	if (!global::AlmostEqualRelative(v, _scale)) { _scale = v; _transformNeedUpdate  = true;  changed(true);}
 }
 
 void Body::setRotation(float angle) {
 	angle = static_cast<float>(std::fmod(angle, 360));
 	if (angle < 0) angle += 360.f;
 	auto lock = safeLock();
-	if (!global::AlmostEqualRelative(angle, _rotation)) { _rotation = angle; _transformNeedUpdate = _changed = true; }
+	if (!global::AlmostEqualRelative(angle, _rotation)) { _rotation = angle; _transformNeedUpdate  = true; changed(true); }
 }
 
 

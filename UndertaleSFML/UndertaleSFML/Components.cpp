@@ -14,18 +14,25 @@ void PlayerOverWorldSystem::update(ex::EntityManager &es, ex::EventManager &even
 }
 
 bool Player::load_resources(ex::EntityX& app) {
-	app.events.subscribe<SystemEvent>(*this);
-	_enity = app.entities.create();
-	_enity.assign<Body>();
-	_enity.assign<RenderableRef>(*this);
-	_enity.assign<Velocity>();
-	_facing = PlayerFacing::DOWN;
+	
 
 	_sprites[0].sprite_index(1043); 
 	_sprites[1].sprite_index(1045); 
 	_sprites[2].sprite_index(1044); 
 	_sprites[3].sprite_index(1046);
+	_facing = PlayerFacing::DOWN;
+	// assign THEN create the enity
+
+	
+	_enity = app.entities.create();
+	_enity.assign<Body>();
+	_enity.component<Body>()->setScale(2.0f);
+	_enity.assign<RenderableCache>(*this);
+	_enity.assign<Velocity>();
+	
 	_enity.component<Body>()->setPosition(180, 180);
+
+	app.events.subscribe<SystemEvent>(*this);
 	return true;
 }
 Player::~Player() {
@@ -36,19 +43,20 @@ Player::~Player() {
 }
 void Player::receive(const SystemEvent &sevent) {
 	auto& event = sevent.event;
-	switch (event.type) {
-	case sf::Event::EventType::KeyPressed:
+	if (event.type == sf::Event::EventType::KeyPressed) {
 		switch (event.key.code) {
 		case sf::Keyboard::Key::A:
-			_enity.component<Velocity>()->velocity.x = -5.0f; 
+			_enity.component<Velocity>()->velocity.x = -50.0f;
 			_facing = PlayerFacing::LEFT;
+			changed(true);
 			break;
 		case sf::Keyboard::Key::D:
-			_enity.component<Velocity>()->velocity.x = 5.0f;
+			_enity.component<Velocity>()->velocity.x = 50.0f;
 			_facing = PlayerFacing::RIGHT;
+			changed(true);
 			break;
 		}
-	};
+	}
 }
 
 
@@ -98,7 +106,7 @@ void draw_box_old(sf::VertexArray& verts, const sf::FloatRect& rect, float thick
 	verts.append(Vertex(Vector2f(right, bottom), color)); verts.append(Vertex(Vector2f(left, bottom), color));
 	verts.append(Vertex(Vector2f(right, bottom), color)); verts.append(Vertex(Vector2f(right, top), color));
 }
-void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness = 4.0f, const sf::Color color = sf::Color::Green) {
+void draw_box(RawVertices& verts, const sf::FloatRect& rect, float thickness = 4.0f, const sf::Color color = sf::Color::Green) {
 	float left = rect.left;
 	float top = rect.top;
 	float right = rect.left + rect.width;
@@ -125,18 +133,13 @@ void draw_box(const sf::FloatRect& rect,  float thickness = 4.0f, const sf::Colo
 
 
 }
-RawTriangles createTest() {
-	sf::VertexArray test(sf::PrimitiveType::TrianglesStrip);
-	RawTriangles vect;
-	global::insert_line(test, sf::Vector2f(100.0f, 100.0f), sf::Vector2f(200.0f, 200.0f), 10.0f, sf::Color::White);
-	vect += test;
-	test.clear();
-	global::insert_hair_line(test, sf::Vector2f(200.0f, 150.0f), sf::Vector2f(50.0f, 50.0f), 10.0f, sf::Color::White);
-	vect += test;
-	test.clear();
+RawVertices createTest() {
+	RawVertices vect;
+	global::insert_line(vect, sf::Vector2f(100.0f, 100.0f), sf::Vector2f(200.0f, 200.0f), 10.0f, sf::Color::White);
+	global::insert_hair_line(vect, sf::Vector2f(200.0f, 150.0f), sf::Vector2f(50.0f, 50.0f), 10.0f, sf::Color::Green);
 	return vect;
 }
-RawTriangles test;
+RawVertices test;
 RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lines(sf::PrimitiveType::Lines) {
 	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
 		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
@@ -150,29 +153,25 @@ RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lin
 }
 std::multimap<int, std::reference_wrapper<const sf::Drawable>> sorting;
 void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
-	
+	RawVertices temp_verts;
 	sortedVerts.clear();
 	debug_lines.clear();
-	
-	sf::VertexArray temp_verts(sf::PrimitiveType::TrianglesStrip);
-	es.each<Body, RenderableCache>([this, &temp_verts](ex::Entity entity, Body& body, RenderableCache &lrenderable) {
-		const auto& transform = body.getTransform();
-		sf::RenderStates states(transform); 
-		target.draw(lrenderable, states);
-	});
-	return;
-	es.each<Body, RenderableRef>([this,&temp_verts](ex::Entity entity, Body& body, RenderableRef &renderable_ref) {
+	size_t draw_count = 0;
+
+	es.each<Body, RenderableCache>([this,&draw_count](ex::Entity entity, Body& body, RenderableCache &lrenderable) {
 		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
-		const auto& transform = body.getTransform();
-		Renderable& renderable = renderable_ref;
-		auto& verts = (sortedVerts[layer])[renderable.texture()];
-		renderable.insert(verts, transform);
-		if (draw_all_boxes || renderable.debug_draw_box) {
-			draw_box(temp_verts, transform.transformRect(renderable.bounds()));
-		}
+		auto& verts = (sortedVerts[layer])[lrenderable.texture()];
+		lrenderable.update_cache(body);
+		verts += lrenderable.cache().transform_copy(body.getTransform());
+	//	if (draw_all_boxes) {
+	//		draw_box(temp_verts, transform.transformRect(renderable.bounds()));
+	//	}
+		//draw_count++;
+		//lrenderable.update_cache(body);
+		//target.draw(lrenderable);
 	});
-	size_t draw_count = 0;
+
 	sf::RenderStates states = sf::RenderStates::Default;
 	
 	
@@ -184,11 +183,9 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 			target.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
 		}
 	}
-	RawTriangles boxes = temp_verts;
-	if(debug_lines.getVertexCount() > 0) {
-		target.draw(debug_lines);
-	}
-	target.draw(boxes);
+
+	target.draw(test);
+
 
 	last_update += dt;
 	frame_count++;
@@ -214,7 +211,12 @@ void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex
 
 void VelocitySystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
 	es.each<Body, Velocity>([this, dt](ex::Entity entity, Body& body, Velocity &velocity) {
-		body.setPosition(body.getPosition() + (velocity.velocity * dt));
+		if (!almost_zero<sf::Vector2f>()(velocity.velocity)) {
+			sf::Vector2f pos = body.getPosition();
+			pos += velocity.velocity * dt;
+			body.setPosition(pos);
+		}
+		
 	});
 }
 

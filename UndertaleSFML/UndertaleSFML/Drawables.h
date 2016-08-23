@@ -4,9 +4,9 @@
 
 namespace global {
 	void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness = 4.0f, const sf::Color color = sf::Color::Green);
-	RawVertices<sf::PrimitiveType::TrianglesStrip> create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
-	void insert_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
-	void insert_hair_line(sf::VertexArray& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color);
+	RawVertices create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
+	void insert_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
+	void insert_hair_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color);
 };
 
 

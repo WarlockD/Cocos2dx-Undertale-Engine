@@ -19,36 +19,30 @@ struct Layer {
 	int layer;
 };
 
-class RenderableCache : public sf::Drawable, public ChangedCass {
+class RenderableCache :public ChangedCass {
 	const Renderable& _renderable;
 	const ChangedCass* _renderable_can_change;
-	const Body* _body;
-	RawVertices<sf::Triangles> cache;
-	bool if_changed_reset() const {
-		if ((_body && _body->changed()) || (_renderable_can_change && _renderable_can_change->changed())) {
-			if (_renderable_can_change) _renderable_can_change->changed(false);
-			_body->changed(false);
-			return true;
-		}
-		else return false;
-	}
+	mutable RawVertices _cache;
 public:
-	explicit RenderableCache(const Renderable& ref) : _renderable(ref) , _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)),_body(nullptr) {}
-	explicit RenderableCache(const Renderable& ref, const Body& body) : _renderable(ref), _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)), _body(nullptr) {}
-
-	const RawVertices<sf::Triangles>& get_verts() {
-		return cache;
+	explicit RenderableCache(const Renderable& ref) : _renderable(ref), _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)) { _cache.assign(_renderable.begin(), _renderable.end()); }
+	void update_cache() const {
+		if ((_renderable_can_change && _renderable_can_change->changed())) {
+			_cache.assign(_renderable.begin(), _renderable.end());
+		}
 	}
-
-protected: // mainly used for debug or just to draw by itself
-	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const {
-		states.texture = _renderable.texture();
-
-		if(_body) states.transform *= _body->getTransform();
-		
-		target.draw(cache.data(),cache.size(),cache.primitive_type(),states);
-
+	void update_cache(const Body& body) const {
+		if (body.changed() || (_renderable_can_change && _renderable_can_change->changed())) {
+			_cache.assign(_renderable.begin(), _renderable.end());
+			_cache.transform(body.getTransform());
+			body.changed(false);
+		}
 	}
+	// helper functions
+	const sf::Texture* texture() const { return _renderable.texture(); }
+	const RawVertices& cache() {
+		return _cache;
+	}
+	const Renderable& renderable() const { return _renderable; }
 };
 
 struct SystemEvent : public ex::Event<SystemEvent> {
@@ -61,6 +55,7 @@ class Player : public SpriteFrameBase, public ex::Receiver<Player> {
 		DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
 	};
 	std::array<UndertaleSprite, 4> _sprites;
+
 	PlayerFacing _facing;
 	int health;
 	int status;
@@ -97,8 +92,7 @@ public:
 };
 
 class RenderSystem : public ex::System<RenderSystem> {
-	typedef std::unordered_map<const sf::Texture*, std::vector<sf::Vertex>> t_dumb_batch;
-	typedef std::vector<sf::Vertex> vert_vector;
+	typedef std::unordered_map<const sf::Texture*, RawVertices> t_dumb_batch;
 	typedef std::vector<sf::FloatRect> t_debug_boxes;
 	std::map<int, t_dumb_batch> sortedVerts;
 	sf::VertexArray debug_lines;

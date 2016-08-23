@@ -67,7 +67,7 @@ UndertaleSprite::UndertaleSpriteData::type  UndertaleSprite::UndertaleSpriteData
 		size_t texture_index = usprite.frames().at(0).texture_index;
 		sprite->_texture = &Global::GetUndertaleTexture(texture_index);
 		auto& verts = sprite->_verts;
-		verts.resize(usprite.frames().size() * 6);
+		verts.reserve(usprite.frames().size() * 6);
 		for (auto uframe : usprite.frames()) {
 			assert(texture_index == uframe.texture_index); // should be the same for all
 			float left = static_cast<float>(uframe.offset_x);
@@ -81,12 +81,12 @@ UndertaleSprite::UndertaleSpriteData::type  UndertaleSprite::UndertaleSpriteData
 			float v2 = static_cast<float>(uframe.y + uframe.height);
 
 			// Add a quad for the current character
-			verts.push_back(Vertex(Vector2f(left, top), sf::Color::White, Vector2f(u1, v1)));
-			verts.push_back(Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
-			verts.push_back(Vertex(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2)));
-			verts.push_back(Vertex(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2)));
-			verts.push_back(Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
-			verts.push_back(Vertex(Vector2f(right, bottom), sf::Color::White, Vector2f(u2, v2)));
+			verts.emplace_back(Vector2f(left, top), sf::Color::White, Vector2f(u1, v1));
+			verts.emplace_back(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1));
+			verts.emplace_back(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2));
+			verts.emplace_back(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2));
+			verts.emplace_back(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1));
+			verts.emplace_back(Vector2f(right, bottom), sf::Color::White, Vector2f(u2, v2));
 		}
 		std::shared_ptr<UndertaleSpriteData> shared_ptr(sprite);
 		weak = shared_ptr; // save in cache

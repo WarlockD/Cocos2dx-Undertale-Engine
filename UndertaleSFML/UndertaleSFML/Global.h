@@ -25,6 +25,7 @@ namespace global {
 	std::vector<sf::Vertex> convert(const std::vector<sf::Vertex>& from, sf::PrimitiveType from_type, sf::PrimitiveType to_type);
 	void convert(const sf::VertexArray& from, std::vector<sf::Vertex>& to, sf::PrimitiveType to_type, bool clear = false);
 	std::vector<sf::Vertex> convert(const sf::VertexArray& from, sf::PrimitiveType to_type);
+
 	constexpr float smallest_pixel = 0.001f; // smallest movement of a pixel
 	extern const std::string empty_string; // used for empty const std::string refrences
 
@@ -104,6 +105,8 @@ struct almost_equal_to {
 	constexpr bool operator()(const T &l, const T &r) const { return std::equal_to<T>(l, r); }
 };
 
+
+
 template<> struct almost_equal_to<float> {
 	static constexpr float maxdiff = 0.0001f;
 	constexpr bool operator()(const float & l, const float& r) const
@@ -111,6 +114,7 @@ template<> struct almost_equal_to<float> {
 		return global::detail::abs(l - r) <= (((global::detail::abs(r) > global::detail::abs(l)) ? global::detail::abs(r) : global::detail::abs(l)) * maxdiff);// Find the largest 
 	}
 };
+
 
 template<> struct almost_equal_to<sf::Vector2f> {
 	constexpr bool operator()(const sf::Vector2f& l, const sf::Vector2f& r) const
@@ -122,8 +126,17 @@ template<> struct almost_equal_to<sf::Vector2f> {
 template<> struct almost_equal_to<sf::Vertex> {
 	constexpr bool operator()(const sf::Vertex& l, const sf::Vertex& r) const
 	{
-		return l.color == r.color && almost_equal_to<sf::Vector2f>()(l.texCoords, r.texCoords) && almost_equal_to<sf::Vector2f>()(l.position, r.position);
+		return l.color.toInteger() == r.color.toInteger() && almost_equal_to<sf::Vector2f>()(l.texCoords, r.texCoords) && almost_equal_to<sf::Vector2f>()(l.position, r.position);
 	}
+};
+
+template<typename T>
+struct almost_zero {
+	constexpr bool operator()(const T &l) const { return almost_equal_to<T>()(l, static_cast<T>(0)); }
+};
+template<>
+struct almost_zero<sf::Vector2f> {
+	constexpr bool operator()(const sf::Vector2f &l) const { return almost_zero<float>()(l.x) && almost_zero<float>()(l.y); }
 };
 
 class ChangedCass {
@@ -179,7 +192,6 @@ protected:
 // This is a wraper for std::vector<sf::Vertex> being that while I like sf::VertexArray, I like
 // the vector interface more.  We template this and created a bunch of conversions
 // with overloaded functions
-template<sf::PrimitiveType PTYPE>
 class RawVertices :  public sf::Drawable {
 public:
 	// vector wrapper
@@ -199,9 +211,31 @@ public:
 	typedef typename std::pair<iterator, iterator> range_iterator;
 	typedef typename std::pair<const_iterator, const_iterator> const_range_iterator;
 
+	// constructors
+	RawVertices() : _ptype(sf::PrimitiveType::Triangles) {} // we always default to triangles
+	RawVertices(const RawVertices& copy) = default;
+	RawVertices(RawVertices&& copy) = default;
+
+
+	RawVertices(sf::PrimitiveType ptype) : _ptype(ptype) {}
+	RawVertices(const vector& verts) : _verts(verts), _ptype(sf::PrimitiveType::Triangles) {}
+	RawVertices(sf::PrimitiveType ptype, const vector& verts) : _verts(verts), _ptype(ptype) {}
+	RawVertices(vector&& verts) : _verts(std::move(verts)), _ptype(sf::PrimitiveType::Triangles) {}
+	RawVertices(sf::PrimitiveType ptype, vector&& verts) : _verts(std::move(verts)), _ptype(ptype) {}
+	template<class IT, class = typename enable_if<std::is_iterator<IT>::value, void>::type>
+	RawVertices(IT begin, IT end) : _verts(begin, end), _ptype(sf::PrimitiveType::Triangles) {}
+	template<class IT, class = typename enable_if<std::is_iterator<IT>::value, void>::type>
+	RawVertices(sf::PrimitiveType ptype, IT begin, IT end) : _verts(begin, end), _ptype(ptype) {}
+
+
+	RawVertices(const sf::VertexArray& verts) : _ptype(verts.getPrimitiveType()), _verts(global::convert(verts, primitive_type())) {}
+
+	// ok, these two, might never want to use.  SUPER HACKY.  I put them in global.cpp because I just don't want anyone to see..
+	// basicly I recast the verts, skip the vtable, then extract the vector directly from vertexArray..  yea:P
+	RawVertices(sf::VertexArray&& verts);
+	RawVertices& operator=(sf::VertexArray&& right);
+
 	// vector function wrap
-	explicit RawVertices(const vector& verts, sf::PrimitiveType ptype = sf::PrimitiveType::Triangles) : _verts(verts) , _ptype(ptype) {}
-	explicit RawVertices(vector&& verts, sf::PrimitiveType ptype = sf::PrimitiveType::Triangles) : _verts(std::move(verts)) , _ptype(ptype) {}
 	reference operator[](size_t index) { return _verts[index]; }
 	const_reference operator[](size_t index) const { return _verts[index]; }
 	reference at(size_t index) { return _verts.at(index); }
@@ -213,6 +247,8 @@ public:
 	const_pointer data() const { return _verts.data(); }
 	void push_back(const value_type& v) { _verts.push_back(v); }
 	void push_back(value_type&& v) { _verts.push_back(v); }
+	template<class... Args> void emplace_back(Args&&... args) { _verts.emplace_back(std::forward<Args>(args)...); }
+	template<class... Args> iterator emplace(const_iterator where, Args&&... args) { return _verts.emplace(where, std::forward<Args>(args)...); }
 	void pop_back() { _verts.pop_back(); }
 	reference front() { return _verts.front(); }
 	reference back() { return _verts.back(); }
@@ -229,55 +265,55 @@ public:
 	const_iterator cbegin() const { return _verts.begin(); }
 	const_iterator cend() const { return _verts.end(); }
 	void clear() { _verts.clear(); }
-	template<class... Args> void emplace_back(Args&&... args) { _verts.emplace_back(std::forward<Args>(args)...); }
-	template<class... Args> iterator emplace(const_iterator where, Args&&... args) { return _verts.emplace(where, std::forward<Args>(args)...); }
 	iterator insert(const_iterator where, value_type&& val) { return _verts.insert(where, val); }
 	iterator insert(const_iterator where, const value_type& val) { return _verts.insert(where, val); }
 	iterator insert(const_iterator where, std:: initializer_list<value_type> list) { return _verts.insert(where, list); }
 	iterator erase(const_iterator first, const_iterator last) { return _verts.erase(first, last); }
 	iterator erase(const_iterator at) { return _verts.erase(at); }
-	void swap(RawVertices& other) { _verts.swap(other._verts); }
+	void swap(RawVertices& other) { _verts.swap(other._verts); std::swap(_ptype, other._ptype); }
 
 	template<class IT> 
-	typename std::enable_if<std::is_iterator<IT>::value, iterator>::type
+	typename std::enable_if<std::is_iterator<IT>::value, iterator>::type 
 		insert(const_iterator where, IT first, IT last) { return _verts.insert(where, first, last); }
 	template<class IT>
-	typename std::enable_if<std::is_iterator<IT>::value, void>::type
+	typename std::enable_if<std::is_iterator<IT>::value, void>::type 
 		assign(IT first, IT last) { _verts.assign(first, last); }
 
-	// rule of 5.  We make them templated so we can convert one type to another, but we have to
-	// have custom functions that handle each type
-	RawVertices() { }
-	// RawVertices extensions, this is also the main comversion functions
-	RawVertices(const sf::VertexArray& verts) : _verts(global::convert(verts, PTYPE)) {}
-	template<sf::PrimitiveType R> explicit RawVertices(const RawVertices<R>& verts) : _vert(global::convert(verts._verts, R, PTYPE)) {}
-#if 0
-	template<typename R,typename = std::enable_if<R == RawVertices<T>, R>::type>
-	explicit RawVertices(R&& right) : _verts(std::move(right._verts)) {}
-	template<typename R, typename = std::enable_if<R == RawVertices<T>, R>::type>
-	explicit RawVertices(const R& right) : _verts(right._verts) {}
-	template<sf::PrimitiveType R>
-	typename std::enable_if<PTYPE == R, RawVertices&>::type operator=(RawVertices<R>&& right) { _verts = std::move(right._verts); return *this; }
-	template<sf::PrimitiveType R>
-	typename std::enable_if<PTYPE == R, RawVertices&>::type operator=(const RawVertices<R>& right) { _verts = right._verts; return *this; }
-	template<sf::PrimitiveType R>
-	typename std::enable_if<PTYPE == R, RawVertices&>::type operator+=(const RawVertices<R>& right) { _verts.append(right); return *this; }
-#endif 
+	// extensions
+	template<class IT>
+	typename std::enable_if<std::is_iterator<IT>::value, void>::type
+		append(IT begin, IT end) { _verts.insert(_verts.begin(), begin, end); }
 
-
-	void emplace_back(const RawVertices& verts) { _verts.insert(_verts.end(), verts.begin(), verts.end());}
-	void emplace_back(const vector& verts) { _verts.emplace_back(verts); }
 	void append(const vector& verts) { _verts.insert(_verts.begin(), verts.begin(), verts.end()); }
+	void append(const RawVertices& verts) { global::convert(verts._verts, verts.primitive_type(), _verts, primitive_type()); }
+	void append(const sf::VertexArray& verts) { global::convert(verts, _verts, primitive_type()); }
+
 	range_iterator range(size_type start, size_type end) { return std::make_pair(_verts.begin() + start, _verts.end() + end); }
 	const_range_iterator range(size_type start, size_type end) const { return std::make_pair(_verts.begin() + start, _verts.end() + end); }
-	RawVertices& operator+=(const sf::VertexArray& right) { global::convert(right,_verts, PTYPE); return *this; }
-	RawVertices& operator=(const sf::VertexArray& right) { global::convert(right, _verts, PTYPE,true); return *this; }
 
+	// we want to convert as there is no way to change this type once its made without doing an explicit construction
+	RawVertices& operator=(const sf::VertexArray& right) { _verts.clear(); append(right); return *this; }
+	RawVertices& operator=(const RawVertices& right) { _verts.clear(); append(right); return *this; }
+	RawVertices& operator+=(const sf::VertexArray& right) { append(right); return *this; }
+	RawVertices& operator+=(const RawVertices& right) { append(right); return *this; }
+	RawVertices& operator*=(const sf::Transform& t) { transform(t); return *this; }
+	RawVertices& operator=(RawVertices&& right) { 
+		if (primitive_type() == right.primitive_type()) {
+			_verts = std::move(right._verts);
+		}
+		else {
+			// else just copy,bleh
+			_verts.clear();
+			append(right);
+		}
+		return *this;
+	}
+	
 	void transform(const sf::Transform& transform) { for (auto& v : _verts) v.position = transform * v.position ; }
-	RawVertices& transform_copy(const sf::Transform& transform) const {
-		vector copy = _verts;
-		for (auto& v : copy) v.position = transform * v.position;
-		return RawVertices(copy);
+	RawVertices transform_copy(const sf::Transform& transform) const {
+		RawVertices copy(*this);
+		copy *= transform;
+		return copy;
 	}
 	void fill_color(const sf::Color& color) { for (auto& v : _verts) v.color = color; }
 	sf::FloatRect bounds() const {
@@ -292,20 +328,20 @@ public:
 		}
 		return sf::FloatRect(vmin, vmax - vmin);
 	}
-	constexpr sf::PrimitiveType primitive_type() const { return PTYPE; }
+	 sf::PrimitiveType primitive_type() const { return _ptype; }
 protected:
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const {
 		if (size() > 0) target.draw(data(), size(), primitive_type(), states);
 	}
 	vector _verts;
+	sf::PrimitiveType _ptype;
 };
-typedef typename RawVertices<sf::PrimitiveType::Triangles> RawTriangles;
-typedef typename RawVertices<sf::PrimitiveType::TrianglesStrip> RawTrianglesStrip;
+
 
 namespace global {
 	 std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color);
 	 void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles); 
-	 void InsertRectangle(RawTriangles& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	 void InsertRectangle(RawVertices& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
 	 void InsertRectangle(sf::VertexArray& verts, const sf::FloatRect& rect, sf::Color fill_color);// convert
 };
 
