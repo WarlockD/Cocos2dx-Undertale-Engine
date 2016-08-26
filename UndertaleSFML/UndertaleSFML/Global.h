@@ -16,7 +16,10 @@
 #include <set>  // Code fragment from kult engine     -    https://github.com/r-lyeh/kult
 #include "kult.hpp"
 #include <entityx/entityx.h>
+#include "Math.h"
 namespace ex = entityx;
+
+
 namespace global {
 	sf::RenderWindow& getWindow();
 	ex::EventManager& getEventManager();
@@ -61,15 +64,6 @@ namespace global {
 	inline size_t hash_vertex(const sf::Vertex& v) {
 		return hash_vector_to_12bit(v.position) << 20 | hash_vector_to_12bit(v.position) << 8 | hash_color_to_8bits(v.color);
 	}
-	// constexpr abs
-	// http://codereview.stackexchange.com/questions/60140/generic-absolute-value-function
-	namespace detail
-	{
-		// generic abs algorithm
-		template<typename T> constexpr auto abs(const T& value) -> T { return (T{} > value) ? -value : value; }
-	}
-
-	template<typename T> constexpr auto abs(const T& value) -> T { using std::abs; using detail::abs; return abs(value); }
 };
 
 // some standard defines
@@ -109,22 +103,22 @@ struct almost_equal_to {
 
 template<> struct almost_equal_to<float> {
 	static constexpr float maxdiff = 0.0001f;
-	constexpr bool operator()(const float & l, const float& r) const
+	bool operator()(const float & l, const float& r) const
 	{
-		return global::detail::abs(l - r) <= (((global::detail::abs(r) > global::detail::abs(l)) ? global::detail::abs(r) : global::detail::abs(l)) * maxdiff);// Find the largest 
+		return umath::compare(l, r, maxdiff);
 	}
 };
 
 
 template<> struct almost_equal_to<sf::Vector2f> {
-	constexpr bool operator()(const sf::Vector2f& l, const sf::Vector2f& r) const
+	 bool operator()(const sf::Vector2f& l, const sf::Vector2f& r) const
 	{
 		return almost_equal_to<float>()(l.x, r.x) && almost_equal_to<float>()(l.y, r.y);
 	}
 };
 
 template<> struct almost_equal_to<sf::Vertex> {
-	constexpr bool operator()(const sf::Vertex& l, const sf::Vertex& r) const
+	 bool operator()(const sf::Vertex& l, const sf::Vertex& r) const
 	{
 		return l.color.toInteger() == r.color.toInteger() && almost_equal_to<sf::Vector2f>()(l.texCoords, r.texCoords) && almost_equal_to<sf::Vector2f>()(l.position, r.position);
 	}
@@ -132,11 +126,11 @@ template<> struct almost_equal_to<sf::Vertex> {
 
 template<typename T>
 struct almost_zero {
-	constexpr bool operator()(const T &l) const { return almost_equal_to<T>()(l, static_cast<T>(0)); }
+	bool operator()(const T &l) const { return almost_equal_to<T>()(l, static_cast<T>(0)); }
 };
 template<>
 struct almost_zero<sf::Vector2f> {
-	constexpr bool operator()(const sf::Vector2f &l) const { return almost_zero<float>()(l.x) && almost_zero<float>()(l.y); }
+	bool operator()(const sf::Vector2f &l) const { return almost_zero<float>()(l.x) && almost_zero<float>()(l.y); }
 };
 
 class ChangedCass {

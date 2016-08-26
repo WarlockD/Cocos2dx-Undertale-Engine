@@ -159,6 +159,7 @@
     <ClCompile Include="Drawables.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="math.cpp" />
     <ClCompile Include="obj_face.cpp" />
     <ClCompile Include="obj_writer.cpp" />
     <ClCompile Include="UndertaleLabel.cpp" />
@@ -170,6 +171,7 @@
     <ClInclude Include="Components.h" />
     <ClInclude Include="Drawables.h" />
     <ClInclude Include="Global.h" />
+    <ClInclude Include="Math.h" />
     <ClInclude Include="obj_dialoger.h" />
     <ClInclude Include="obj_writer.h" />
     <ClInclude Include="UndertaleLabel.h" />

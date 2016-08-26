@@ -409,7 +409,7 @@ namespace cvt_triangles {
 		constexpr size_t operator()(const Vertex& v)  const { return v.hash; }
 	};
 	struct vertex_equals {
-		constexpr bool operator()(const Vertex& l, const Vertex& r)  const { return almost_equal_to<sf::Vertex>()(l.V, r.V); }
+		bool operator()(const Vertex& l, const Vertex& r)  const { return almost_equal_to<sf::Vertex>()(l.V, r.V); }
 	};
 	struct Book {
 		typedef std::unordered_set<Vertex, vertex_hasher, vertex_equals> vertex_container;

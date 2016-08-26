@@ -68,10 +68,10 @@ bool Animation::update(Renderable& renderable, float dt) {
 	return true; // we havn't gotten to the next frame yet so just assume true
 }
 /*as a fall back to line()*/
-void line_raw(double x1, double y1, double x2, double y2,
-	double w,
-	double Cr, double Cg, double Cb,
-	double, double, double, bool)
+void line_raw(float x1, float y1, float x2, float y2,
+	float w,
+	float Cr, float Cg, float Cb,
+	float, float, float, bool)
 {
 	glLineWidth((float)w);
 	float line_vertex[] =
