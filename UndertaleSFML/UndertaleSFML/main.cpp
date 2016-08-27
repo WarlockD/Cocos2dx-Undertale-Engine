@@ -245,7 +245,7 @@ void gameLoop() {
 	}
 }
 int main(int argc, const char* argv[]) {
-	testVec();
+	umath::test2();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
 	logging::init_cerr();
 	logging::init_cout();

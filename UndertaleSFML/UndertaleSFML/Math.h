@@ -229,6 +229,8 @@ namespace umath {
 		typedef typename vec_base<T, DIM> vec_base_type;
 		static constexpr size_t dimensions = DIM;
 		T ptr[DIM];
+		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
+		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
 		vec_base() { std::memset(ptr, 0.0f, sizeof(float)*DIM); }
 	};
 	template<typename T> struct vec_base<T,2> {
@@ -236,84 +238,136 @@ namespace umath {
 		typedef typename vec_base<T, 2> vec_base_type;
 		static constexpr size_t dimensions = 2;
 		union { struct { T x; T y; }; T ptr[2]; };
-		vec_base() : x(0.0f), y(0.0f) {}
+		vec_base() : x((T)0), y((T)0) {}
 		vec_base(T x, T y) : x(x), y(y) {}
-		vec_base& set(T X, T Y) { x = X; y = Y; return *this; }
-		vec_base& set(const vec_base& r) { x = r.x; y = r.y; return *this; }
-		inline bool compare(const vec_base &l) const { return x == l.x && y == l.y; }
-		template<class C>
-		typename std::enable_if<std::is_floating_point<T>::value,bool>::type
-		inline compare(const vec2f &l, const T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon); }
-		inline bool operator==(const vec_base &r) const { return compare(r); }
-		inline bool operator!=(const vec_base &r) const { return !compare(r); }
-		inline vec_base operator-() const { return vec_base(-x, -y); }
-		inline vec_base& operator+=(const vec_base &r) { x += r.x; y += r.y; return *this; }
-		inline vec_base& operator-=(const vec_base &r) { x -= r.x; y -= r.y; return *this; }
-		inline vec_base& operator*=(const vec_base &r) { x *= r.x; y *= r.y; return *this; }
-		inline vec_base& operator*=(const T r) { x *= r; y *= r; return *this; }
+		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
+		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
+		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
+		inline compare(const D &l) const { return x == l.x && y == l.y; }
+		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value,bool>::type
+		inline compare(const D &l, T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon); }
+		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, D&>::type
+			inline set(T X, T Y) const { x = X; y = Y;  return *((D*)this); }
+		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
+			inline operator==(const D &r) const { return compare(r); }
+		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
+			inline operator!=(const D &r) const { return !compare(r); }
+		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, D>::type
+			inline operator-() const { return D(-x, -y); }
+		template<typename D, typename = typename std::enable_if<std::is_convertible<D,T>::value>::type>
+			inline void set(D X, D Y) { x = static_cast<T>(X); y = static_cast<T>(Y);  }
 	};
-	template<typename T> inline vec_base<T,2> operator+(const vec_base<T, 2>&l, const vec_base<T, 2>&r) { return vec_base<T, 2>(l.x + r.x, l.y + r.y); }
-	template<typename T> inline vec_base<T,2> operator-(const vec_base<T, 2>&l, const vec_base<T, 2>&r) { return vec_base<T, 2>(l.x - r.x, l.y - r.y); }
-	template<typename T> inline vec_base<T,2> operator*(const vec_base<T, 2>&l, const vec_base<T, 2>&r) { return vec_base<T, 2>(l.x * r.x, l.y * r.y); }
-	template<typename T> inline vec_base<T,2> operator*(const vec_base<T, 2>&l, const T r) { return vec_base<T, 2>(l.x * r, l.y * r); }
-	template<typename T> inline vec_base<T,2> operator*(const T r, const vec_base<T, 2>&l) { return vec_base<T, 2>(l.x * r, l.y * r); }
-	template<typename T> inline vec_base<T,2> operator/(const vec_base<T, 2>&l, const vec_base<T, 2>&r) { return vec_base<T, 2>(l.x / r.x, l.y / r.y); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
+		inline operator*=(D &l, const T &r) { l.x *= r; l.y *= r; return l; }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
+		inline operator/=(D &l, const T &r) { l.x /= r; l.y /= r; return l; }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
+		inline operator+=(D &l, const D &r) { x += r.x; y += r.y; return l; }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
+		inline operator-=(D &l, const D &r) { x -= r.x; y -= r.y; return l; }
+
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator+(const D &l, const D &r) { return D(l.x + r.x, l.y + r.y); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator-(const D &l, const D &r) { return D(l.x - r.x, l.y - r.y); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator*(const D &l, const D &r) { return D(l.x * r.x, l.y * r.y); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator*(const D &l, const T &r) { return D(l.x * r, l.y * r); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator*(const T &l, const D &r) { return D(l * r.x, l * r.x); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator/(const D &l, const T &r) { return D(l.x / r, l.y / r); }
+	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
+		inline operator/(const T &l, const D &r) { return D(l / r.x, l / r.x); }
+	
 
 	template<typename T> struct vec_base<T, 3> {
 		typedef typename T type;
 		typedef typename vec_base<T, 3> vec_base_type;
 		static constexpr size_t dimensions = 3;
 		union { struct { T x; T y; T z; }; T ptr[3]; };
-		vec_base() : x(0.0f), y(0.0f), z(0.0f) {}
+		vec_base() : x((T)0), y((T)0), z((T)0) {}
 		vec_base(T x, T y, T z) : x(x), y(y), z(z) {}
-		vec_base& set(T X, T Y, T Z) { x = X; y = Y; z = Z; return *this; }
-		vec_base& set(const vec_base& r) { x = r.x; y = r.y; z = r.z;  return *this; }
-		inline bool compare(const vec_base &l) const { return x == l.x && y == l.y && z == l.z; }
-		template<class C>
-		typename std::enable_if<std::is_floating_point<T>::value, bool>::type
-			inline compare(const vec_base &l, const T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon); }
-		inline bool operator==(const vec_base &r) const { return compare(r); }
-		inline bool operator!=(const vec_base &r) const { return !compare(r); }
-		inline vec_base operator-() const { return vec_base(-x, -y,-z); }
-		inline vec_base& operator+=(const vec_base &r) { x += r.x; y += r.y; z += r.z; return *this; }
-		inline vec_base& operator-=(const vec_base &r) { x -= r.x; y -= r.y; z -= r.z; return *this; }
-		inline vec_base& operator*=(const vec_base &r) { x *= r.x; y *= r.y; z *= r.z; return *this; }
-		inline vec_base& operator*=(const T r) { x *= r; y *= r; z *= r; return *this; }
+		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
+		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
+		template<typename D>
+		typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
+			inline compare(const D &l) const { return x == l.x && y == l.y && z == l.z; }
+		template<typename D>
+		typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value, bool>::type
+			inline compare(const D &l, T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon);}
+	
+		
 	};
-	template<typename T> inline vec_base<T, 3> operator+(const vec_base<T, 3>&l, const vec_base<T, 3>&r) { return vec_base<T, 2>(l.x + r.x, l.y + r.y, l.z + r.z); }
-	template<typename T> inline vec_base<T, 3> operator-(const vec_base<T, 3>&l, const vec_base<T, 3>&r) { return vec_base<T, 2>(l.x - r.x, l.y - r.y, l.z - r.z); }
-	template<typename T> inline vec_base<T, 3> operator*(const vec_base<T, 3>&l, const vec_base<T, 3>&r) { return vec_base<T, 2>(l.x * r.x, l.y * r.y, l.z * r.z); }
-	template<typename T> inline vec_base<T, 3> operator*(const vec_base<T, 3>&l, const T r) { return vec_base<T, 3>(l.x * r, l.y * r, l.z * r); }
-	template<typename T> inline vec_base<T, 3> operator*(const T r, const vec_base<T, 3>&l) { return vec_base<T, 3>(l.x * r, l.y * r, l.z * r); }
-	template<typename T> inline vec_base<T, 3> operator/(const vec_base<T, 3>&l, const vec_base<T, 3>&r) { return vec_base<T, 2>(l.x / r.x, l.y / r.y, l.z / r.z); }
 
 	template<typename T> struct vec_base<T, 4> {
 		typedef typename T type;
 		typedef typename vec_base<T, 4> vec_base_type;
 		static constexpr size_t dimensions = 4;
 		union { struct { T x; T y; T z; T w; }; T ptr[4]; };
-		vec_base() : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
-		vec_base(T x, T y, T z, T w) : x(x), y(y), z(z), z(z) {}
-		vec_base& set(T X, T Y, T Z, T W) { x = X; y = Y; z = Z; w = W; return *this; }
-		vec_base& set(const vec_base& r) { x = r.x; y = r.y; z = r.z;  w = r.w; return *this; }
-		inline bool compare(const vec_base &l) const { return x == l.x && y == l.y && z == l.z&& w == l.w; }
-		template<class C>
-		typename std::enable_if<std::is_floating_point<T>::value, bool>::type
-			inline compare(const vec_base &l, const T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon) && umath::compare(w, l.w, epsilon); }
-		inline bool operator==(const vec_base &r) const { return compare(r); }
-		inline bool operator!=(const vec_base &r) const { return !compare(r); }
-		inline vec_base operator-() const { return vec_base(-x, -y, -z); }
-		inline vec_base& operator+=(const vec_base &r) { x += r.x; y += r.y; z += r.z; w += r.w; return *this; }
-		inline vec_base& operator-=(const vec_base &r) { x -= r.x; y -= r.y; z -= r.z; w -= r.w; return *this; }
-		inline vec_base& operator*=(const vec_base &r) { x *= r.x; y *= r.y; z *= r.z; w *= r.w; return *this; }
-		inline vec_base& operator*=(const T r) { x *= r; y *= r; z *= r; w *= r; return *this; }
+		
+		vec_base() : x((T)0), y((T)0), z((T)0), w((T)0) {}
+		vec_base(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
+		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
+		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
+		template<typename D>
+		typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
+		inline compare(const D &l) const { return x == l.x && y == l.y&& z == l.z&& w == l.w; }
+		template<typename D>
+		typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value, bool>::type
+		inline  compare(const D &l, T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon) && umath::compare(w, l.w, epsilon); }
+
+
 	};
-	template<typename T> inline vec_base<T, 4> operator+(const vec_base<T, 4>&l, const vec_base<T, 4>&r) { return vec_base<T, 2>(l.x + r.x, l.y + r.y, l.z + r.z, l.w + r.w); }
-	template<typename T> inline vec_base<T, 4> operator-(const vec_base<T, 4>&l, const vec_base<T, 4>&r) { return vec_base<T, 2>(l.x - r.x, l.y - r.y, l.z - r.z, l.w - r.w); }
-	template<typename T> inline vec_base<T, 4> operator*(const vec_base<T, 4>&l, const vec_base<T, 4>&r) { return vec_base<T, 2>(l.x * r.x, l.y * r.y, l.z * r.z, l.w * r.w); }
-	template<typename T> inline vec_base<T, 4> operator*(const vec_base<T, 4>&l, const T r) { return vec_base<T, 3>(l.x * r, l.y * r, l.z * r, l.w * r); }
-	template<typename T> inline vec_base<T, 4> operator*(const T r, const vec_base<T, 4>&l) { return vec_base<T, 3>(l.x * r, l.y * r, l.z * r, l.w * r); }
-	template<typename T> inline vec_base<T, 4> operator/(const vec_base<T, 4>&l, const vec_base<T, 4>&r) { return vec_base<T, 2>(l.x / r.x, l.y / r.y, l.z / r.z, l.w / r.w); }
+
+	template<typename T,typename D> struct color4_base {
+		typedef typename T type;
+		static constexpr T max = std::is_floating_point<T>::value ? ((T)1) : ((T)std::numeric_limits<T>::max());
+		static constexpr T min = std::is_floating_point<T>::value ? ((T)0) : ((T)std::numeric_limits<T>::min());
+		typedef typename color4_base<T,D> color_base_type;
+		static constexpr size_t dimensions = 4;
+		union { struct { T r; T g; T b; T a; }; T ptr[4]; };
+		color4_base() : r((T)0), g((T)0), b((T)0), a((T)0) {}
+		explicit color4_base(T r, T g, T b, T a=max) : r(r), g(g), b(b), a(a) {}
+		explicit color4_base(const T* arr) : r(arr[0]), g(arr[1]), b(arr[2]), a(arr[3]) {}
+		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
+		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
+		static inline D blend(const D& l, const D& r) {
+			return blend((l.r + r.r) / color4_base::max, (l.g + r.g) / color4_base::max, (l.b + r.b) / color4_base::max);
+		}
+		static inline D blend(const color4_base& l, const color4_base& r, T alpha) {
+			return blend((l.r * alpha + r.r*(max - alpha)) / max, (l.g * alpha + r.g*(max - alpha)) / max, (l.b * alpha + r.b*(max - alpha)) / max);
+		}
+		inline D& blend(const D& rv) {
+			r = (r + rv.r) / max;
+			g = (g + rv.g) / max;
+			b = (b + rv.b) / max;
+			return *this;
+		}
+		inline D& blend(const D& rv, T alpha) {
+			r = (r * alpha + rv.r*(max - alpha)) / max;
+			g = (g * alpha + rv.g*(max - alpha)) / max;
+			b = (b * alpha + rv.b*(max - alpha)) / max;
+			return *this;
+		}
+	};
+
+	struct color4b : public color4_base<uint8_t, color4b> {
+		color4b() : color4_base() {}
+		explicit color4b(uint8_t r, uint8_t g, uint8_t b, uint8_t a) : color4_base(r,g,b,a) {}
+		explicit color4b(uint32_t v) : color4_base(reinterpret_cast<const uint8_t*>(&v)) {}
+		uint32_t as_int() const { return *reinterpret_cast<const uint32_t*>(ptr); }
+		color4b& operator*=(uint8_t o) { r *= o; g *= o; b *= b; return *this; }
+	};
+	struct color4f : public color4_base<float, color4f> {
+		color4f() : color4_base() {}
+		explicit color4f(float r, float g, float b, float a) : color4_base(r, g, b, a) {}
+		explicit color4f(const float* ptr) : color4_base(ptr) {}
+		uint32_t as_int() const { return *reinterpret_cast<const uint32_t*>(ptr); }
+		color4f& operator*=(float o) { r *= o; g *= o; b *= b; return *this; }
+	};
+
 	struct vec2i : public vec_base<int, 2> {
 		static const vec2i zero;
 		static const vec2i one;
@@ -322,29 +376,17 @@ namespace umath {
 		static const vec2i max;
 		static const vec2i min;
 		//constructor
-		vec2i() : vec_base<int, 2>() {}
-		vec2i(float x, float y) : vec_base<int, 2>(x, y) {}
+		vec2i() : vec_base() {}
+		vec2i(int x, int y) : vec_base(x, y) {}
 
-		vec2i& set(int X, int Y) { x = X; y = Y; return *this; }
-		vec2i& set(const vec2i& r) { x = r.x; y = r.y; return *this; }
-		inline bool compare(const vec2i &l) const { return x == l.x && y == l.y; }
-		inline bool operator==(const vec2i &r) const { return compare(r); }
-		inline bool operator!=(const vec2i &r) const { return !compare(r); }
-		inline vec2i operator-() const { return vec2i(-x, -y); }
-		inline vec2i& operator+=(const vec2i &r) { x += r.x; y += r.y; return *this; }
-		inline vec2i& operator-=(const vec2i &r) { x -= r.x; y -= r.y; return *this; }
-		inline vec2i& operator*=(const vec2i &r) { x *= r.x; y *= r.y; return *this; }
-		inline vec2i& operator*=(int r) { x *= r; y *= r; return *this; }
-		inline vec2i& operator/=(int r) { x /= r; y /= r; return *this; }
-		inline vec2i& operator/=(const vec2i &r) { x /= r.x; y /= r.y; return *this; }
+	//	vec2i& set(int X, int Y) { x = X; y = Y; return *this; }
+	//	vec2i& set(const vec2i& r) { x = r.x; y = r.y; return *this; }
+	//	inline bool operator==(const vec2i &r) const { return compare(r); }
+	//	inline bool operator!=(const vec2i &r) const { return !compare(r); }
+		
+
 	};
-	/*
 
-	inline vec2i operator+(const vec2i&l, const vec2i&r) { return vec2i(l.x + r.x, l.y + r.y); }
-	inline vec2i operator-(const vec2i&l, const vec2i&r) { return vec2i(l.x - r.x, l.y - r.y); }
-	inline vec2i operator*(const vec2i&l, const vec2i&r) { return vec2i(l.x * r.x, l.y * r.y); }
-	inline vec2i operator/(const vec2i&l, const vec2i&r) { return vec2i(l.x / r.x, l.y / r.y); }
-	*/
 
 	struct vec2f :public vec_base<float,2> {
 		// some simple constants
@@ -356,21 +398,22 @@ namespace umath {
 		static const vec2f min;
 		static const vec2f infinity;
 		//constructor
-		vec2f() : vec_base<float, 2>() {}
-		vec2f(float x, float y) : vec_base<float, 2>(x,y) {}
+		vec2f() : vec_base() {}
+		vec2f(float x, float y) : vec_base(x,y) {}
 
-		vec2f& set(float X, float Y) { x = X; y = Y; return *this; }
-		vec2f& set(const vec2f& r) { x = r.x; y = r.y; return *this; }
-		inline bool compare(const vec2f &l) const { return x == l.x && y == l.y;  }
-		inline bool compare(const vec2f &l, const float epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon); }
-		inline bool operator==(const vec2f &r) const { return compare(r); }
-		inline bool operator!=(const vec2f &r) const { return !compare(r); }
-		inline vec2f operator-() const { return vec2f(-x, -y); }
+
+	//	vec2f& set(float X, float Y) { x = X; y = Y; return *this; }
+	//	vec2f& set(const vec2f& r) { x = r.x; y = r.y; return *this; }
+	//	inline bool operator==(const vec2f &r) const { return compare(r); }
+		//inline bool operator!=(const vec2f &r) const { return !compare(r); }
+		//inline vec2f operator-() const { return vec2f(-x, -y); }
+		/*
 		inline vec2f& operator+=(const vec2f &r) { x += r.x; y += r.y; return *this; }
 		inline vec2f& operator-=(const vec2f &r) { x -= r.x; y -= r.y; return *this; }
 		inline vec2f& operator*=(const vec2f &r) { x *= r.x; y *= r.y; return *this; }
 		inline vec2f& operator*=(const float r) { x *= r; y *= r; return *this; }
 		inline vec2f& operator/=(const float r) { float ir = 1.0f / r;  x /= ir; y /= ir; return *this; }
+		*/
 		inline float length_sqr() const { return (x * x + y * y); }
 		inline float length() const { return umath::sqrt(length_sqr()); }
 		inline vec2f& length(float new_length) { // sets the lengh of the vector
@@ -446,13 +489,15 @@ namespace umath {
 		}
 #endif
 	};
+	/*
+
 	inline vec2f operator+(const vec2f&l, const vec2f&r) { return vec2f(l.x + r.x, l.y + r.y); }
 	inline vec2f operator-(const vec2f&l, const vec2f&r) { return vec2f(l.x - r.x, l.y - r.y); }
 	inline float operator*(const vec2f&l, const vec2f&r) { return l.dot(r); }
 	inline vec2f operator*(const vec2f&l, const float r) { return vec2f(l.x*r, l.y*r); }
 	inline vec2f operator*(const float r, const vec2f&l) { return vec2f(l.x*r, l.y*r); }
 	inline vec2f operator/(const vec2f&l, const float r) { return l * (1.0f / r); }
-
+	*/
 	struct vec3f :public vec_base<float, 3> {
 		// some simple constants
 		static const vec3f zero;
@@ -468,8 +513,6 @@ namespace umath {
 
 		vec3f& set(float X, float Y, float Z) { x = X; y = Y; z = Z; return *this; }
 		vec3f& set(const vec3f& r) { x = r.x; y = r.y; z = r.z; return *this; }
-		inline bool compare(const vec3f &l) const { return x == l.x && y == l.y&& z == l.z; }
-		inline bool compare(const vec3f &l, const float epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon); }
 		inline bool operator==(const vec3f &r) const { return compare(r); }
 		inline bool operator!=(const vec3f &r) const { return !compare(r); }
 		inline vec3f operator-() const { return vec3f(-x, -y, -z); }
@@ -523,8 +566,6 @@ namespace umath {
 		static const quat Zero;
 		quat() : vec_base<float, 4>() {}
 		quat(float x, float y, float z, float w) : vec_base<float, 4>(x,y,z,w) {}
-		inline bool compare(const quat &l) const { return x == l.x && y == l.y&& z == l.z&& w == l.w; }
-		inline bool compare(const quat &l, const float epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon) && umath::compare(w, l.w, epsilon); }
 		quat operator-() const { return quat(-x, -y, -z, -w); }
 		quat& operator+=(const quat &a) { x += a.x;  y += a.y; z += a.z; w += a.w; return *this; }
 		quat& operator-=(const quat &a) { x -= a.x;  y -= a.y; z -= a.z; w -= a.w; return *this; }
@@ -536,10 +577,6 @@ namespace umath {
 			z = a.w*b.z + a.z*b.w + a.x*b.y - a.y*b.x;
 			w = a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z;
 			return *this;
-		}
-		inline bool compare(const quat &l) const { return x == l.x && y == l.y && z == l.z && w == l.w; }
-		inline bool compare(const quat &l, float epsilon) const {
-			return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon) && umath::compare(w, l.w, epsilon);
 		}
 		inline bool operator==(const quat &l) const { return compare(l); }
 		inline bool operator!=(const quat &l) const { return !compare(l); }
@@ -579,6 +616,23 @@ namespace umath {
 			(xy2 - zw2)*b.x + (a.y*a.y + a.w*a.w - a.x*a.x - a.z*a.z)*b.y + (yz2 + xw2)*b.z,
 			(xz2 + yw2)*b.x + (yz2 - xw2)*b.y + (wwyy - xxzz)*b.z
 		);
+	}
+	typedef std::tuple<vec2f, vec2f, vec2i> vertex;
+	inline void test2() {
+		color4b test2;
+		color4f test4;
+		vec2f test5;
+		vec2f test6;
+		vec2i test7;
+		test7.compare(test7);
+		test6.compare(test6,3.0f);
+		test6 *= 3.3f;
+		test6.set(3.0f, 2.0f);
+
+		auto m = color4f::max;
+		auto m22 = color4b::max;
+		//test2.blend()
+		printf("max check");
 	}
 
 };
