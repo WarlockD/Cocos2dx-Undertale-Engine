@@ -128,11 +128,6 @@ namespace umath {
 	//template<typename T> T clamp(T v, T min, T max) { return v < min ? min : v > max ? max : v; }
 
 	
-	// constexpr sin
-	//http://forum.devmaster.net/t/fast-and-accurate-sine-cosine/9648
-	// fast and accurate sine/cosine
-	// used to get constexpr from it
-	// this is like 12% off
 	constexpr float sin_const(float x) {
 #define _B (4.0f / PI)
 #define _C (-4.0f / (PI*PI))
@@ -186,30 +181,53 @@ namespace umath {
 	inline float BYTE2ANGLE(uint8_t x) { return (x) * (360.0f / 256.0f); }
 	// C++14 stuff
 	template<class T> inline const T& max(const T& a, const T& b) { return (a < b) ? b : a; }
-	template<class T, class Compare> inline const T& max(const T& a, const T& b, Compare comp) { return (comp(a, b)) ? b : a; }
+//	template<class T, class Compare> inline const T& max(const T& a, const T& b, Compare comp) { return (comp(a, b)) ? b : a; }
 	template<class T> inline const T& min(const T& a, const T& b) { return (b < a) ? b : a; }
-	template<class T, class Compare> const T& min(const T& a, const T& b, Compare comp) { return (comp(b, a)) ? b : a; }
-	template<class T> inline std::pair<const T&, const T&> minmax(const T& a, const T& b) { return (b < a) ? std::pair<const T&, const T&>(b, a) : std::pair<const T&, const T&>(a, b); }
-	template<class T, class Compare> inline std::pair<const T&, const T&> minmax(const T& a, const T& b, Compare comp){return comp(b, a) ? std::pair<const T&, const T&>(b, a): std::pair<const T&, const T&>(a, b);}
+//	template<class T, class Compare> const T& min(const T& a, const T& b, Compare comp) { return (comp(b, a)) ? b : a; }
+//	template<class T> inline std::pair<const T&, const T&> minmax(const T& a, const T& b) { return (b < a) ? std::pair<const T&, const T&>(b, a) : std::pair<const T&, const T&>(a, b); }
+//	template<class T, class Compare> inline std::pair<const T&, const T&> minmax(const T& a, const T& b, Compare comp){return comp(b, a) ? std::pair<const T&, const T&>(b, a): std::pair<const T&, const T&>(a, b);}
 
-	template<typename T> bool compare(T a, T b) { return std::equal_to<T>(a, b); }
-	template<typename T> 
-	typename std::enable_if<std::is_floating_point<T>::value,bool>::type 
-		compare(T a, T b, T epslon) { 
-		// Calculate the difference.
-		T diff = umath::abs(a - b); 
-		a = umath::abs(a); 
-		b = umath::abs(b);
-		return diff <= (umath::max(a, b) * epslon);
+	/* Adapted from http://floating-point-gui.de/errors/comparison/ */
+	// I saw the same page but the magnum engine implmented this much better
+	template<typename T,typename E>
+	inline bool compare(T a, T b, const E epslon) {
+		/* Shortcut for binary equality (also infinites) */
+		if (a == b) return true;
+
+		const T absA = umath::abs(a);
+		const T absB = umath::abs(b);
+		const T difference = umath::abs(a - b);
+		
+			/* One of the numbers is zero or both are extremely close to it, relative
+			error is meaningless */
+			if (a == T{} || b == T{} || difference < epslon)
+				return difference < epslon;
+
+		/* Relative error */
+		return difference / (absA + absB) < epslon;
 	}
+	
 	template<typename T>
 	typename std::enable_if<std::is_floating_point<T>::value, bool>::type
-		compare(const T* a, const T* b, size_t count, T epslon) {
+		inline compare(const T* a, const T* b, size_t count, T epslon) {
 		while (count-- > 0) {
 			if (!compare(*a++, *b++, epslon)) return false;
 		}
 		return true;
 	}
+
+	template<typename T>
+	typename std::enable_if<!std::is_floating_point<T>::value, bool>::type
+		inline compare(T a, T b) { return std::equal_to<T>(a, b); }
+
+	template<typename T>
+	typename std::enable_if<std::is_floating_point<T>::value, bool>::type
+		inline compare(T a, T b) {
+		return compare(a, b, std::numeric_limits<T>::epsilon());
+	}
+
+
+	
 	// tired of the limitations, so my personal vec class
 	// the vec class just adds some traits
 
@@ -242,6 +260,7 @@ namespace umath {
 		vec_base(T x, T y) : x(x), y(y) {}
 		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
 		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
+
 		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
 		inline compare(const D &l) const { return x == l.x && y == l.y; }
 		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value,bool>::type
@@ -320,6 +339,36 @@ namespace umath {
 
 
 	};
+	/*
+
+	template<typename T> struct rect_base {
+		typedef typename T type;
+		typedef typename rect_base<T> rect_base_type;
+		static constexpr size_t dimensions = 4;
+		union { struct { T top; T left; T right; T bottom; }; T ptr[4]; };
+		T width() const { return right - left; }
+		T height() const { return bottom - top; }
+		rect_base() : top((T)0), left((T)0), bottom((T)0), right((T)0) {}
+		explicit rect_base(T top, T left, T right, T bottom) : top(top), left(left), bottom(bottom), right(right) {}
+		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, D&>::type
+			inline set(T Top, T Left, , T Right, T Bottom) const { top = Top; left = Left; right = Right; bottom = Bottom;  return *((D*)this); }
+		template<typename D>
+		typename std::enable_if<std::is_base_of<rect_base_type, D>::value, bool>::type
+			inline compare(const D &l) const { return top == l.top && left == l.left && right == l.right&& bottom == l.bottom; }
+		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, bool>::type
+			inline operator==(const D &r) const { return compare(r); }
+		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, bool>::type
+			inline operator!=(const D &r) const { return !compare(r); }
+		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, D>::type
+			inline operator-() const { return D(-top , -left , -right , -bottom); }
+	};
+	template<typename T> inline rect_base<T>& operator*=(rect_base<T> &l, const T &r) { l.top *= r; l.bottom *= r; l.right *= r; l.left *= r; return l; }
+	template<typename T> inline rect_base<T>& operator/=(rect_base<T> &l, const T &r) { l.top /= r; l.bottom /= r; l.right /= r; l.left /= r; return l; }
+	template<typename T> inline rect_base<T>& operator+=(rect_base<T> &l, const rect_base<T> &r) { l.top += r.top; l.bottom += r.bottom; l.right += r.right; l.left += r.left; return l; }
+	template<typename T> inline rect_base<T>& operator-=(rect_base<T> &l, const rect_base<T> &r) { l.top -= r.top; l.bottom -= r.bottom; l.right -= r.right; l.left -= r.left; return l; }
+	template<typename T> inline rect_base<T> operator+(const rect_base<T> &l, const rect_base<T> &r) { return rect_base<T>(l.top + r.top, l.bottom + r.bottom, l.right + r.right, l.left + r.left); }
+	template<typename T> inline rect_base<T> operator-(const rect_base<T> &l, const rect_base<T> &r) { return rect_base<T>(l.top - r.top, l.bottom - r.bottom, l.right - r.right, l.left - r.left); }
+	*/
 
 	template<typename T,typename D> struct color4_base {
 		typedef typename T type;

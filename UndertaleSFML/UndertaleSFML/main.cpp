@@ -199,7 +199,8 @@ void gameLoop() {
 	sprite.assign<Body>();
 	sprite.component<Body>()->setPosition(20, 50);
 	sprite.component<Body>()->setScale(2.0, 2.0);
-	//sprite.assign<RenderableRef>(raw_sprite);
+	sprite.assign<RenderableCache>(raw_sprite);
+	sprite.assign<Velocity>(0.0f,10.0f);
 //	sprite.assign<LightRenderable>(raw_sprite);
 	//sprite.assign<Animation>(0.25f);
 
@@ -208,19 +209,8 @@ void gameLoop() {
 	sprite2.component<Body>()->setPosition(20, 80);
 	sprite2.component<Body>()->setPosition(20, 60);
 	sprite2.component<Body>()->setScale(2.0, 2.0);
-	//sprite2.assign<RenderableRef>(raw_sprite2);
-//	sprite2.assign<LightRenderable>(raw_sprite);
-	//sprite2.component<Animation>() = Animation(0.25f;
 
-	// don't want to invalidate the sprite entry
-	//SpriteEnity sprite(&global::getEntities(), sprite_id.id());
-	//sprite.setSpriteIndex(sprite_index);
-	///sprite._sprite_index = 0;
-	//sprite._body = sprite.assign<Body>().get();
-	//return sprite;
-
-	s_app->init(*s_app.get());
-	//teste->setPosition(20, 20);
+	Player& player = systems.system<PlayerOverWorldSystem>()->getPlayer();
 	while (window.isOpen())
 	{
 		// Handle events
@@ -234,27 +224,29 @@ void gameLoop() {
 				if (event.key.code == sf::Keyboard::Escape) {
 					return;
 				}
+				player.receive(event);
 				break;
 			}
-			events.emit<SystemEvent>(event);
 		}
-		window.clear();
+	//	window.clear();
 		sf::Time elapsed = clock.restart();
-		systems.update_all(elapsed.asSeconds());
-		window.display();
+		s_app->update(elapsed.asSeconds());
+	//	window.display();
 	}
 }
 int main(int argc, const char* argv[]) {
 	umath::test2();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
-	logging::init_cerr();
-	logging::init_cout();
+	console::init();
+	//logging::init_cerr();
+	//logging::init_cout();
 	const int gameWidth = 800;
 	const int gameHeight = 600;
 
 	// Create the window of the application
 	s_window.reset(new sf::RenderWindow(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close));
 	s_app.reset(new Application(*s_window));
+	s_app->init(*s_app.get());
 	gameLoop();
 	// we got to run this to delete all the loaded textures we have or visual studio blows a fit
 	s_window->close();

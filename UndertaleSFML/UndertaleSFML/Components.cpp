@@ -22,7 +22,7 @@ bool Player::load_resources(ex::EntityX& app) {
 	_sprites[3].sprite_index(1046);
 	_facing = PlayerFacing::DOWN;
 	// assign THEN create the enity
-
+	_ismoving = false;
 	
 	_enity = app.entities.create();
 	_enity.assign<Body>();
@@ -30,29 +30,47 @@ bool Player::load_resources(ex::EntityX& app) {
 	_enity.assign<RenderableCache>(*this);
 	_enity.assign<Velocity>();
 	
-	_enity.component<Body>()->setPosition(180, 180);
+	_enity.component<Body>()->setPosition(50, 50);
 
-	app.events.subscribe<SystemEvent>(*this);
+	//app.events.subscribe<SystemEvent>(*this);
 	return true;
 }
 Player::~Player() {
 	if (_enity.valid()) {
-		global::getEventManager().unsubscribe<SystemEvent>(*this);
 		_enity.destroy();
 	}
 }
-void Player::receive(const SystemEvent &sevent) {
-	auto& event = sevent.event;
-	if (event.type == sf::Event::EventType::KeyPressed) {
+void Player::receive(const sf::Event &event) {
+	if (!_ismoving &&  event.type == sf::Event::EventType::KeyPressed) {
 		switch (event.key.code) {
 		case sf::Keyboard::Key::A:
 			_enity.component<Velocity>()->velocity.x = -50.0f;
+			_enity.assign<Animation>(0.25f);
 			_facing = PlayerFacing::LEFT;
+			_ismoving = true;
 			changed(true);
 			break;
 		case sf::Keyboard::Key::D:
 			_enity.component<Velocity>()->velocity.x = 50.0f;
+			_enity.assign<Animation>(0.25f);
 			_facing = PlayerFacing::RIGHT;
+			_ismoving = true;
+			changed(true);
+			break;
+		}
+	}
+	else if (_ismoving &&  event.type == sf::Event::EventType::KeyReleased) {
+		switch (event.key.code) {
+		case sf::Keyboard::Key::A:
+			_enity.component<Velocity>()->velocity.x = 0.0f;
+			//_facing = PlayerFacing::LEFT;
+			_ismoving = false;
+			changed(true);
+			break;
+		case sf::Keyboard::Key::D:
+			_enity.component<Velocity>()->velocity.x = 0.0f;
+			//_facing = PlayerFacing::RIGHT;
+			_ismoving = false;
 			changed(true);
 			break;
 		}
@@ -167,38 +185,7 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 	//	if (draw_all_boxes) {
 	//		draw_box(temp_verts, transform.transformRect(renderable.bounds()));
 	//	}
-		//draw_count++;
-		//lrenderable.update_cache(body);
-		//target.draw(lrenderable);
 	});
-
-	sf::RenderStates states = sf::RenderStates::Default;
-	
-	
-	//target.pushGLStates();
-	for (auto& sv : sortedVerts) {
-		for (auto& b : sv.second) {
-			draw_count++;
-			states.texture = b.first;
-			target.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
-		}
-	}
-
-	target.draw(test);
-
-
-	last_update += dt;
-	frame_count++;
-	if (last_update >= 0.5) {
-		std::ostringstream out;
-		const double fps = frame_count / last_update;
-		out << es.size() << " entities (" << static_cast<int>(fps) << " fps)" << std::endl;
-		out << "draws " << draw_count;
-		text.setString(out.str());
-		last_update = 0.0;
-		frame_count = 0.0;
-	}
-	target.draw(text);
 }
 
 void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
@@ -209,23 +196,47 @@ void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex
 	});
 }
 
+std::unordered_map<size_t, size_t> debug_handles;
+static size_t lineindex = 0;
+size_t findDebugLine(size_t value) {
+	auto it = debug_handles.find(value);
+	if (it == debug_handles.end()) {
+		it = debug_handles.emplace(value, lineindex).first;
+		it->second = lineindex++;
+	}
+	return it->second;
+}
 void VelocitySystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
+	console::output_context context; // save the terminal information
 	es.each<Body, Velocity>([this, dt](ex::Entity entity, Body& body, Velocity &velocity) {
-		if (!almost_zero<sf::Vector2f>()(velocity.velocity)) {
-			sf::Vector2f pos = body.getPosition();
-			pos += velocity.velocity * dt;
-			body.setPosition(pos);
-		}
-		
+		const sf::Vector2f& v = velocity.velocity;
+		if (umath::compare(v.x, 0.0f) && umath::compare(v.y, 0.0f)) return;
+		sf::Vector2f pos = body.getPosition();
+		pos += velocity.velocity * dt;
+		body.setPosition(pos); 
+		auto id = (size_t)entity.id().id();
+	//	std::cout << con::gotoy(findDebugLine(id)) << "\rID " << id << " Velocity " << (velocity.velocity * dt) << "Current Position " << pos << std::endl;
 	});
+	//console::redraw();
 }
 
-Application::Application(sf::RenderTarget &target) {
+Application::Application(sf::RenderWindow &target) : _window(target), draw_count(0), frame_count(0) {
 	systems.add<PlayerOverWorldSystem>(*this,target);
 	systems.add<VelocitySystem>(target);
 	systems.add<AnimationSystem>(target);
 	systems.add<RenderSystem>(target);
+	render_system = systems.system<RenderSystem>().get();
 	systems.configure();
+
+	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
+		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
+		exit(1);
+	}
+	_text.setFont(_font);
+	_text.setPosition(sf::Vector2f(2, 2));
+	_text.setCharacterSize(18);
+	_text.setColor(sf::Color::White);
+
 }
 void Application::init(ex::EntityX& app) {
 	systems.system<PlayerOverWorldSystem>()->init(app);

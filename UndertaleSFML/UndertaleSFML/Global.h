@@ -17,6 +17,8 @@
 #include "kult.hpp"
 #include <entityx/entityx.h>
 #include "Math.h"
+#include "console.h"
+
 namespace ex = entityx;
 
 
@@ -93,45 +95,18 @@ namespace std { // try to detect if iliterator
 		}
 	};
 };
-
-template<typename T>
+template<typename T, T DIFF_VALUE= std::numeric_limits<T>::epsilon()>
 struct almost_equal_to {
-	constexpr bool operator()(const T &l, const T &r) const { return std::equal_to<T>(l, r); }
-};
-
-
-
-template<> struct almost_equal_to<float> {
-	static constexpr float maxdiff = 0.0001f;
-	bool operator()(const float & l, const float& r) const
-	{
-		return umath::compare(l, r, maxdiff);
-	}
-};
-
-
-template<> struct almost_equal_to<sf::Vector2f> {
-	 bool operator()(const sf::Vector2f& l, const sf::Vector2f& r) const
-	{
-		return almost_equal_to<float>()(l.x, r.x) && almost_equal_to<float>()(l.y, r.y);
-	}
-};
-
-template<> struct almost_equal_to<sf::Vertex> {
-	 bool operator()(const sf::Vertex& l, const sf::Vertex& r) const
-	{
-		return l.color.toInteger() == r.color.toInteger() && almost_equal_to<sf::Vector2f>()(l.texCoords, r.texCoords) && almost_equal_to<sf::Vector2f>()(l.position, r.position);
-	}
+	static constexpr T maxdiff = DIFF_VALUE;
+	bool operator()(const T &l, const T &r) const { return umath::compare(l, r, maxdiff); }
 };
 
 template<typename T>
 struct almost_zero {
 	bool operator()(const T &l) const { return almost_equal_to<T>()(l, static_cast<T>(0)); }
 };
-template<>
-struct almost_zero<sf::Vector2f> {
-	bool operator()(const sf::Vector2f &l) const { return almost_zero<float>()(l.x) && almost_zero<float>()(l.y); }
-};
+
+
 
 class ChangedCass {
 public:
@@ -523,17 +498,3 @@ namespace SmalleEntiySystem {
 #endif
 
 
-
-
-namespace console {
-
-};
-
-
-
-namespace logging {
-	void init_cerr();
-	void init_cout();
-	bool init();
-	void error(const std::string& message);
-};
