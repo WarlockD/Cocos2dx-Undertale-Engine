@@ -1,11 +1,19 @@
 #include <windows.h>
-#ifdef COORD
-#undef COORD
-#endif
-#ifdef SMALL_RECT
-##undef SMALL_RECT
-#endif
+
 #include "console.h"
+#include <queue>
+#include <stack>
+
+inline COORD& operator+=(COORD& l, const COORD& r) { l.X -= r.X; l.Y -= r.Y; return l; }
+inline COORD& operator-=(COORD& l, const COORD& r) { l.X -= r.X; l.Y -= r.Y; return l; }
+inline COORD& operator*=(COORD& l, SHORT r) { l.X *= r; l.Y *= r; return l; }
+inline COORD operator-(const COORD& l) { return COORD{ -l.X, -l.Y }; }
+inline COORD operator+(const COORD& l, const COORD& r) { return COORD{ l.X + r.X, l.Y + r.Y }; }
+inline COORD operator-(const COORD& l, const COORD& r) { return COORD{ l.X - r.X, l.Y - r.Y }; }
+inline COORD operator*(const COORD& l, SHORT r) { return COORD{ l.X * r, l.Y * r }; }
+inline COORD operator*(SHORT r, const COORD& l) { return COORD{ l.X * r, l.Y * r }; }
+
+inline COORD& operator*=(COORD& l, const COORD& r) { l.X *= r.X; l.Y *= l.Y; return l; }
 
 // all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
 class basic_debugbuf : public std::streambuf {
@@ -125,6 +133,11 @@ namespace logging {
 };
 #define PERR(bSuccess, api){if(!(bSuccess)) printf("%s:Error %d from %s on line %d\n", __FILE__, GetLastError(), api, __LINE__);}
 namespace console {
+	const Point Point::Up(0, -1);
+	const Point Point::Down(0, 1);
+	const Point Point::Left(-1, 0);
+	const Point Point::Right(1, 0);
+
 	namespace _details
 	{
 		
@@ -286,6 +299,9 @@ namespace console {
 	void gotoxy(int x, int y) {
 		_details::_setpos(hConsole, Point(x,y));
 	}
+	void gotoxy(const Point& p) {
+		_details::_setpos(hConsole, p);
+	}
 	void gotox(int x) {
 		_details::_setposx(hConsole, x);
 	}
@@ -306,46 +322,51 @@ namespace console {
 	}
 	//http://stackoverflow.com/questions/13003645/stdfunction-as-a-custom-stream-manipulator
 	// mabey set it up like that
-	void cls()
-	{
-		if (hConsole == NULL) return;
-		COORD coordScreen = { 0, 0 };    /* here's where we'll home the
-										 cursor */
-		BOOL bSuccess;
-		DWORD cCharsWritten;
-		CONSOLE_SCREEN_BUFFER_INFO csbi; /* to get buffer info */
-		DWORD dwConSize;                 /* number of character cells in
-										 the current buffer */
-
-										 /* get the number of character cells in the current buffer */
-
-		bSuccess = GetConsoleScreenBufferInfo(hConsole, &csbi);
-		PERR(bSuccess, "GetConsoleScreenBufferInfo");
-		dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
-
-		/* fill the entire screen with blanks */
-
-		bSuccess = FillConsoleOutputCharacter(hConsole, (TCHAR) ' ',
-			dwConSize, coordScreen, &cCharsWritten);
-		PERR(bSuccess, "FillConsoleOutputCharacter");
-
-		/* get the current text attribute */
-
-		bSuccess = GetConsoleScreenBufferInfo(hConsole, &csbi);
-		PERR(bSuccess, "ConsoleScreenBufferInfo");
-
-		/* now set the buffer's attributes accordingly */
-
-		bSuccess = FillConsoleOutputAttribute(hConsole, csbi.wAttributes,
-			dwConSize, coordScreen, &cCharsWritten);
-		PERR(bSuccess, "FillConsoleOutputAttribute");
-
-		/* put the cursor at (0, 0) */
-
-		bSuccess = SetConsoleCursorPosition(hConsole, coordScreen);
-		PERR(bSuccess, "SetConsoleCursorPosition");
-		return;
+	Point screen_size() {
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		PERR(GetConsoleScreenBufferInfo(hConsole, &csbi), "GetConsoleScreenBufferInfo");
+		return Point(csbi.dwSize.X, csbi.dwSize.Y);
 	}
+	void cls(int i) {
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		PERR(GetConsoleScreenBufferInfo(hConsole, &csbi), "GetConsoleScreenBufferInfo");
+		COORD start;
+		DWORD count;
+		switch (i) {
+		case 1:
+			start = COORD{ 0,0 }; 
+			count = csbi.dwSize.X  + (csbi.dwSize.X * (start.Y-1)); 
+			break;
+		case 2:start = COORD{ 0,0 }; count = csbi.dwSize.X* csbi.dwSize.Y; break;
+		case 0:
+		default: // 0
+			start = csbi.dwCursorPosition;
+			count = csbi.dwSize.X - csbi.dwCursorPosition.X + (csbi.dwSize.X * (csbi.dwSize.Y - start.Y));	
+			assert(i == 0);
+			break;
+		}
+		/* fill the entire screen with blanks */
+		DWORD written;
+		PERR(FillConsoleOutputCharacterA(hConsole, ' ',count,start,&written), "FillConsoleOutputCharacter");
+		PERR(FillConsoleOutputAttribute(hConsole, csbi.wAttributes, count, start, &written),  "FillConsoleOutputCharacter");
+	}
+	void scroll(int lines) {
+		if (lines == 0) return; // no lines to scroll;
+		CONSOLE_SCREEN_BUFFER_INFO csbiInfo;
+		PERR(GetConsoleScreenBufferInfo(hConsole, &csbiInfo), "GetConsoleScreenBufferInfo");
+		SMALL_RECT srctScrollRect, srctClipRect;
+		COORD coordDest = { 0 ,0 };
+		CHAR_INFO chiFill{ (char)' ', 7 };
+		srctScrollRect.Top = lines < 0 ? -lines : 0;
+		srctScrollRect.Bottom = csbiInfo.dwSize.Y - (lines < 0 ? 1 : lines);
+		srctScrollRect.Left = 0;
+		srctScrollRect.Right = csbiInfo.dwSize.X - 1;
+		coordDest.X = 0;
+		coordDest.Y = 0;
+		srctClipRect = srctScrollRect;
+		PERR(ScrollConsoleScreenBuffer(hConsole, &srctScrollRect, &srctClipRect, coordDest, &chiFill), "ScrollConsoleScreenBuffer");
+	}
+
 
 
 	// putch has a bare bones scrolling interface.  It handles stuff like /n/r /b etc and keeps the cursor within the window
@@ -366,9 +387,197 @@ namespace console {
 			*this << "[special handling for mystream]";
 		}
 	};
+	class VT100 {
+		enum class State {
+			ground,
+			escape,
+			escape_intermediate,
+			escape_dispatch,
+			count_escape,
+			csi_entry,
+			csi_intermediate,
+			csi_parm,
+			csi_dispatch,
+			csi_ignore,
+			count_csi,
+			dcs_entry,
+			
+			exit
+		};
+	
+		std::stack<State> _states;
+		std::queue<char> _chars;
+		State _state = State::ground;
+		std::vector<int> _parms;
+		int _current_parm = 0;
+		std::vector<char> _collect;
+		void clear() {
+			_parms.clear();// 30 - 39) and the semicolon(code 3B
+			_collect.clear();
+			_current_parm = 0;
+		}
+		inline bool is_csi_state() const { return _state >= State::csi_entry && _state <= State::count_csi; }
+		bool parm(char c) {
+			if (c >= 0x30 && c <= 0x39) {
+				_current_parm = (_current_parm * 10) + (0x30 - c);
+				return true;
+			} else if (c == 0x3B) {
+				_parms.push_back(_current_parm);
+				_current_parm = 0;
+				return true;
+			}
+			return false;	
+		}
+		void collect(char c) {
+			_collect.push_back(c);
+		}
+		bool execute(char c) { 
+
+			if ((c >= 0x00 && c <= 0x17) || c == 0x19 || (c >= 0x1C && c <= 0x1F)) {
+				return true; // execute, happens in any state
+			}
+			
+			// we do the execute commands here
+			// return if it was executed
+			
+			return false;
+		}
+		void csi_dispatch(char c) {
+			CONSOLE_SCREEN_BUFFER_INFO info;
+			PERR(GetConsoleScreenBufferInfo(hConsole, &info), "GetConsoleScreenBufferInfo");
+			COORD cursor = info.dwCursorPosition;
+			switch (c) {
+			case 'A': cursor = info.dwCursorPosition + COORD{ 0,-1 } *(_current_parm ? _current_parm : 1); break;
+			case 'B': cursor = info.dwCursorPosition + COORD{ 0, 1 } * (_current_parm ? _current_parm : 1); break;
+			case 'C': cursor = info.dwCursorPosition + COORD{ 1,0 } * (_current_parm ? _current_parm : 1); break;
+			case 'D': cursor = info.dwCursorPosition + COORD{ -1,0 } * (_current_parm ? _current_parm : 1); break;
+			case 'E': cursor.X = 0; info.dwCursorPosition.Y += (_current_parm ? _current_parm : 1);  break;
+			case 'F': cursor.X = 0; info.dwCursorPosition.Y -= (_current_parm ? _current_parm : 1);  break;
+			case 'G': cursor.X = (_current_parm ? _current_parm-1 : 0);  break;
+			case 'H': 
+				cursor.Y = (_current_parm ? _current_parm - 1 : 0);
+				cursor.X = (_parms.size()>0 && _parms[0] ? _parms[0] - 1 : 0);
+				break;
+			case'J': // erase display
+				assert(false);
+				break;
+
+			}
+			SetConsoleCursorPosition(hConsole, cursor);
+		}
+		void escape_dispatch(char c) {
+
+		}
+	public:
+		void putch(char c) {
+			if (_state == State::csi_ignore) {
+				if (!execute(c) && c != 0x7f  && !(c >= 0x40 && c <= 0x7e))_state = State::ground;
+				else return;
+			}
+			switch (c) {
+				case 0x1B: _state = State::escape; clear(); return;// escape
+			//	case 0x9D: _state = State::osc_string; return;// escape
+			}
+			if (is_csi_state()) {
+				if (c == 0x7f || execute(c)) return;
+				if (c >= 0x40 && c <= 0x7e) _state = State::csi_dispatch;
+			}
+			while (true){
+				switch (_state) {
+				case State::ground:
+				{
+					char buffer[1] = { c };
+					DWORD writin;
+					WriteConsoleA(hConsole, &buffer, 1, &writin, NULL);
+				}
+					
+					break;
+				case State::csi_ignore:
+					if (!execute(c) && c >= 0x40 && c <= 0x7e) {
+						_state = State::ground;
+						continue;
+					}
+					break;
+				case State::escape_dispatch:
+					escape_dispatch(c);
+					_state = State::ground;
+					break;
+				case State::csi_dispatch:
+					csi_dispatch(c);
+					_state = State::ground;
+					break;
+				case State::escape_intermediate:
+					if (c >= 0x20 && c <= 0x2F) collect(c);
+					else if (c >= 30 && c <= 0x7E) {
+						_state = State::escape_dispatch;
+						continue;
+					}
+					break;
+				case State::escape:
+					switch (c) {
+					case 0x5B: _state = State::csi_entry; break;
+					default:
+						if (c >= 0x20 && c <= 0x2F) {
+							_state = State::escape_intermediate;
+							continue;
+						}
+						else if ((c >= 0x30 && c <= 0x4F) || (c >= 0x51 && c <= 0x57) || c == 0x59 || c == 0x5A || c == 0x5C || (c >= 0x60 && c <= 0x7E)) {
+							_state = State::escape_dispatch;
+							continue;
+						}
+						assert(false);
+					}
+					break;
+				case State::csi_entry:
+					clear();
+					if (c >= 0x20 && c <= 0x2F) {
+						_state = State::csi_intermediate;
+						continue;
+					}
+					else if (c == 0x3A) _state = State::csi_ignore;
+					// We don't know if if its a collect or parm yet so do it then just return
+					else if (c >= 0x3C && c <= 0x3F) {
+						collect(c); _state = State::csi_parm;
+					}
+					else if (parm(c)) _state = State::csi_parm;
+					break;
+				case State::csi_intermediate:
+					if (c >= 0x40 && c <= 0x7E) {
+						_state = State::csi_dispatch;
+						continue;
+					}else if (c >= 0x30 && c <= 0x3F) {
+						_state = State::csi_ignore;
+						continue;
+					}
+					else if (c >= 0x20 && c <= 0x2F) collect(c);
+					else {
+						assert(false);
+					}
+					break;
+				case State::csi_parm:
+					if (c >= 0x20 && c <= 0x2F) {
+						_state = State::csi_intermediate;
+						continue;
+					}
+					else if (c == 0x3A || c >= 0x3C && c <= 0x3F) 
+						_state = State::csi_ignore;
+					else if (!parm(c)) {
+						assert(false);
+					}
+					break;
+				}
+				break;
+			} 
+		}		
+	};
 	std::ostream& vt100() {
 		return std::cout;
 	} // stream for vt100 emulation on console, only simple escape codes are supported however
+	static VT100 vt;
+	void test_vt(const std::string& text) {
+		for (char c : text) 
+			vt.putch(c);
+	}
 };
 
 namespace con {

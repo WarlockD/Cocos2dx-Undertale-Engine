@@ -182,9 +182,13 @@ namespace console {
 	struct Point {
 		union { struct { int16_t x; int16_t y; }; int16_t ptr[2]; uint32_t int_value; };
 		static constexpr size_t dimensions = 2;
+		static const Point Up;
+		static const Point Down;
+		static const Point Left;
+		static const Point Right;
 		Point() : x(0), y(0) {}
 		Point& set(int16_t X, int16_t Y) {x = X; y = Y;return *this;} 
-		explicit Point(int16_t X, int16_t Y) : x(X), y(Y) {}
+		Point(int16_t X, int16_t Y) : x(X), y(Y) {}
 
 
 		inline Point operator-() const { return Point(-x, -y); }
@@ -199,6 +203,9 @@ namespace console {
 	inline bool operator!=(const Point &l, const Point &r) { return l.int_value != r.int_value; }
 	inline Point operator+(const Point &l, const Point &r) { return Point(l.x + r.x, l.y + r.y); }
 	inline Point operator-(const Point &l, const Point &r) { return Point(l.x - r.x, l.y - r.y); }
+	inline Point operator*(const Point &l, const Point &r) { return Point(l.x * r.x, l.y * r.y); }
+	inline Point operator*(const Point &l, int16_t r) { return Point(l.x * r, l.y * r); }
+	inline Point operator*(int16_t r, const Point &l) { return Point(l.x * r, l.y * r); }
 
 	struct Rect {
 		union { struct { int16_t top; int16_t left; int16_t right; int16_t bottom; }; int16_t ptr[4]; uint64_t int_value; };
@@ -332,14 +339,13 @@ namespace console {
 		output_context() { save(); }
 		~output_context() { restore(); }
 	};
-
+	void gotoxy(const Point& p);
 	void gotoxy(int x, int y);
-	inline void gotoxy(const Point& p) { gotoxy(p.x, p.y); }
 	void gotox(int x);
 	void gotoy(int y);
 	Point cursor();
-	
-	void cls();
+	void scroll(int lines);
+	void cls(int i=2);
 	void mode(Mode m);
 	void background(Color c);
 	void foreground(Color c);
@@ -348,6 +354,7 @@ namespace console {
 
 
 	std::ostream& vt100(); // stream for vt100 emulation on console, only simple escape codes are supported however
+	void test_vt(const std::string& text);
 };
 
 namespace con {

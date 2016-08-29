@@ -73,7 +73,7 @@
       <Filter>Header Files</Filter>
     </ClCompile>
     <ClCompile Include="..\console\console.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

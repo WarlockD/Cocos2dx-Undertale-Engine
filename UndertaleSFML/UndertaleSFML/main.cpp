@@ -224,6 +224,23 @@ void gameLoop() {
 				if (event.key.code == sf::Keyboard::Escape) {
 					return;
 				}
+				switch (event.key.code) {
+				case sf::Keyboard::Down:
+					console::test_vt("\33[B");
+					break;
+				case sf::Keyboard::Up:
+					console::test_vt("\33[A");
+					break;
+				case sf::Keyboard::Left:
+					console::test_vt("\33[D");
+					break;
+				case sf::Keyboard::Right:
+					console::test_vt("\33[C");
+					break;
+				case sf::Keyboard::Return:
+					console::test_vt("Testing");
+					break;
+				}
 				player.receive(event);
 				break;
 			}
