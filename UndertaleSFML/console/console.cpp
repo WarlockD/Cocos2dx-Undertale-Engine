@@ -387,6 +387,10 @@ namespace console {
 			*this << "[special handling for mystream]";
 		}
 	};
+	// parser is built from the state diagram from here
+	// http://vt100.net/emu/dec_ansi_parser
+	// used the codes from here, but I could get more in here..humm
+	// https://en.wikipedia.org/wiki/ANSI_escape_code
 	class VT100 {
 		enum class State {
 			ground,
