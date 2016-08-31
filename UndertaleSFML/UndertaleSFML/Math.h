@@ -143,7 +143,8 @@ namespace umath {
 	}
 	inline float sin_cos(float a, float &s, float &c) {
 		// looking this up, but a few people say its slow? humm
-#ifdef _WIN32
+//#if 0 //_WIN32
+#if 0 //_WIN32
 		_asm {
 			fld		a
 			fsincos
@@ -158,7 +159,8 @@ namespace umath {
 #endif
 	}
 	inline int FtoiFast(float f) {
-#ifdef _WIN32
+//#ifdef _WIN32
+#if 0
 		int i;
 		__asm fld		f
 		__asm fistp		i		// use default rouding mode (round nearest)
@@ -228,9 +230,9 @@ namespace umath {
 
 
 	
+	
 	// tired of the limitations, so my personal vec class
 	// the vec class just adds some traits
-
 	
 	template<class, class = void> struct vector_traits_base {};// empty for non-vectors
 	template<class V> struct vector_traits_base<V, std::void_t<typename V::type, typename V::vec_base_type>>

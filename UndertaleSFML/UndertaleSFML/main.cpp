@@ -5,6 +5,8 @@
 #include "UndertaleLabel.h"
 
 #include <cassert>
+#include <iostream>
+#include <functional>
 
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "opengl32.lib")
@@ -24,123 +26,119 @@
 
 static std::unique_ptr<sf::RenderWindow> s_window;// global window
 static std::unique_ptr<Application> s_app;
-#if 0
-namespace umath {
-	// ALIAS TEMPLATE bool_constant
 
-	template<class _Iter>
-	void_t test;
-	std::void_t<> test;
 
-	template<typename T, size_t DIM> struct vector_traits<T, void_t<
-		typename _Iter::iterator_category,
-		typename _Iter::value_type,
-		typename _Iter::difference_type,
-		typename _Iter::pointer,
-		typename _Iter::reference
-	> >
-	{	// defined if _Iter::* types exist
-		typedef typename _Iter::iterator_category iterator_category;
-		typedef typename _Iter::value_type value_type;
-		typedef typename _Iter::difference_type difference_type;
+//http://stackoverflow.com/questions/19936841/initialize-a-constexpr-array-as-sum-of-other-two-constexpr-arrays
+//http://en.cppreference.com/w/cpp/language/parameter_pack
+// just beutiful
+namespace array_helpers {
+	template<int... Is>
+	struct seq {};
+	template<int I, int... Is>
+	struct gen_seq : gen_seq<I - 1, I - 1, Is...> {};
+	template<int... Is>
+	struct gen_seq<0, Is...> : seq<Is...> {};
 
-		typedef typename _Iter::pointer pointer;
-		typedef typename _Iter::reference reference;
+	template<typename T,size_t SIZE>
+	struct _vec { 
+		typedef T element_type;  
+		T ptr[SIZE]; 
+		static constexpr size_t dimensions = SIZE; 
+		template<typename... Targs>
+		constexpr _vec(Targs... Fargs) : ptr{ static_cast<T>(Fargs)... } {}
 	};
-
-	// TEMPLATE CLASS iterator_traits
-	
-	template<class, class = void> struct vector_traits_base {};// empty for non-vectors
-	template<class V> struct vector_traits_base<V, std::void_t<typename V::type, typename V::base_type>>
-	{	// defined if types exist
-		typedef	typename V::type type;
-		typedef	typename V::base_type base_type;
-	};
-	template<class V>struct vector_traits : vector_traits_base<V> {};	// get traits from iterator _Iter, if possible
-
-	template<class T, class = void> struct is_vector : std::false_type { static constexpr size_t dimensions = 0; };// default definition
-	template<class T> struct is_vector<T, std::void_t<typename vector_traits<T>::base_type>> : std::true_type { };
-
-	template<typename T, size_t DIM> struct vec_base { 
-		typedef T type; 
-		typedef vec_base<T, DIM> base_type; 
-		T ptr[DIM];  
-		static constexpr size_t dimensions = DIM; 
-		T operator[](size_t i) const { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		T& operator[](size_t i) { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		inline bool compare(const base_type &r) const { std::equal(&ptr[0], &ptr[DIM], &r.ptr[0], &r.ptr[DIM], [](const T a, const T b) { return a == b; }); }
-		inline  bool compare(const base_type &r, T epsilon) const {
-			std::equal(&ptr[0], &ptr[DIM], &r.ptr[0], &r.ptr[DIM], [epsilon](const T a, const T b) { return umath::compare(a, b, epsilon); });
-		}
-		bool operator==(const base_type &r) const { return compare(r); }
-		bool operator!=(const base_type &r) const { return !compare(r); }
-		
-	};
-	template<typename T> struct vec_base<T, 2> { 
-		typedef typename T type; 
-		typedef typename vec_base<T, 2> base_type; 
+	template<typename T>
+	struct _vec<T, 2> {
+		typedef T element_type;
+		typedef T element_type;  struct { union { struct { T x; T y; }; T ptr[2]; }; }; 
 		static constexpr size_t dimensions = 2;
-		union { struct { T x; T y; }; T ptr[2]; }; 
-		T operator[](size_t i) const { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		T& operator[](size_t i) { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		inline  bool compare(const base_type &r) const { return x == r.x && y == r.y; }
-		inline  bool compare(const base_type &r, T epsilon) const { return umath::compare(x, r.x, epsilon) && umath::compare(y, r.y, epsilon); }
-		bool operator==(const base_type &r) const { return compare(r); }
-		bool operator!=(const base_type &r) const { return !compare(r); }
-		base_type& operator+=(const base_type&r) { x.}
-	};
-	template<typename T> struct vec_base<T, 3> { 
-		typedef typename T type; 
-		typedef typename vec_base<T, 3> base_type; 
-		static constexpr size_t dimensions = 3;
-		union { struct { T x; T y; T z; }; T ptr[3]; }; 
-		T operator[](size_t i) const { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		T& operator[](size_t i) { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		inline  bool compare(const base_type &r) const { return x == r.x && y == r.y && z == r.z; }
-		inline  bool compare(const base_type &r, T epsilon) const { return umath::compare(x, r.x, epsilon) && umath::compare(y, r.y, epsilon) && umath::compare(z, r.z, epsilon); }
-		bool operator==(const base_type &r) const { return compare(r); }
-		bool operator!=(const base_type &r) const { return !compare(r); }
-	};
-	template<typename T> struct vec_base<T, 4> { 
-		typedef typename T type; 
-		typedef typename vec_base<T, 4> base_type; 
-		static constexpr size_t dimensions = 4;
-		union { struct { T x; T y; T z; T w; }; T ptr[4]; }; 
-		T operator[](size_t i) const { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		T& operator[](size_t i) { assert((i >= 0) && (i < dimensions)); ptr[i]; }
-		inline bool compare(const base_type &r) const { return x == r.x && y == r.y && z == r.z && z == r.w; }
-		inline bool compare(const base_type &r, T epsilon) const { umath::compare(x, r.x, epsilon) && umath::compare(y, r.y, epsilon) && umath::compare(z, r.z, epsilon) && umath::compare(w, r.w, epsilon); }
-		bool operator==(const base_type &r) const { return compare(r); }
-		bool operator!=(const base_type &r) const { return !compare(r); }
+		template<typename... Targs>
+		constexpr _vec(Targs... Fargs) : ptr{ static_cast<T>(Fargs)... } {}
+		//template<typename A, typename B>
+		//constexpr _vec(A x,B x) : ptr{ static_cast<T>(x), static_cast<T>(y) } {}
 	};
 
-	template<typename T, size_t DIM>
-	struct vec : public vec_base<T, DIM>{
-		
-#if 0
-		template<typename O>
-		typename std::enable_if<std::is_same<O, vector_type>::value && (DIM == 2), bool>::type
-			inline compare(const O &r, const T epsilon) const
-		{
-			return umath::compare(x, r.x, epsilon) && umath::compare(y, r.y, epsilon);
-		}
-		template<typename O>
-		typename std::enable_if<std::is_same<O, vector_type>::value && (DIM == 3), bool>::type
-			inline compare(const O &r, const T epsilon) const
-		{
-			return umath::compare(x, r.x, epsilon) && umath::compare(y, r.y, epsilon) && umath::compare(z, r.z, epsilon);
-		}
-		template<typename O>
-		typename std::enable_if<std::is_same<O, vector_type>::value && (DIM == 4), bool>::type
-			inline compare(const O &r, const T epsilon) const
-		{
-			return umath::compare(x, r.x, epsilon) && umath::compare(y, r.y, epsilon) && umath::compare(z, r.z, epsilon) && umath::compare(w, r.w, epsilon);
-		}
-#endif
+	template<typename T, size_t N>
+	struct vec : public _vec<T,N> {
+		using _vec::_vec;
+		size_t constexpr size() const { return dimensions; }
+		constexpr T operator[](size_t i) const { return ptr[i]; }
+		T& operator[](size_t i) { return ptr[i]; }
 	};
+
+	template<class CHAR, class TRAITS, typename T, size_t N, int... Is>
+	void print_vect(std::basic_ostream<CHAR, TRAITS>& os, vec<T, N> const& v, seq<Is...>) {
+		using swallow = int[];
+		(void)swallow { 0, (void(os << (Is == 0 ? "" : ", ") << v.ptr[Is]), 0)... };
+	}
+	template<class CHAR, class TRAITS,  size_t N, int... Is>
+	void print_vect(std::basic_ostream<CHAR, TRAITS>& os, vec<float, N> const& v, seq<Is...>) {
+		auto pbackup = os.precision();
+		auto fbackup = os.flags();
+		os.flags(fbackup | std::ios::fixed);
+		os.precision(2);
+		using swallow = int[];
+		(void)swallow {
+			0, (void(os << (Is == 0 ? "" : ", ") << v.ptr[Is] << "f"), 0)...
+		};
+		os.flags(fbackup);
+		os.precision(pbackup);
+	}
+
+	template<class CHAR, class TRAITS, typename T, size_t N>
+	std::basic_ostream<CHAR, TRAITS>& operator<<(std::basic_ostream<CHAR, TRAITS>& os, vec<T, N> const& v) 
+	{
+		os << "(";
+		print_vect(os, v, gen_seq<static_cast<int>(N)>{});
+		return os << ")";
+	}
+
+	template<typename LT, typename RT, size_t N, int... Is>
+	constexpr vec<LT, N> vec_add(vec<LT, N> const &lhs, vec<RT, N> const &rhs, seq<Is...>) { return vec<LT, N>(lhs[Is]+rhs[Is]...); }
+	template<typename LT, typename RT, size_t N, int... Is>
+	vec<LT, N>& vec_addeq(vec<LT, N> &lhs, vec<RT, N> const &rhs, seq<Is...>) { 
+		using swallow = int[];
+		(void)swallow {
+			0, (void(lhs[Is] += rhs[Is]), 0)...
+		};
+		return lhs;
+		//return vec<LT, N>(lhs[Is] + rhs[Is]...); 
+	}
+	template<class T, int N, class F, int... Is> constexpr vec<T, N> transform(vec<T, N> const &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { return vec<T, N>( f(lhs[Is], rhs[Is])... ); }
+	template<class T, int N, class F> constexpr vec<T, N>  transform(vec<T, N> const &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
+	template<class T, int N, class F, int... Is> constexpr vec<T, N>& transform(vec<T, N>  &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { 
+		using swallow = int[];
+		(void)swallow {
+			0, (void(f(lhs[Is], rhs[Is])), 0)...
+		};
+		return lhs;
+	}
+	template<class T, int N, class F> constexpr vec<T, N>&  transform(vec<T, N>  &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
+
+
+	//template<typename T, size_t N> constexpr vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return vec_add(l, r, gen_seq<N>{}); }
+	template<typename T, size_t N> constexpr vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a + b; }); }
+	template<typename T, size_t N> constexpr vec<T, N>& operator+=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a += b; }); }
+	template<typename T, size_t N> constexpr vec<T, N> operator-(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a - b; }); }
+	template<typename T, size_t N> constexpr vec<T, N>& operator-=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a -= b; }); }
+
+
+	void example_sum() {
+		vec<float, 2> test1(30.0f, 20.0f);
+		vec<float, 2> test2(12, 32);
+		auto add_test = test1 + test2;
+		std::cout << add_test;
+		add_test += test1;
+		std::cout  << " more " << add_test;
+		//constexpr auto c = sum(a, b);
+		//auto test = sum(a, b);
+		std::cout << std::endl;
+		std::cout << "End of example" << std::endl;
+	}
 };
-#endif
+
 void testVec() {
+	
 	/*
 	
 	umath::vec<float, 3> test;
@@ -252,7 +250,7 @@ void gameLoop() {
 	}
 }
 int main(int argc, const char* argv[]) {
-	umath::test2();
+	array_helpers::example_sum();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
 	console::init();
 	//logging::init_cerr();
