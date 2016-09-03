@@ -244,133 +244,106 @@ namespace umath {
 	template<class T, class = void> struct is_vector : std::false_type {};// default definition
 	template<class T> struct is_vector<T, std::void_t<typename vector_traits<T>::vec_base_type>> : std::true_type {};
 
-	template<typename T, size_t DIM> struct vec_base {
-		typedef typename T type;
-		typedef typename vec_base<T, DIM> vec_base_type;
-		static constexpr size_t dimensions = DIM;
-		T ptr[DIM];
-		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
-		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
-		vec_base() { std::memset(ptr, 0.0f, sizeof(float)*DIM); }
+	namespace array_helpers {
+		//http://stackoverflow.com/questions/19936841/initialize-a-constexpr-array-as-sum-of-other-two-constexpr-arrays
+		//http://en.cppreference.com/w/cpp/language/parameter_pack
+		// just beutiful
+		template<int... Is>
+		struct seq {};
+		template<int I, int... Is>
+		struct gen_seq : gen_seq<I - 1, I - 1, Is...> {};
+		template<int... Is>
+		struct gen_seq<0, Is...> : seq<Is...> {};
+#pragma pack(push,1)
+		template<typename TT, size_t NN>
+		struct vec_traits {
+			static constexpr size_t dimension = NN;
+			typedef T element_type;
+			typedef _vec<T, N> vec_type;
+			template<typename T, size_t N>
+			struct _vec {
+				union { T ptr[N]; struct {  }; };
+				static constexpr size_t dimension = N;
+				typedef T element_type;
+				typedef _vec<T, N> vec_type;
+				template<typename... Targs, typename = std::enable_if<sizeof...(Targs) == N>::type>
+				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+				_vec() : ptr{ gen_seq<N>((T)0) } {}
+			};
+			template<typename T>
+			struct _vec<T, 4> {
+				union { T ptr[4]; struct { T x; T y; T z; T w; }; };
+				static constexpr size_t dimension = 4;
+				typedef T element_type;
+				typedef _vec<T, 4> vec_type;
+				template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 4>::type>
+				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+				_vec() : ptr{ gen_seq<N>((T)0) } {}
+			};
+			template<typename T>
+			struct _vec<T, 3> {
+				union { T ptr[3]; struct { T x; T y; T z; }; };
+				static constexpr size_t dimension = 3;
+				typedef T element_type;
+				typedef _vec<T, 3> vec_type;
+				template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 3>::type>
+				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+				_vec() : ptr{ gen_seq<N>((T)0) } {}
+			};
+			template<typename T>
+			struct _vec<T, 2> {
+				union { T ptr[2]; struct { T x; T y; }; };
+				static constexpr size_t dimension = 2;
+				typedef T element_type;
+				typedef _vec<T, 2> vec_type;
+				template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 2>::type>
+				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+				_vec() : ptr{ gen_seq<N>((T)0) } {}
+			};
+
+			typedef typename _vec<TT, NN> type;
+		};
+		template<class T, int N, class F, int... Is> constexpr inline vec<T, N> transform_vec(vec<T, N> const &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { return vec<T, N>(f(lhs[Is], rhs[Is])...); }
+		template<class T, int N, class F> constexpr inline vec<T, N>  transform_vec(vec<T, N> const &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
+		template<class T, int N, class F, int... Is> constexpr inline vec<T, N>& transform_vec(vec<T, N>  &lhs, vec<T, N>const &rhs, F f, seq<Is...>) {
+			using swallow = int[];
+			(void)swallow {
+				0, (void(f(lhs[Is], rhs[Is])), 0)...
+			};
+			return lhs;
+		}
+		template<class T, int N, class F> constexpr inline vec<T, N>&  transform_vec(vec<T, N>  &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
+
+		/* I have done extensive tests on how the compile optimizes and in the end I discovered two things
+			1: It unrolls these small loops, so for(0;4;++) is always unrolled
+			2: There is no asembly diffrence between having a loop vs the templated lambda here
+			So, in essence, I can make a general add, subtract, multiply and it all does the same thing.
+			Also, because of the way SSE/SSE2 works, there is no benifit using addsb on antyhing other than vec4 values and even
+			then its doubious.  However, cross multiplying vec3 or matrixes there IS such a value
+			I write this here to stop me from sub optimizeing this again..and again...and again.. god I hope this is the last time
+			I EVER write a vector library
+			With this in mind, I am going to keep the trasform method as it allows me to create on the fly trasforms and 
+			dosn't create any obious preformance degrergation but going to just run loops in all the general add functions
+			with enable_ifs on anything that needs optimization
+		*/
 	};
-	template<typename T> struct vec_base<T,2> {
-		typedef typename T type;
-		typedef typename vec_base<T, 2> vec_base_type;
-		static constexpr size_t dimensions = 2;
-		union { struct { T x; T y; }; T ptr[2]; };
-		vec_base() : x((T)0), y((T)0) {}
-		vec_base(T x, T y) : x(x), y(y) {}
-		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
-		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
+	template<typename T, size_t N>
+	struct vec : public array_helpers::vec_traits<T, N>::type {
+		template<typename... Targs>
+		constexpr vec(Targs... Fargs) : _vec(static_cast<T>(Fargs)...) {}
 
-		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
-		inline compare(const D &l) const { return x == l.x && y == l.y; }
-		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value,bool>::type
-		inline compare(const D &l, T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon); }
-		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, D&>::type
-			inline set(T X, T Y) const { x = X; y = Y;  return *((D*)this); }
-		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
-			inline operator==(const D &r) const { return compare(r); }
-		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
-			inline operator!=(const D &r) const { return !compare(r); }
-		template<typename D> typename std::enable_if<std::is_base_of<vec_base_type, D>::value, D>::type
-			inline operator-() const { return D(-x, -y); }
-		template<typename D, typename = typename std::enable_if<std::is_convertible<D,T>::value>::type>
-			inline void set(D X, D Y) { x = static_cast<T>(X); y = static_cast<T>(Y);  }
-	};
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
-		inline operator*=(D &l, const T &r) { l.x *= r; l.y *= r; return l; }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
-		inline operator/=(D &l, const T &r) { l.x /= r; l.y /= r; return l; }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
-		inline operator+=(D &l, const D &r) { x += r.x; y += r.y; return l; }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D&>::type
-		inline operator-=(D &l, const D &r) { x -= r.x; y -= r.y; return l; }
+		T& operator[](size_t i) { return ptr[i]; }
+		constexpr const T& operator[](size_t i) const { return ptr[i]; }
+		// keep to show examples, use loops to show consitantcy
+		constexpr inline vec& operator+=(const vec&r) { return array_helpers::transform_vec(l, r, [](T& a, T b) { a += b; }); }
+		constexpr inline vec& operator-=(const vec&r) { return array_helpers::transform_vec(l, r, [](T& a, T b) { a -= b; }); }
 
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator+(const D &l, const D &r) { return D(l.x + r.x, l.y + r.y); }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator-(const D &l, const D &r) { return D(l.x - r.x, l.y - r.y); }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator*(const D &l, const D &r) { return D(l.x * r.x, l.y * r.y); }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator*(const D &l, const T &r) { return D(l.x * r, l.y * r); }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator*(const T &l, const D &r) { return D(l * r.x, l * r.x); }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator/(const D &l, const T &r) { return D(l.x / r, l.y / r); }
-	template<typename T, typename D> typename std::enable_if<std::is_base_of<vec_base<T, 2>, D>::value, D>::type
-		inline operator/(const T &l, const D &r) { return D(l / r.x, l / r.x); }
-	
-
-	template<typename T> struct vec_base<T, 3> {
-		typedef typename T type;
-		typedef typename vec_base<T, 3> vec_base_type;
-		static constexpr size_t dimensions = 3;
-		union { struct { T x; T y; T z; }; T ptr[3]; };
-		vec_base() : x((T)0), y((T)0), z((T)0) {}
-		vec_base(T x, T y, T z) : x(x), y(y), z(z) {}
-		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
-		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
-		template<typename D>
-		typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
-			inline compare(const D &l) const { return x == l.x && y == l.y && z == l.z; }
-		template<typename D>
-		typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value, bool>::type
-			inline compare(const D &l, T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon);}
-	
 		
 	};
-
-	template<typename T> struct vec_base<T, 4> {
-		typedef typename T type;
-		typedef typename vec_base<T, 4> vec_base_type;
-		static constexpr size_t dimensions = 4;
-		union { struct { T x; T y; T z; T w; }; T ptr[4]; };
-		
-		vec_base() : x((T)0), y((T)0), z((T)0), w((T)0) {}
-		vec_base(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
-		T& operator[](size_t i) { assert(i < dimensions); return ptr[i]; }
-		const T& operator[](size_t i) const { assert(i < dimensions); return ptr[i]; }
-		template<typename D>
-		typename std::enable_if<std::is_base_of<vec_base_type, D>::value, bool>::type
-		inline compare(const D &l) const { return x == l.x && y == l.y&& z == l.z&& w == l.w; }
-		template<typename D>
-		typename std::enable_if<std::is_base_of<vec_base_type, D>::value && std::is_floating_point<T>::value, bool>::type
-		inline  compare(const D &l, T epsilon) const { return umath::compare(x, l.x, epsilon) && umath::compare(y, l.y, epsilon) && umath::compare(z, l.z, epsilon) && umath::compare(w, l.w, epsilon); }
-
-
-	};
-	/*
-
-	template<typename T> struct rect_base {
-		typedef typename T type;
-		typedef typename rect_base<T> rect_base_type;
-		static constexpr size_t dimensions = 4;
-		union { struct { T top; T left; T right; T bottom; }; T ptr[4]; };
-		T width() const { return right - left; }
-		T height() const { return bottom - top; }
-		rect_base() : top((T)0), left((T)0), bottom((T)0), right((T)0) {}
-		explicit rect_base(T top, T left, T right, T bottom) : top(top), left(left), bottom(bottom), right(right) {}
-		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, D&>::type
-			inline set(T Top, T Left, , T Right, T Bottom) const { top = Top; left = Left; right = Right; bottom = Bottom;  return *((D*)this); }
-		template<typename D>
-		typename std::enable_if<std::is_base_of<rect_base_type, D>::value, bool>::type
-			inline compare(const D &l) const { return top == l.top && left == l.left && right == l.right&& bottom == l.bottom; }
-		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, bool>::type
-			inline operator==(const D &r) const { return compare(r); }
-		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, bool>::type
-			inline operator!=(const D &r) const { return !compare(r); }
-		template<typename D> typename std::enable_if<std::is_base_of<rect_base_type, D>::value, D>::type
-			inline operator-() const { return D(-top , -left , -right , -bottom); }
-	};
-	template<typename T> inline rect_base<T>& operator*=(rect_base<T> &l, const T &r) { l.top *= r; l.bottom *= r; l.right *= r; l.left *= r; return l; }
-	template<typename T> inline rect_base<T>& operator/=(rect_base<T> &l, const T &r) { l.top /= r; l.bottom /= r; l.right /= r; l.left /= r; return l; }
-	template<typename T> inline rect_base<T>& operator+=(rect_base<T> &l, const rect_base<T> &r) { l.top += r.top; l.bottom += r.bottom; l.right += r.right; l.left += r.left; return l; }
-	template<typename T> inline rect_base<T>& operator-=(rect_base<T> &l, const rect_base<T> &r) { l.top -= r.top; l.bottom -= r.bottom; l.right -= r.right; l.left -= r.left; return l; }
-	template<typename T> inline rect_base<T> operator+(const rect_base<T> &l, const rect_base<T> &r) { return rect_base<T>(l.top + r.top, l.bottom + r.bottom, l.right + r.right, l.left + r.left); }
-	template<typename T> inline rect_base<T> operator-(const rect_base<T> &l, const rect_base<T> &r) { return rect_base<T>(l.top - r.top, l.bottom - r.bottom, l.right - r.right, l.left - r.left); }
-	*/
+	template<typename T, size_t N> constexpr vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return vec_add(l, r, gen_seq<N>{}); }
+	template<typename T, size_t N> constexpr inline vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a + b; }); }
+	template<typename T, size_t N> constexpr inline vec<T, N> operator-(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a - b; }); }
+	template<typename T, size_t N> constexpr inline vec<T, N>& operator-=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a -= b; }); }
 
 	template<typename T,typename D> struct color4_base {
 		typedef typename T type;

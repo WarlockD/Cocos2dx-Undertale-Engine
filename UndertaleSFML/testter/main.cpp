@@ -13,33 +13,60 @@ namespace array_helpers {
 	template<int... Is>
 	struct gen_seq<0, Is...> : seq<Is...> {};
 #pragma pack(push,1)
-	template<typename T, size_t SIZE>
-	struct _vec {
-		typedef T element_type;
-		T ptr[SIZE];
-		static constexpr size_t dimensions = SIZE;
-		template<typename... Targs>
-		constexpr _vec(Targs... Fargs) : ptr{ static_cast<T>(Fargs)... } {}
-	};
-	template<typename T>
-	struct _vec<T, 2> {
-		typedef T element_type;
-		typedef T element_type;  struct { union { struct { T x; T y; }; T ptr[2]; }; };
-		static constexpr size_t dimensions = 2;
-		template<typename... Targs>
-		constexpr _vec(Targs... Fargs) : ptr{ static_cast<T>(Fargs)... } {}
-		//template<typename A, typename B>
-		//constexpr _vec(A x,B x) : ptr{ static_cast<T>(x), static_cast<T>(y) } {}
+	template<typename TT, size_t NN>
+	struct vec_choise {
+		template<typename T, size_t N> 
+		struct _vec {
+			union { T ptr[N]; struct {  }; };
+			static constexpr size_t dimension = N;
+			typedef T element_type;
+			typedef _vec<T, N> vec_type;
+			template<typename... Targs, typename = std::enable_if<sizeof...(Targs) == N>::type>
+			constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+			_vec() : ptr{ gen_seq<N>((T)0) } {}
+		};
+		template<typename T> 
+		struct _vec<T,4> {
+			union { T ptr[4]; struct { T x; T y; T z; T w; }; }; 
+			static constexpr size_t dimension = 4; 
+			typedef T element_type; 
+			typedef _vec<T, 4> vec_type;
+			template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 4>::type>
+			constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+			_vec() : ptr{ gen_seq<N>((T)0) } {}
+		};
+		template<typename T> 
+		struct _vec<T, 3> {
+			union { T ptr[3]; struct { T x; T y; T z;  }; }; 
+			static constexpr size_t dimension = 3; 
+			typedef T element_type; 
+			typedef _vec<T, 3> vec_type;
+			template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 3>::type>
+			constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+			_vec() : ptr{ gen_seq<N>((T)0) } {}
+		};
+		template<typename T> 
+		struct _vec<T, 2> {
+		 union { T ptr[2]; struct { T x; T y;  }; }; 
+		 static constexpr size_t dimension = 2; 
+		 typedef T element_type; 
+		 typedef _vec<T,2> vec_type;
+		 template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 2>::type>
+		 constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
+		 _vec() : ptr{ gen_seq<N>((T)0) } {}
+		};
+		
+		typedef typename _vec<TT, NN> type;
 	};
 
 	template<typename T, size_t N>
-	struct vec : public _vec<T, N> {
-		using _vec::_vec;
-		size_t constexpr size() const { return dimensions; }
-		constexpr T operator[](size_t i) const { return ptr[i]; }
+	struct vec : public vec_choise<T, N>::type {
+		template<typename... Targs>
+		constexpr vec(Targs... Fargs) : _vec(static_cast<T>(Fargs)...) {} 
+
 		T& operator[](size_t i) { return ptr[i]; }
+		constexpr const T& operator[](size_t i) const { return ptr[i];  }
 	};
-#pragma pack(pop)
 
 	template<class CHAR, class TRAITS, typename T, size_t N, int... Is>
 	void print_vect(std::basic_ostream<CHAR, TRAITS>& os, vec<T, N> const& v, seq<Is...>) {
@@ -69,9 +96,38 @@ namespace array_helpers {
 		print_vect(os, v, gen_seq<static_cast<int>(N)>{});
 		return os << ")";
 	}
+	template<class F, class... Args>
+	constexpr auto index_invoke(F f, int i, Args&&... args)
+		-> decltype(f(args[i]...))
+	{
+		return f(args[i]...);
+	}
 
-	template<class T, int N, class F, int... Is> constexpr inline vec<T, N> transform(vec<T, N> const &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { return vec<T, N>(f(lhs[Is], rhs[Is])...); }
-	template<class T, int N, class F> constexpr inline vec<T, N>  transform(vec<T, N> const &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
+	template<class F, int... Is, class... Args>
+	constexpr auto transform_impl(F f, seq<Is...>, Args&&... args)
+		->vec<decltype(f(args[0]...)), sizeof...(Is)>
+	{
+		using T = decltype(f(args[0]...);
+		return vec<T, sizeof...(Is)>(index_invoke(f, Is, std::forward<Args>(args)...)...);
+	}
+
+	template<size_t N, class F, class... Args>
+	constexpr auto transform(F f, Args&&... args) ->vec<decltype(f(args[0]...)), sizeof...(Args)>
+	{
+	///	using N = sizeof...(Args);
+	//	static_assert(N != 2, "Fuck me");
+		return transform_impl(f, gen_seq<sizeof...(Args)>, std::forward<Args>(args)...);
+	}
+	/*
+
+	template<class T, int N, class F, int... Is> 
+	constexpr inline vec<T, N> transform(vec<T, N> const &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { 
+		return vec<T, N>(f(lhs[Is], rhs[Is])...); 
+	}
+	template<class T, int N, class F> constexpr inline vec<T, N>  
+		transform(vec<T, N> const &lhs, vec<T, N>const &rhs, F f) { 
+			return transform(lhs, rhs, f, gen_seq<N>{}); 
+		}
 	template<class T, int N, class F, int... Is> constexpr inline vec<T, N>& transform(vec<T, N>  &lhs, vec<T, N>const &rhs, F f, seq<Is...>) {
 		using swallow = int[];
 		(void)swallow {
@@ -79,21 +135,17 @@ namespace array_helpers {
 		};
 		return lhs;
 	}
-	template<class T, int N, class F> constexpr inline vec<T, N>&  transform(vec<T, N>  &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
-
-
-	//template<typename T, size_t N> constexpr vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return vec_add(l, r, gen_seq<N>{}); }
-	template<typename T, size_t N> constexpr inline vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a + b; }); }
+	*/
+	template<typename T, size_t N> constexpr inline vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return transform([](T a, T b) { return a + b; }, l, r); }
 	template<typename T, size_t N> constexpr inline vec<T, N>& operator+=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a += b; }); }
 	template<typename T, size_t N> constexpr inline vec<T, N> operator-(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a - b; }); }
 	template<typename T, size_t N> constexpr inline vec<T, N>& operator-=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a -= b; }); }
 
 
 };
-#pragma pack(push,1)
+using namespace array_helpers;
 
-typedef std::array<float, 4> svec;
-
+typedef vec<float, 4> svec;
 #pragma pack(pop)
 template<class CHAR, class TRAITS>
 std::basic_ostream<CHAR, TRAITS>& operator<<(std::basic_ostream<CHAR, TRAITS>& os, const svec const& v)
@@ -102,9 +154,22 @@ std::basic_ostream<CHAR, TRAITS>& operator<<(std::basic_ostream<CHAR, TRAITS>& o
 	return os << ")";
 }
 //http://neilkemp.us/src/sse_tutorial/sse_tutorial.html#D
- inline  void __fastcall asm_add(svec& l, const svec& r) {
+
+
+inline  void  __vectorcall asm_add(svec& l, const svec& r) {
+	//
 	// fast call makes the argumetns on edx and ecx, left to right
 	// naked dosn't write a preamble or post so we have to return ourselves
+	__asm {
+		//movups	xmm0, [ecx]
+		//movups	xmm1, [edx]
+		addps xmm0, xmm1
+	//	movups[ecx], xmm0
+	}
+}
+/*
+
+inline  void  __fastcall asm_add(svec& l, const svec& r) {
 	__asm {
 		movups	xmm0, [ecx]
 		movups	xmm1, [edx]
@@ -112,6 +177,7 @@ std::basic_ostream<CHAR, TRAITS>& operator<<(std::basic_ostream<CHAR, TRAITS>& o
 		movups [ecx], xmm0
 	}
 }
+*/
 void __fastcall sub_vec(svec& l, const svec& r) {
 	// fast call makes the argumetns on edx and ecx, left to right
 	// naked dosn't write a preamble or post so we have to return ourselves
@@ -172,17 +238,13 @@ __forceinline  void  __fastcall  mul_vec(svec& l, const float& r) {
 		movups[ecx], xmm0
 	}
 }
-
-__declspec(noinline) void __vectorcall normal_add(svec& l, const svec& r) {
-	for (int i = 0; i < l.size(); i++) l[i] += r[i];
+//__forceinline  void  __fastcall
+inline void __vectorcall normal_add(float l[4], const float  r[4]) {
+	for (int i = 0; i < 4; i++) l[i] += r[i];
 }
 
 
-svec operator+(const svec& l, const svec& r) { 
-	return svec{ l[0] + r[0], l[1] + r[1], l[2] + r[2] }; 
-}
-svec& operator+=(svec& l, const svec& r) {  }
-using namespace array_helpers;
+//using namespace array_helpers;
 // used to force the asembler to not treat eveything as constexpr
 
 
@@ -194,16 +256,18 @@ __declspec(noinline) vec<float, 3> template_test() {
 volatile float meh = 50.0f;
 
 __declspec(noinline) void simple_test() {
-	svec test1s{ 1.0f, 1.0f, 1.0f };
-	svec test1c{ 1.0f, 1.0f, 1.0f };
-	svec test2{ 2.0f, 2.0f, 2.0f };
-	normal_add(test1s, test2);
+	svec test1s( 1.0f, 1.0f, 1.0f, 1.0f);
+	svec test1c( 1.0f, 1.0f, 1.0f, 1.0f);
+	svec test2(2.0f, 2.0f, 2.0f, 1.0f);
+	///humm
+	//normal_add(test1s.ptr.m128_f32, test2.ptr);
+	///humm
 	asm_add(test1c, test2);
-	mul_vec(test1c, 50.0f);
+	///humm
 	std::cout << " more " << test1s << " " << test1c;
 }
 
-int main(int argc, const char* argv[]) {
+int __cdecl main(int argc, const char* argv[]) {
 	simple_test();
 	return 0;
 }
