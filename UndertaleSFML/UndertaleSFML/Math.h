@@ -7,6 +7,7 @@
 #include <limits>
 #include <cassert>
 #include  <algorithm>
+#include <functional>
 
 #ifdef INFINITY
 #undef INFINITY
@@ -244,41 +245,90 @@ namespace umath {
 	template<class T, class = void> struct is_vector : std::false_type {};// default definition
 	template<class T> struct is_vector<T, std::void_t<typename vector_traits<T>::vec_base_type>> : std::true_type {};
 
+	//http://en.cppreference.com/w/cpp/language/parameter_pack
+	// just beutiful
+	template<int... Is>
+	struct seq {};
+	template<int I, int... Is>
+	struct gen_seq : gen_seq<I - 1, I - 1, Is...> {};
+	template<int... Is>
+	struct gen_seq<0, Is...> : seq<Is...> {};
+	namespace Implementation {
+		/** @todo C++14: use std::make_index_sequence and std::integer_sequence */
+		template<std::size_t ...> struct Sequence {};
+
+#ifndef DOXYGEN_GENERATING_OUTPUT
+		/* E.g. GenerateSequence<3>::Type is Sequence<0, 1, 2> */
+		template<std::size_t N, std::size_t ...sequence> struct GenerateSequence :
+			GenerateSequence<N - 1, N - 1, sequence...> {};
+
+		template<std::size_t ...sequence> struct GenerateSequence<0, sequence...> {
+			typedef Sequence<sequence...> Type;
+		};
+
+		template<std::size_t N, std::size_t ...sequence> struct GenerateReverseSequence :
+			GenerateReverseSequence<N - 1, sequence..., N - 1> {};
+
+		template<std::size_t ...sequence> struct GenerateReverseSequence<0, sequence...> {
+			typedef Sequence<sequence...> Type;
+		};
+#endif
+
+		template<class T> constexpr T repeat(T value, std::size_t) { return value; }
+	}
+
 	namespace array_helpers {
 		//http://stackoverflow.com/questions/19936841/initialize-a-constexpr-array-as-sum-of-other-two-constexpr-arrays
-		//http://en.cppreference.com/w/cpp/language/parameter_pack
-		// just beutiful
-		template<int... Is>
-		struct seq {};
-		template<int I, int... Is>
-		struct gen_seq : gen_seq<I - 1, I - 1, Is...> {};
-		template<int... Is>
-		struct gen_seq<0, Is...> : seq<Is...> {};
+		// http://stackoverflow.com/questions/2978259/programmatically-create-static-arrays-at-compile-time-in-c
 #pragma pack(push,1)
+		template <size_t N>
+		struct array_set {
+			template <typename T, typename ...Tn>
+			static constexpr auto apply(T v, Tn ...vs)
+			{
+				return array_set<N - 1>::apply(v, v, vs...);
+			}
+		};
+
+		template <>
+		struct array_set<1> {
+			template <typename T, typename ...Tn>
+			static constexpr auto apply(T v, Tn ...vs)
+			{
+				using type = T[sizeof...(vs)+1];
+				return type{v, vs...};
+			}
+		};
+
 		template<typename TT, size_t NN>
 		struct vec_traits {
-			static constexpr size_t dimension = NN;
-			typedef T element_type;
-			typedef _vec<T, N> vec_type;
-			template<typename T, size_t N>
-			struct _vec {
+			
+			template<typename T, size_t N> struct _vec {
+
+
 				union { T ptr[N]; struct {  }; };
 				static constexpr size_t dimension = N;
 				typedef T element_type;
 				typedef _vec<T, N> vec_type;
 				template<typename... Targs, typename = std::enable_if<sizeof...(Targs) == N>::type>
 				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
-				_vec() : ptr{ gen_seq<N>((T)0) } {}
+				constexpr _vec() : ptr{ typename Implementation::GenerateSequence<N>::Type() } {}
+
+				/* Implementation for Array<dimensions, T>::Array(U) */
+			private:
+				template<std::size_t ...sequence> constexpr explicit _vec(Implementation::Sequence<sequence...>) : ptr{ Implementation::repeat(T{}, sequence)... } {}
+
 			};
-			template<typename T>
-			struct _vec<T, 4> {
+			template<typename T> struct _vec<T, 4> {
 				union { T ptr[4]; struct { T x; T y; T z; T w; }; };
 				static constexpr size_t dimension = 4;
 				typedef T element_type;
 				typedef _vec<T, 4> vec_type;
 				template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 4>::type>
 				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
-				_vec() : ptr{ gen_seq<N>((T)0) } {}
+				template<typename TV>
+				constexpr _vec(const _vec<TV, 2>& a, const _vec<TV, 2>& b) : _vec(a.ptr[0], a.ptr[1], b.ptr[0], b.ptr[1]) {}
+				_vec() : ptr{ static_cast<T>(0) ,static_cast<T>(0) ,static_cast<T>(0) ,static_cast<T>(0) } {}
 			};
 			template<typename T>
 			struct _vec<T, 3> {
@@ -288,32 +338,24 @@ namespace umath {
 				typedef _vec<T, 3> vec_type;
 				template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 3>::type>
 				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
-				_vec() : ptr{ gen_seq<N>((T)0) } {}
+				_vec() : ptr{ static_cast<T>(0) ,static_cast<T>(0) ,static_cast<T>(0) } {}
 			};
 			template<typename T>
 			struct _vec<T, 2> {
 				union { T ptr[2]; struct { T x; T y; }; };
 				static constexpr size_t dimension = 2;
-				typedef T element_type;
-				typedef _vec<T, 2> vec_type;
+				
 				template<typename... Targs, typename = std::enable_if<(sizeof...(Targs)) == 2>::type>
 				constexpr _vec(Targs... Fargs) :ptr{ static_cast<T>(Fargs)... } {}
-				_vec() : ptr{ gen_seq<N>((T)0) } {}
+				_vec() : ptr{ static_cast<T>(0) ,static_cast<T>(0) } {}
 			};
 
 			typedef typename _vec<TT, NN> type;
 		};
-		template<class T, int N, class F, int... Is> constexpr inline vec<T, N> transform_vec(vec<T, N> const &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { return vec<T, N>(f(lhs[Is], rhs[Is])...); }
-		template<class T, int N, class F> constexpr inline vec<T, N>  transform_vec(vec<T, N> const &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
-		template<class T, int N, class F, int... Is> constexpr inline vec<T, N>& transform_vec(vec<T, N>  &lhs, vec<T, N>const &rhs, F f, seq<Is...>) {
-			using swallow = int[];
-			(void)swallow {
-				0, (void(f(lhs[Is], rhs[Is])), 0)...
-			};
-			return lhs;
-		}
-		template<class T, int N, class F> constexpr inline vec<T, N>&  transform_vec(vec<T, N>  &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
-
+#pragma pack(pop)
+		/*
+	
+				*/
 		/* I have done extensive tests on how the compile optimizes and in the end I discovered two things
 			1: It unrolls these small loops, so for(0;4;++) is always unrolled
 			2: There is no asembly diffrence between having a loop vs the templated lambda here
@@ -325,25 +367,72 @@ namespace umath {
 			With this in mind, I am going to keep the trasform method as it allows me to create on the fly trasforms and 
 			dosn't create any obious preformance degrergation but going to just run loops in all the general add functions
 			with enable_ifs on anything that needs optimization
+	
+		template<class T, int N, int... Is>
+		constexpr std::array<T, N> sum(T const (&lhs)[N], T const (&rhs)[N], seq<Is...>)
+		{
+			return{ { lhs[Is] + rhs[Is]... } };
+		}
+
+		template<class T, int N>
+		constexpr auto sum(T const (&lhs)[N], T const (&rhs)[N])
+			-> decltype(sum(lhs, rhs, gen_seq<N>{}))
+		{
+			return sum(lhs, rhs, gen_seq<N>{});
+		}
 		*/
+		template<class T,size_t N>
+		inline constexpr T length_sqr(const T(&ptr)[N], size_t i=0) {
+			return i == N - 1 ? v * ptr[i] : length_sqr(v, i + 1) + ptr[i] * ptr[i];
+		}
+		template<class T, size_t N>
+		inline constexpr bool compare(const T(&l)[N], const T(&r)[N], size_t i=0) {
+			return i == N - 1 ? l[i] == r[i] : l[i] == r[i] && compare(l, r, i + 1);
+		}
+		template<class T, size_t N>
+		inline constexpr bool compare(const T(&l)[N], const T(&r)[N], T ep, size_t i=0) {
+			return i == N - 1 ? umath::compare(l[i],r[i],ep) : umath::compare(l[i], r[i], ep) && compare(l, r, i + 1);
+		}
 	};
 	template<typename T, size_t N>
 	struct vec : public array_helpers::vec_traits<T, N>::type {
+		typedef T element_type;
+		typedef vec<T, N> vec_type;
 		template<typename... Targs>
 		constexpr vec(Targs... Fargs) : _vec(static_cast<T>(Fargs)...) {}
-
+		template<typename... Targs>
+		void set(Targs... Fargs) { *this = vec(Fargs...); }
 		T& operator[](size_t i) { return ptr[i]; }
 		constexpr const T& operator[](size_t i) const { return ptr[i]; }
+		inline constexpr bool compare(const vec& r) const { return array_helpers::compare(ptr, r.ptr); }
+		inline constexpr bool compare(const vec& r, T ep) const { return array_helpers::compare(ptr, r.ptr,ep); }
 		// keep to show examples, use loops to show consitantcy
-		constexpr inline vec& operator+=(const vec&r) { return array_helpers::transform_vec(l, r, [](T& a, T b) { a += b; }); }
-		constexpr inline vec& operator-=(const vec&r) { return array_helpers::transform_vec(l, r, [](T& a, T b) { a -= b; }); }
+		// trust the god damn compiler for once
+		template<typename AT> inline vec& operator+=(const vec<AT, N>&r) { for (size_t i = 0; i < N; i++) ptr[i] += static_cast<T>(r.ptr[i]); }
+		template<typename AT> inline vec& operator-=(const vec<AT, N>&r) { for (size_t i = 0; i < N; i++) ptr[i] -= static_cast<T>(r.ptr[i]); }
+		template<typename AT> inline vec& operator*=(const vec<AT, N>&r) { for (size_t i = 0; i < N; i++) ptr[i] *= static_cast<T>(r.ptr[i]); }
+		template<typename AT> inline vec& operator*=(const AT&r) { for (size_t i = 0; i < N; i++) ptr[i] *= static_cast<T>(r); }
 
-		
+		constexpr inline T length_sqr() const { return array_helper::length_sqr(ptr, N); }
+		inline T length() const { return umath::sqrt(length_sqr()); }
+		template<typename TT = T, typename = std::enable_if<N == 2>::type> inline T dot(const vec<TT, 2>& r)  const { return (r.x * x) + (r.y* y); }
+		template<typename TT = T, typename = std::enable_if<N == 2>::type>  inline T cross(const vec<TT,2>& r)  const { return (r.x * y) - (r.x* y); }
+		template<typename TT = T, typename = std::enable_if<N == 2>::type> inline T determinant(const vec<TT, 2>& a, const vec<TT, 2>& b) const { return ((a.x - x)*(b.y - y)) - ((a.y - y)*(b.x - x)); }
+		inline vec& normalize() { *this *= umath::isqrt(length_sqr()); return *this; }
+		inline vec normalize() const {
+			float invLength = isqrt(length_sqr());
+			return vec2f(x * invLength, y * invLength);
+		}
 	};
-	template<typename T, size_t N> constexpr vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return vec_add(l, r, gen_seq<N>{}); }
-	template<typename T, size_t N> constexpr inline vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a + b; }); }
-	template<typename T, size_t N> constexpr inline vec<T, N> operator-(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T a, T b) { return a - b; }); }
-	template<typename T, size_t N> constexpr inline vec<T, N>& operator-=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a -= b; }); }
+	template<class T, int N, class F, int... Is> constexpr inline vec<T, N> transform_vec(vec<T, N> const &lhs, vec<T, N>const &rhs, F f, seq<Is...>) { return vec<T, N>(f(lhs[Is], rhs[Is])...); }
+	template<class T, int N, class F> constexpr inline vec<T, N>  transform_vec(vec<T, N> const &lhs, vec<T, N>const &rhs, F f) { return transform(lhs, rhs, f, gen_seq<N>{}); }
+	//template<typename T, size_t N> constexpr inline vec<T, N> operator+(const vec<T, N>& l, const vec<T, N>&r) { vec<T, N> temp(l); temp += l; return temp; }
+	// while we could run loops here, this way we can make the add/subtract operations const
+	template<typename T, typename A, size_t N> inline vec<T, N> operator+(const vec<T, N>& l, const vec<A, N>&r) { vec<T, N> ret(l); ret += r; return ret; }
+	template<typename T, typename A, size_t N> inline vec<T, N> operator-(const vec<T, N>& l, const vec<A, N>&r) { vec<T, N> ret(l); ret -= r; return ret; }
+
+//	template<typename T, typename A, size_t N> inline vec<T, N> operator-(const vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](const T& a, const T& b) { return a - b; }); }
+//	template<typename T, size_t N> constexpr inline vec<T, N>& operator-=(vec<T, N>& l, const vec<T, N>&r) { return transform(l, r, [](T& a, T b) { a -= b; }); }
 
 	template<typename T,typename D> struct color4_base {
 		typedef typename T type;
@@ -392,26 +481,10 @@ namespace umath {
 		color4f& operator*=(float o) { r *= o; g *= o; b *= b; return *this; }
 	};
 
-	struct vec2i : public vec_base<int, 2> {
-		static const vec2i zero;
-		static const vec2i one;
-		static const vec2i one_x;
-		static const vec2i one_y;
-		static const vec2i max;
-		static const vec2i min;
-		//constructor
-		vec2i() : vec_base() {}
-		vec2i(int x, int y) : vec_base(x, y) {}
-
-	//	vec2i& set(int X, int Y) { x = X; y = Y; return *this; }
-	//	vec2i& set(const vec2i& r) { x = r.x; y = r.y; return *this; }
-	//	inline bool operator==(const vec2i &r) const { return compare(r); }
-	//	inline bool operator!=(const vec2i &r) const { return !compare(r); }
-		
-
-	};
-
-
+	typedef  vec<float, 2> vec2f;
+	typedef  vec<int, 2> vec2i;
+	typedef  vec<float, 3> vec3f;
+#if 0
 	struct vec2f :public vec_base<float,2> {
 		// some simple constants
 		static const vec2f zero;
@@ -641,8 +714,11 @@ namespace umath {
 			(xz2 + yw2)*b.x + (yz2 - xw2)*b.y + (wwyy - xxzz)*b.z
 		);
 	}
+#endif
 	typedef std::tuple<vec2f, vec2f, vec2i> vertex;
 	inline void test2() {
+		auto test3333 = array_helpers::array_set<3>::apply(0.0f);
+
 		color4b test2;
 		color4f test4;
 		vec2f test5;

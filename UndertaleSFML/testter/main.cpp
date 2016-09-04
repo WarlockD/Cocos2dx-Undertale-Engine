@@ -96,28 +96,7 @@ namespace array_helpers {
 		print_vect(os, v, gen_seq<static_cast<int>(N)>{});
 		return os << ")";
 	}
-	template<class F, class... Args>
-	constexpr auto index_invoke(F f, int i, Args&&... args)
-		-> decltype(f(args[i]...))
-	{
-		return f(args[i]...);
-	}
 
-	template<class F, int... Is, class... Args>
-	constexpr auto transform_impl(F f, seq<Is...>, Args&&... args)
-		->vec<decltype(f(args[0]...)), sizeof...(Is)>
-	{
-		using T = decltype(f(args[0]...);
-		return vec<T, sizeof...(Is)>(index_invoke(f, Is, std::forward<Args>(args)...)...);
-	}
-
-	template<size_t N, class F, class... Args>
-	constexpr auto transform(F f, Args&&... args) ->vec<decltype(f(args[0]...)), sizeof...(Args)>
-	{
-	///	using N = sizeof...(Args);
-	//	static_assert(N != 2, "Fuck me");
-		return transform_impl(f, gen_seq<sizeof...(Args)>, std::forward<Args>(args)...);
-	}
 	/*
 
 	template<class T, int N, class F, int... Is> 

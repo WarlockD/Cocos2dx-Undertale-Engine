@@ -106,15 +106,27 @@ struct almost_zero {
 	bool operator()(const T &l) const { return almost_equal_to<T>()(l, static_cast<T>(0)); }
 };
 
+struct ChangedInterface {
+	virtual bool changed() const = 0;
+	virtual void changed(bool value) const = 0;
+	virtual bool changed_then_reset() const = 0;
+	virtual ~ChangedInterface() {}
+};
 
-
-class ChangedCass {
-public:
-	ChangedCass() : _changed(true) {} // set true caues at the start of the class it is changed
-	bool changed() const { return _changed; }
-protected:
+class ChangedCass : public ChangedInterface {
 	mutable bool _changed;
-	bool changed(bool value) const { bool ret = _changed; _changed = value; return ret; }
+public:
+	explicit ChangedCass(bool start=false) : _changed(start) {} // set true caues at the start of the class it is changed
+	bool changed() const { return _changed; }
+	bool operator=(bool b) { _changed = b; return b; }
+	bool changed_then_reset() const {
+		if (_changed) {
+			_changed = false; 
+			return true;
+		}
+		else return false;
+	}
+	void changed(bool value) const {  _changed = value;  }
 	friend class RenderableCache; // all the friends that can reset _changed
 };
 
@@ -152,6 +164,7 @@ public:
 	template<typename Q> typename std::enable_if<!std::is_const<Q>::value, reference>::type inline operator*() { return _ref.at(_pos); }
 	template<typename Q> typename std::enable_if<!std::is_const<Q>::value, pointer>::type inline operator->() { return &_ref.at(_pos); }
 	generic_iterator(container_refrence ref, difference_type pos) : _pos(pos), _ref(ref) {}
+	difference_type pos() const { return _pos; }
 protected:
 	difference_type _pos;
 	container_refrence _ref;
@@ -394,6 +407,7 @@ inline std::ostream& operator<<(std::ostream& os, const sf::Vector2f& v) {
 	os << std::fixed << std::setprecision(3) << '('  << v.x << ',' << v.y << ')';
 	return os;
 }
+
 
 
 #if 0

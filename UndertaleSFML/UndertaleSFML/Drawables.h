@@ -56,14 +56,14 @@ public:
 		return sf::FloatRect(vmin, vmax - vmin);
 	}
 	virtual sf::FloatRect bounds(const sf::Transform&t) const { return t.transformRect(bounds()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, begin(), end()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t) const { for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); }
-	virtual void insert(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace(at, t * v.position, color, v.texCoords); }
-	virtual void insert(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
-	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t) const {
+	virtual void copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, begin(), end()); }
+	virtual void copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t) const { for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); }
+	virtual void copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace(at, t * v.position, color, v.texCoords); }
+	virtual void copy(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
+	virtual void copy(std::vector<sf::Vertex>& verts, const sf::Transform& t) const {
 		for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords);
 	}
-	virtual void insert(std::vector<sf::Vertex>& verts, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace_back(t * v.position, color, v.texCoords); }
+	virtual void copy(std::vector<sf::Vertex>& verts, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace_back(t * v.position, color, v.texCoords); }
 	virtual ~Renderable() {}
 	std::reference_wrapper<Renderable> ref() { return std::ref(*this); }
 	std::reference_wrapper<const Renderable> ref() const { return std::ref(*this); }
@@ -84,16 +84,38 @@ typedef std::reference_wrapper<Renderable> RenderableRef;
 class Mesh : public Renderable {
 	std::vector<sf::Vertex> _verts;
 	const sf::Texture* _texture;
+	typedef std::vector<sf::Vertex>::const_iterator vector_const_iterator;
+	typedef std::vector<sf::Vertex>::iterator vector_iterator;
 public:
 	virtual const sf::Vertex& at(size_t index) const { return _verts[index]; }
-	virtual const sf::Texture* texture() const override { return _texture; }
-	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
+	sf::Vertex& at(size_t index) { return _verts[index]; }
+	sf::Vertex& operator[](size_t index) { return at(index); }
+	iterator begin() { return iterator(*this, 0); }
+	iterator end() { return iterator(*this, (int)size()); }
 
+	virtual const sf::Texture* texture() const override { return _texture; }
+	void texture(const sf::Texture* texture)  { _texture= texture; }
+	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
+	void clear() { _verts.clear(); }
+	void resize(size_t t) { _verts.resize(t); }
+	void reserve(size_t t) { _verts.reserve(t); }
+	virtual const sf::Vertex& at(size_t index) const = 0;
+	// end interface, the rest is just optimiztion
+	
 	Mesh() : _texture(nullptr) {}
 	Mesh(const sf::Texture* texture, const std::vector<sf::Vertex>& verts) : _texture(texture), _verts(verts) {}
 	Mesh(const sf::Texture* texture, std::vector<sf::Vertex>&& verts) : _texture(texture), _verts(std::move(verts)) {}
 	Mesh(const std::vector<sf::Vertex>& verts) : _texture(nullptr), _verts(verts) {}
 	Mesh(const std::vector<sf::Vertex>&& verts) : _texture(nullptr), _verts(std::move(verts)) {}
+	template<typename... Targs>
+	void emplace_back(Targs&&... Fargs) { _verts.emplace_back(Fargs...); }
+	void push_back(sf::Vertex&&v) { _verts.push_back(std::move(v));}
+	void push_back(const sf::Vertex&v) { _verts.push_back(v); }
+	iterator insert(const_iterator where, sf::Vertex&&v) {  _verts.insert(_verts.begin() + where.pos(), std::move(v)); }
+	iterator insert(const_iterator where, const sf::Vertex&v) { _verts.insert(_verts.begin() + where.pos(), v); }
+	template<typename... Targs>
+	iterator emplace(const_iterator where, Targs&&... Fargs) { return _verts.emplace(_verts.begin() + where.pos(), Fargs...); }
+
 };
 class SpriteFrameBase : public Renderable ,public sf::Drawable , public ChangedCass {
 public:
@@ -153,8 +175,8 @@ public:
 	// custom stuff
 	size_t image_index() const { return _image_index; }
 	void image_index(size_t index) { _image_index = index % _frames.size(); }
-	bool next_frame() override final { image_index(image_index() + 1); _changed = true;  return true; }
-	bool prev_frame() override final { image_index(image_index() - 1); _changed = true; return true; }
+	bool next_frame() override final { image_index(image_index() + 1); changed(true);  return true; }
+	bool prev_frame() override final { image_index(image_index() - 1); changed(true); return true; }
 	void push_back(const SpriteFrame& frame) { _frames.push_back(frame); }
 	SpriteFrameCollection& operator+=(const SpriteFrame& frame){_frames.push_back(frame); return *this; }
 	SpriteFrameCollection& operator=(const std::vector<SpriteFrame>& frames) { _frames = frames; return *this; }
@@ -167,7 +189,8 @@ public:
 };
 
 
-class Body : public LockingObject , public ChangedCass {
+class Body : public LockingObject, public ChangedCass {
+protected:
 	sf::Vector2f _position;
 	sf::Vector2f _origin;
 	sf::Vector2f _scale;
@@ -176,14 +199,14 @@ class Body : public LockingObject , public ChangedCass {
 	mutable sf::Transform _transform;
 public:
 	Body();
-	void setPosition(const sf::Vector2f& v);
+	virtual void setPosition(const sf::Vector2f& v);
 	void setPosition(float x, float y) { setPosition(sf::Vector2f(x, y)); }
-	void setOrigin(const sf::Vector2f& v);
+	virtual void setOrigin(const sf::Vector2f& v);
 	void setOrigin(float x, float y) { setOrigin(sf::Vector2f(x, y)); }
-	void setScale(const sf::Vector2f& v);
+	virtual void setScale(const sf::Vector2f& v);
 	void setScale(float x, float y) { setScale(sf::Vector2f(x, y)); }
 	void setScale(float x) { setScale(sf::Vector2f(x, x)); }
-	void setRotation(float angle);
+	virtual void setRotation(float angle);
 	void move(const sf::Vector2f& v) { setPosition(getPosition() + v); }
 	const sf::Vector2f& getPosition() const { return _position; }
 	const sf::Vector2f& getOrigin() const { return _origin; }
@@ -196,3 +219,30 @@ inline std::ostream& operator<<(std::ostream& os, const Body& body) {
 	return os;
 }
 
+class  GameObject : public Body {
+	sf::Vector2f _size;
+	sf::FloatRect _bounds;
+public:
+	GameObject() : _size(0.0f, 0.0f), _bounds() {}
+	void setSize(const sf::Vector2f& size) { _size = size; }
+	void setSize(float x, float y) { _size = sf::Vector2f(x, y); }
+	const sf::Vector2f& getSize() const { return _size; }
+	virtual void setPosition(const sf::Vector2f& v) override { 
+		_bounds.left = v.x; _bounds.top = v.y;
+		Body::setPosition(v);
+	}
+	virtual void setScale(const sf::Vector2f& v) override { 
+		_bounds.width = _size.x * v.x;
+		_bounds.height = _size.y * v.y;
+		Body::setScale(v);
+	}
+	const sf::FloatRect& getBounds() const { return _bounds; }
+	virtual ~GameObject() {}
+};
+
+class Room : public Renderable {
+	std::unordered_map<const sf::Texture*, Mesh> _tiles;
+	std::vector<SpriteFrame> _backgrounds;
+	std::vector<SpriteFrame> _forgrounds;
+	std::vector<std::unique_ptr<GameObject>> _objects;
+};

@@ -316,19 +316,21 @@ void Body::setPosition(const sf::Vector2f& v) {
 }
 void Body::setOrigin(const sf::Vector2f& v) {
 	auto lock = safeLock();
-	if (!global::AlmostEqualRelative(v, _origin)) { _origin = v; _transformNeedUpdate  = true; changed(true);}
+	if (!global::AlmostEqualRelative(v, _origin)) { _origin = v; _transformNeedUpdate   = true; }
 }
 
 void Body::setScale(const sf::Vector2f& v) {
 	auto lock = safeLock();
-	if (!global::AlmostEqualRelative(v, _scale)) { _scale = v; _transformNeedUpdate  = true;  changed(true);}
+	if (!global::AlmostEqualRelative(v, _scale)) { _scale = v; _transformNeedUpdate = true; changed(true);
+	}
 }
 
 void Body::setRotation(float angle) {
 	angle = static_cast<float>(std::fmod(angle, 360));
 	if (angle < 0) angle += 360.f;
 	auto lock = safeLock();
-	if (!global::AlmostEqualRelative(angle, _rotation)) { _rotation = angle; _transformNeedUpdate  = true; changed(true); }
+	if (!global::AlmostEqualRelative(angle, _rotation)) { _rotation = angle; _transformNeedUpdate  = true; changed(true);
+	}
 }
 
 

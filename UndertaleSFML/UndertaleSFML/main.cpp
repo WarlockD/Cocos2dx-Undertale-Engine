@@ -239,9 +239,10 @@ void gameLoop() {
 					console::test_vt("Testing");
 					break;
 				}
-				player.receive(event);
+				
 				break;
 			}
+			player.receive(event);
 		}
 	//	window.clear();
 		sf::Time elapsed = clock.restart();
@@ -250,7 +251,7 @@ void gameLoop() {
 	}
 }
 int main(int argc, const char* argv[]) {
-	array_helpers::example_sum();
+	//array_helpers::example_sum();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
 	console::init();
 	//logging::init_cerr();

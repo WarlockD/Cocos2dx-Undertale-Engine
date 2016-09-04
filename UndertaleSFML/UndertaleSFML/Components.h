@@ -3,6 +3,7 @@
 #include "Drawables.h"
 #include "UndertaleLoader.h"
 
+
 struct Bounds {
 	explicit Bounds(sf::FloatRect bounds) :bounds(bounds) {}
 	sf::FloatRect bounds;
@@ -59,23 +60,34 @@ public:
 	explicit Animation(float fps) : _watch(std::fabs(fps)), _reverse(fps > 0.0f ? false : true) {}
 	bool update(Renderable& renderable, float dt);
 };
+enum class  Direction : char {
+	DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
+};
 
 class Player : public SpriteFrameBase {
 	enum class  PlayerFacing : char {
 		DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
 	};
 	std::array<UndertaleSprite, 4> _sprites;
-
+	float _frameTime;
 	PlayerFacing _facing;
 	int health;
 	int status;
+	sf::Vector2f _moving_speed;
+	bool _directionDown[4];
 	bool in_overworld;
 	int _direction;
 	ex::Entity _enity;
 	bool _ismoving;
+	friend class PlayerOverWorldSystem;
 public:
-	virtual bool next_frame() { if (_ismoving) _sprites[(int)_facing].next_frame(); return _ismoving; }; // This interface just tells the sprite to do next frame
-	virtual bool prev_frame() { if (_ismoving) _sprites[(int)_facing].next_frame(); return _ismoving; }; // This interface just tells the sprite to do prev frame
+	bool isMoving() const {
+		return _directionDown[0] || _directionDown[1] || _directionDown[2] || _directionDown[3];
+	}
+	bool isMoving(PlayerFacing direction) const { return _directionDown[(char)direction]; }
+	virtual bool next_frame() { 
+		bool moving = isMoving(); if (moving) _sprites[(int)_facing].next_frame(); return moving; }; // This interface just tells the sprite to do next frame
+	virtual bool prev_frame() { bool moving = isMoving(); if (moving) _sprites[(int)_facing].prev_frame(); return moving; }; // This interface just tells the sprite to do prev frame
 	virtual const sf::Vertex*  ptr() const { return _sprites[(char)_facing].ptr(); }
 	const sf::Texture* texture() const override final { return _sprites[(char)_facing].texture(); }
 	Player() {} // does NOTHING  use load

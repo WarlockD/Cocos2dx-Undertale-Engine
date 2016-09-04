@@ -10,7 +10,51 @@ PlayerOverWorldSystem::PlayerOverWorldSystem(ex::EntityX& app,sf::RenderTarget &
 	//_player.load_resources(app);
 }
 void PlayerOverWorldSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt)  {
+	// we update the player
+	static constexpr float movement_amount = 30.0f;
+	if (_player.isMoving()) {
 
+		sf::Vector2f movement;
+		bool turned = false;
+		if (_player.isMoving(Player::PlayerFacing::LEFT)) {
+			//if (self.xprevious == self.x + 3) self.x -= 2; else self.x -= 3;
+			movement.x -= movement_amount;
+			turned = true;
+			if (_player.isMoving(Player::PlayerFacing::UP) && _player._facing == Player::PlayerFacing::UP) turned = false;
+			if (_player.isMoving(Player::PlayerFacing::DOWN) && _player._facing == Player::PlayerFacing::DOWN) turned = false;
+			if (turned) _player._facing = Player::PlayerFacing::LEFT;
+		}
+		if (_player.isMoving(Player::PlayerFacing::UP)) {
+			movement.y -= movement_amount;
+			turned = true;
+			if (_player.isMoving(Player::PlayerFacing::RIGHT) && _player._facing == Player::PlayerFacing::RIGHT) turned = false;
+			if (_player.isMoving(Player::PlayerFacing::LEFT) && _player._facing == Player::PlayerFacing::LEFT) turned = false;
+			if (turned) _player._facing = Player::PlayerFacing::UP;
+		}
+		if (_player.isMoving(Player::PlayerFacing::RIGHT) && !_player.isMoving(Player::PlayerFacing::LEFT)) {
+			movement.x += movement_amount;
+			turned = true;
+			if (_player.isMoving(Player::PlayerFacing::UP) && _player._facing == Player::PlayerFacing::UP) turned = false;
+			if (_player.isMoving(Player::PlayerFacing::DOWN) && _player._facing == Player::PlayerFacing::DOWN) turned = false;
+			if (turned) _player._facing = Player::PlayerFacing::RIGHT;
+		}
+		if (_player.isMoving(Player::PlayerFacing::DOWN) && !_player.isMoving(Player::PlayerFacing::UP)) {
+			movement.y += movement_amount;	
+			turned = true;
+			if (_player.isMoving(Player::PlayerFacing::RIGHT) && _player._facing == Player::PlayerFacing::RIGHT) turned = false;
+			if (_player.isMoving(Player::PlayerFacing::LEFT) && _player._facing == Player::PlayerFacing::LEFT) turned = false;
+			if (turned) _player._facing = Player::PlayerFacing::DOWN;
+		}
+		_player._frameTime += dt;
+		if (_player._frameTime > 0.2f) {
+			_player._frameTime = 0.0f;
+			_player._sprites[(int)_player._facing].next_frame();
+		}
+		_player._enity.component<Body>()->move(movement*dt);
+	} else {
+		_player._sprites[(char)_player._facing].image_index(0);
+		_player._frameTime = 0;
+	}
 }
 
 bool Player::load_resources(ex::EntityX& app) {
@@ -26,12 +70,12 @@ bool Player::load_resources(ex::EntityX& app) {
 	
 	_enity = app.entities.create();
 	_enity.assign<Body>();
-	_enity.component<Body>()->setScale(2.0f);
+	_enity.component<Body>()->setScale(1.5f);
 	_enity.assign<RenderableCache>(*this);
 	_enity.assign<Velocity>();
-	
-	_enity.component<Body>()->setPosition(50, 50);
 
+	_enity.component<Body>()->setPosition(50, 50);
+	_directionDown[0] = _directionDown[1] = _directionDown[2] = _directionDown[3] = false;
 	//app.events.subscribe<SystemEvent>(*this);
 	return true;
 }
@@ -41,42 +85,42 @@ Player::~Player() {
 	}
 }
 void Player::receive(const sf::Event &event) {
-	if (!_ismoving &&  event.type == sf::Event::EventType::KeyPressed) {
+	switch (event.type) {
+	case sf::Event::EventType::KeyPressed:
 		switch (event.key.code) {
 		case sf::Keyboard::Key::A:
-			_enity.component<Velocity>()->velocity.x = -50.0f;
-			_enity.assign<Animation>(0.25f);
-			_facing = PlayerFacing::LEFT;
-			_ismoving = true;
-			changed(true);
+			_directionDown[(int)PlayerFacing::LEFT] = true;
 			break;
 		case sf::Keyboard::Key::D:
-			_enity.component<Velocity>()->velocity.x = 50.0f;
-			_enity.assign<Animation>(0.25f);
-			_facing = PlayerFacing::RIGHT;
-			_ismoving = true;
-			changed(true);
+			_directionDown[(int)PlayerFacing::RIGHT] = true;
+			break;
+		case sf::Keyboard::Key::W:
+			_directionDown[(int)PlayerFacing::UP] = true;
+			break;
+		case sf::Keyboard::Key::S:
+			_directionDown[(int)PlayerFacing::DOWN] = true;
 			break;
 		}
-	}
-	else if (_ismoving &&  event.type == sf::Event::EventType::KeyReleased) {
+		break;
+	case sf::Event::EventType::KeyReleased:
 		switch (event.key.code) {
 		case sf::Keyboard::Key::A:
-			_enity.component<Velocity>()->velocity.x = 0.0f;
-			//_facing = PlayerFacing::LEFT;
-			_ismoving = false;
-			changed(true);
+			_directionDown[(int)PlayerFacing::LEFT] = false;
 			break;
 		case sf::Keyboard::Key::D:
-			_enity.component<Velocity>()->velocity.x = 0.0f;
-			//_facing = PlayerFacing::RIGHT;
-			_ismoving = false;
-			changed(true);
+			_directionDown[(int)PlayerFacing::RIGHT] = false;
+			break;
+		case sf::Keyboard::Key::W:
+			_directionDown[(int)PlayerFacing::UP] = false;
+			break;
+		case sf::Keyboard::Key::S:
+			_directionDown[(int)PlayerFacing::DOWN] = false;
 			break;
 		}
+		break;
 	}
-}
 
+}
 
 
 
@@ -191,8 +235,8 @@ void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::T
 void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
 	
 	es.each<RenderableRef, Animation>([this,dt](ex::Entity entity, RenderableRef &renderable_ref, Animation &animation) {
-		if (!animation.update(renderable_ref, dt)) entity.remove<Animation>();
-	
+		//if (!animation.update(renderable_ref, dt)) entity.remove<Animation>();
+		animation.update(renderable_ref, dt);
 	});
 }
 
