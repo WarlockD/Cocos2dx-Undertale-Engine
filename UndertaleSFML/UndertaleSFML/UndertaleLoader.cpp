@@ -70,32 +70,81 @@ UndertaleSprite::UndertaleSpriteData::type  UndertaleSprite::UndertaleSpriteData
 		verts.reserve(usprite.frames().size() * 6);
 		for (auto uframe : usprite.frames()) {
 			assert(texture_index == uframe.texture_index); // should be the same for all
-			float left = static_cast<float>(uframe.offset_x);
-			float top = static_cast<float>(uframe.offset_y);
-			float right = static_cast<float>(uframe.offset_x + uframe.width);
-			float bottom = static_cast<float>(uframe.offset_y + uframe.height);
-
-			float u1 = static_cast<float>(uframe.x);
-			float v1 = static_cast<float>(uframe.y);
-			float u2 = static_cast<float>(uframe.x + uframe.width);
-			float v2 = static_cast<float>(uframe.y + uframe.height);
-
-			// Add a quad for the current character
-			verts.emplace_back(Vector2f(left, top), sf::Color::White, Vector2f(u1, v1));
-			verts.emplace_back(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1));
-			verts.emplace_back(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2));
-			verts.emplace_back(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2));
-			verts.emplace_back(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1));
-			verts.emplace_back(Vector2f(right, bottom), sf::Color::White, Vector2f(u2, v2));
+			auto& frame = Global::LoadFrame(uframe);
+			frame.copy(verts);
 		}
 		std::shared_ptr<UndertaleSpriteData> shared_ptr(sprite);
 		weak = shared_ptr; // save in cache
 		return shared_ptr; // return ptr, should move
 	}
 }
+UndertaleRoom::type
+UndertaleRoom::LoadRoom(size_t room_index) {
+	static std::unordered_map<size_t, std::weak_ptr<UndertaleRoom>> cache;
+	auto& weak = cache[room_index];
+	if (!weak.expired()) return weak.lock();
+	else {
+		UndertaleLib::Room uroom = file.LookupRoom(room_index);
+		
+		if (uroom.valid()) {
+			UndertaleRoom* room = new UndertaleRoom;
+			room->_index = room_index;
+			std::unordered_map<size_t, SpriteFrame> _backgroundCache;
+			for (auto& t : uroom.tiles()) {
+				auto& b = _backgroundCache[t.background_index];
+				if (b.texture() == nullptr) b = Global::LookupBackground(t.background_index);
+				auto& tile_mesh = room->_tiles[b.texture()];
+				if (tile_mesh.texture() == nullptr) tile_mesh = TileMap(b.texture(),b.texRect());
+				assert(t.blend == -1);
+				assert(t.scale_x == 1 && t.scale_y == 1);
+				tile_mesh.tile_create(sf::Vector2f(t.x, t.y), sf::IntRect(t.offset_x, t.offset_y, t.width, t.height));
+			}
+			for (auto& o : uroom.objects()) {
+				RoomObject obj;
+				obj.body.setPosition(o.x, o.y); 
+				obj.body.setRotation(o.rotation);
+				obj.body.setScale(o.scale_x, o.scale_y);
+				obj.obj = file.LookupObject(o.object_index);
+				obj.depth = obj.obj.depth();
+				room->_objects.emplace_back(obj);
+			}
+			for (auto& b : uroom.backgrounds()) {
+				if (b.background_index >= 0) {
+					auto& frame = _backgroundCache[b.background_index];
+					if (frame.texture() == nullptr) frame = Global::LookupBackground(b.background_index);
+					RoomBackground bb;
+					bb.frame = frame;
+					bb.strech = b.strech != 0;
+					bb.speed = sf::Vector2f(b.speed_x, b.speed_y);
+					bb.forground = b.foreground != 0;
+					bb.visible = b.visible != 0;
+					bb.pos = sf::Vector2f((float)b.x, (float)b.y);
+					room->_backgrounds.emplace_back(bb);
+				}
+			}
+			std::shared_ptr<UndertaleRoom> shared_ptr(room);
+			weak = shared_ptr; // save in cache
+			return shared_ptr; // return ptr, should move
+		}
+		else return UndertaleRoom::type();
+	}
+}
 
 namespace Global {
-
+	UndertaleLib::Object LookupObject(size_t index) {
+		return file.LookupObject(index);
+	}
+	SpriteFrame LoadFrame(const UndertaleLib::SpriteFrame& uf) {
+		sf::FloatRect bounds(uf.offset_x, uf.offset_y, uf.width, uf.height);
+		sf::IntRect texRect(uf.x, uf.y, uf.width, uf.height);
+		const sf::Texture* texture = &Global::GetUndertaleTexture(uf.texture_index);
+		return SpriteFrame(bounds, texture, texRect);
+	}
+	SpriteFrame LookupBackground(size_t index) {
+		auto& b = file.LookupBackground(index);
+		if (b.valid()) return LoadFrame(b.frame());
+		else return SpriteFrame();
+	}
 	bool LoadUndertaleDataWin(const std::string& filename) {
 		return file.loadFromFilename(filename);
 	}

@@ -3,12 +3,16 @@
 using namespace sf;
 
 namespace global {
+	void InsertFrame(sf::Vertex* verts, const sf::FloatRect& bounds, const sf::FloatRect& texRect, sf::Color fill_color, sf::PrimitiveType type) {
+		float left = bounds.left;
+		float top = bounds.top;
+		float right = bounds.left + bounds.width;
+		float bottom = bounds.top + bounds.height;
 
-	void InsertRectangle(sf::Vertex * verts, float left, float top, float right, float bottom, sf::Color fill_color, sf::PrimitiveType type= sf::PrimitiveType::Triangles) {
-		float u1 = static_cast<float>(0);
-		float v1 = static_cast<float>(0);
-		float u2 = static_cast<float>(1);
-		float v2 = static_cast<float>(1);
+		float u1 = texRect.left;
+		float v1 = texRect.top;
+		float u2 = texRect.left + texRect.width;
+		float v2 = texRect.top + texRect.height;
 		// Add a quad for the current character
 		if (type == sf::PrimitiveType::Triangles) {
 			*verts++ = (Vertex(Vector2f(left, top), fill_color, Vector2f(u1, v1)));
@@ -25,31 +29,20 @@ namespace global {
 			*verts++ = (Vertex(Vector2f(left, bottom), fill_color, Vector2f(u1, v2)));
 		}
 	}
-	void InsertRectangle(sf::Vertex * verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type) {
-		float left = rect.left;
-		float top = rect.top;
-		float right = rect.left + rect.width;
-		float bottom = rect.top + rect.height;
+	void InsertFrame(sf::Vertex* verts, const sf::FloatRect& bounds, const sf::IntRect& texRect, sf::Color fill_color, sf::PrimitiveType type ) {
+		InsertFrame(verts, bounds, sf::FloatRect(static_cast<float>(texRect.left), static_cast<float>(texRect.top), static_cast<float>(texRect.width), static_cast<float>(texRect.height)), fill_color, type);
+	}
+	void InsertFrame(std::vector<sf::Vertex>& verts, const sf::FloatRect& bounds, const sf::FloatRect& texRect, sf::Color fill_color, sf::PrimitiveType type) {
+		size_t pos = verts.size();
+		verts.resize(pos + (type != sf::PrimitiveType::Triangles ? 4 : 6));
+		return InsertFrame(verts.data()+pos, bounds, texRect, fill_color, type);
+	}
+	void InsertFrame(std::vector<sf::Vertex>& verts, const sf::FloatRect& bounds, const sf::IntRect& texRect, sf::Color fill_color, sf::PrimitiveType type) {
+		InsertFrame(verts, bounds, sf::FloatRect(static_cast<float>(texRect.left), static_cast<float>(texRect.top), static_cast<float>(texRect.width), static_cast<float>(texRect.height)), fill_color, type);
+	}
 
-		float u1 = static_cast<float>(0);
-		float v1 = static_cast<float>(0);
-		float u2 = static_cast<float>(1);
-		float v2 = static_cast<float>(1);
-		// Add a quad for the current character
-		if (type == sf::PrimitiveType::Triangles) {
-			*verts++ = (Vertex(Vector2f(left, top), fill_color, Vector2f(u1, v1)));
-			*verts++ = (Vertex(Vector2f(right, top), fill_color, Vector2f(u2, v1)));
-			*verts++ = (Vertex(Vector2f(left, bottom), fill_color, Vector2f(u1, v2)));
-			*verts++ = (Vertex(Vector2f(left, bottom), fill_color, Vector2f(u1, v2)));
-			*verts++ = (Vertex(Vector2f(right, top), fill_color, Vector2f(u2, v1)));
-			*verts++ = (Vertex(Vector2f(right, bottom), fill_color, Vector2f(u2, v2)));
-		}
-		else {
-			*verts++ = (Vertex(Vector2f(left, top), fill_color, Vector2f(u1, v1)));
-			*verts++ = (Vertex(Vector2f(right, top), fill_color, Vector2f(u2, v1)));
-			*verts++ = (Vertex(Vector2f(right, bottom), fill_color, Vector2f(u2, v2)));
-			*verts++ = (Vertex(Vector2f(left, bottom), fill_color, Vector2f(u1, v2)));
-		}
+	void InsertRectangle(sf::Vertex * verts, const sf::FloatRect& bounds, sf::Color fill_color, sf::PrimitiveType type) {
+		InsertFrame(verts, bounds, sf::IntRect(0, 0, 1, 1), fill_color, type);
 	}
 	void draw_box(sf::VertexArray& verts, const sf::FloatRect& rect, float thickness, const sf::Color color) {
 		float left = rect.left;
@@ -284,25 +277,24 @@ namespace global {
 		verts += strip;
 	}
 };
+void Mesh::push_back(const sf::FloatRect& bounds, const sf::FloatRect& texRect, const sf::Color& color) {
+	global::InsertFrame(_verts.vector(), bounds, texRect, color);
+}
+void Mesh::push_back(const sf::FloatRect& bounds, const sf::IntRect& texRect, const sf::Color& color) {
+	global::InsertFrame(_verts.vector(), bounds, texRect, color);
+}
 
 SpriteFrame::SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::IntRect& textureRect, const sf::Color& color) : _texture(texture) {
-	float left = bounds.left;
-	float top = bounds.top;
-	float right = bounds.left + bounds.width;
-	float bottom = bounds.top + bounds.height;
-
-	float u1 = static_cast<float>(textureRect.left);
-	float v1 = static_cast<float>(textureRect.top);
-	float u2 = static_cast<float>(textureRect.left + textureRect.width);
-	float v2 = static_cast<float>(textureRect.top + textureRect.height);
-	sf::Vertex* verts = _verts.data();
-	// Add a quad for the current character
-	*verts++ = (Vertex(Vector2f(left, top), sf::Color::White, Vector2f(u1, v1)));
-	*verts++ = (Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
-	*verts++ = (Vertex(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2)));
-	*verts++ = (Vertex(Vector2f(left, bottom), sf::Color::White, Vector2f(u1, v2)));
-	*verts++ = (Vertex(Vector2f(right, top), sf::Color::White, Vector2f(u2, v1)));
-	*verts++ = (Vertex(Vector2f(right, bottom), sf::Color::White, Vector2f(u2, v2)));
+	global::InsertFrame(_verts.data(), bounds, textureRect, color);
+}
+SpriteFrameRef TileMap::tile_create(const sf::Vector2f& pos, const sf::IntRect& rect) {
+	
+	sf::Vector2f size(rect.width, rect.height);
+	sf::Vector2f offset(_textureRect.left + rect.left, _textureRect.top + rect.top);
+	global::InsertFrame(_verts.vector(), sf::FloatRect(pos, size), sf::FloatRect(offset, size),sf::Color::White);
+	SpriteFrameRef tile(_verts.data() + _verts.size() - 6, _texture);
+	_tiles.push_back(tile);
+	return tile;
 }
 SpriteFrame::SpriteFrame(const sf::FloatRect& bounds, const sf::Color& color) : SpriteFrame(bounds, nullptr, sf::IntRect(0, 0, 1, 1), color) {}
 SpriteFrame::SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::Color& color) : SpriteFrame(bounds, texture, sf::IntRect(0, 0, texture->getSize().x, texture->getSize().y), color) {}

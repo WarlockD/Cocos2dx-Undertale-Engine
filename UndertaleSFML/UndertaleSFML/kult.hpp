@@ -407,6 +407,7 @@ namespace kult {
 		}
 
 		virtual void merge(const type &dst, const type &src) const {
+			static_assert(std::is_copy_assignable<T>::value, "Type canot be copied");
 				add<component>(dst) = get<component>(src);
 			//_assign(add<component>(dst), get<component>(src),_can_move());
 		}

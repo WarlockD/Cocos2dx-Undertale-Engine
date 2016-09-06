@@ -70,7 +70,7 @@ bool Player::load_resources(ex::EntityX& app) {
 	
 	_enity = app.entities.create();
 	_enity.assign<Body>();
-	_enity.component<Body>()->setScale(1.5f);
+//	_enity.component<Body>()->setScale(1.5f);
 	_enity.assign<RenderableCache>(*this);
 	_enity.assign<Velocity>();
 
@@ -212,24 +212,75 @@ RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lin
 	text.setCharacterSize(18);
 	text.setColor(sf::Color::White);
 	test = createTest();
+	_transform.scale(2.0f, 2.0f);
 }
 std::multimap<int, std::reference_wrapper<const sf::Drawable>> sorting;
+void RenderSystem::LoadRoom(size_t index) {
+	for (auto& e : _roomObjects) e.destroy();
+	_roomObjects.clear();
+	_room.reset();
+	_room = std::move(UndertaleRoom::LoadRoom(index));
+	if (_room) {
+		ex::EntityManager &es = global::getEntities();
+		for (auto& o : _room->objects()) {
+			ex::Entity e = es.create();
+			e.assign<UndertaleObject>(o.obj);
+			auto body = e.assign<Body>(o.body);
+			if (o.obj.sprite_index() >= 0) {
+				auto handle = e.assign<UndertaleSprite>(o.obj.sprite_index());
+				e.assign<RenderableCache>(*handle.get());
+				_roomObjects.push_back(e);
+			}
+		}
+	}
+}
 void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
 	RawVertices temp_verts;
 	sortedVerts.clear();
 	debug_lines.clear();
 	size_t draw_count = 0;
+	{
+		if (_room) {
+			if (_room->backgrounds().size() > 0) {
+				for (auto& t : _room->backgrounds()) {
+					if (t.forground) continue;
+					int layer = t.depth;
+					auto& verts = (sortedVerts[layer])[t.frame.texture()];
+					verts.append(t.frame.ptr(), t.frame.ptr() + t.frame.size());
+				}
+				if (_room->tiles().size() > 0) {
+					for (auto& t : _room->tiles()) {
+						auto& verts = (sortedVerts[0])[t.first];
+						const auto& f = t.second;
+						verts += f.verts();
+					}
+				}
+			}
+		}
+	}
+		
 
 	es.each<Body, RenderableCache>([this,&draw_count](ex::Entity entity, Body& body, RenderableCache &lrenderable) {
 		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
 		auto& verts = (sortedVerts[layer])[lrenderable.texture()];
 		lrenderable.update_cache(body);
+	
 		verts += lrenderable.cache().transform_copy(body.getTransform());
 	//	if (draw_all_boxes) {
 	//		draw_box(temp_verts, transform.transformRect(renderable.bounds()));
 	//	}
 	});
+	{
+		if (_room && _room->backgrounds().size() > 0) {
+			for (auto& t : _room->backgrounds()) {
+				if (!t.forground) continue;
+				int layer = t.depth;
+				auto& verts = (sortedVerts[layer])[t.frame.texture()];
+				verts.append(t.frame.ptr(), t.frame.ptr() + t.frame.size());
+			}
+		}
+	}
 }
 
 void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
@@ -264,12 +315,13 @@ void VelocitySystem::update(ex::EntityManager &es, ex::EventManager &events, ex:
 	//console::redraw();
 }
 
-Application::Application(sf::RenderWindow &target) : _window(target), draw_count(0), frame_count(0) {
-	systems.add<PlayerOverWorldSystem>(*this,target);
-	systems.add<VelocitySystem>(target);
-	systems.add<AnimationSystem>(target);
-	systems.add<RenderSystem>(target);
-	render_system = systems.system<RenderSystem>().get();
+Application::Application(sf::RenderWindow &window) : _window(window), draw_count(0), frame_count(0) {
+	_transform.scale(1.5f, 1.5f);
+	systems.add<PlayerOverWorldSystem>(*this, _window);
+	systems.add<VelocitySystem>(_window);
+	systems.add<AnimationSystem>(_window);
+//	systems.add<RenderSystem>(_window);
+//	render_system = systems.system<RenderSystem>().get();
 	systems.configure();
 
 	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
@@ -284,4 +336,5 @@ Application::Application(sf::RenderWindow &target) : _window(target), draw_count
 }
 void Application::init(ex::EntityX& app) {
 	systems.system<PlayerOverWorldSystem>()->init(app);
+	
 }

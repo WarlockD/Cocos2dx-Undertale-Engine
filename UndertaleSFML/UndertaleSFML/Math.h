@@ -104,17 +104,11 @@ namespace umath {
 #endif
 	constexpr float DegreesToRadians(float a) { return a*M_DEG2RAD; }
 	constexpr float RadiansToDegrees(float a) { return a*M_RAD2DEG; }
-	template<class T, class Compare>
-	constexpr const T& clamp(const T& v, const T& lo, const T& hi, Compare comp)
-	{
-		return assert(!comp(hi, lo)),
-			comp(v, lo) ? lo : comp(hi, v) ? hi : v;
+
+	template<class T> inline typename std::enable_if<std::is_arithmetic<T>::value, T>::type clamp(T value, T min, T max) {
+		return std::min(std::max(value, min), max);
 	}
-	template<class T>
-	constexpr const T& clamp(const T& v, const T& lo, const T& hi)
-	{
-		return clamp(v, lo, hi, std::less<>());
-	}
+
 	template<typename T> constexpr T pow_const(T x, unsigned int y) { return y > 1 ? x * pow_const(x, y - 1) : x; }
 	template<typename T> inline T pow(T x, unsigned int y) { T r = x; while (y-- > 1) r *= x; return r; }
 	template<typename T> constexpr T abs_const(T v) { return v >= 0 ? v : -v; }

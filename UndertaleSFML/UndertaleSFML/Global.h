@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 #include <cassert>
 #include <iostream>
 #include <iomanip>
@@ -178,18 +179,18 @@ class RawVertices :  public sf::Drawable {
 public:
 	// vector wrapper
 	// Traits
-	typedef std::vector<sf::Vertex> vector;
-	typedef typename vector::size_type size_type;
-	typedef typename vector::value_type value_type;
-	typedef typename vector::difference_type difference_type;
-	typedef typename vector::const_iterator const_iterator;
-	typedef typename vector::iterator iterator;
-	typedef typename vector::reverse_iterator reverse_iterator;
-	typedef typename vector::const_reverse_iterator const_reverse_iterator;
-	typedef typename vector::const_pointer const_pointer;
-	typedef typename vector::const_reference const_reference;
-	typedef typename vector::pointer pointer;
-	typedef typename vector::reference reference;
+	typedef std::vector<sf::Vertex> vector_type;
+	typedef typename vector_type::size_type size_type;
+	typedef typename vector_type::value_type value_type;
+	typedef typename vector_type::difference_type difference_type;
+	typedef typename vector_type::const_iterator const_iterator;
+	typedef typename vector_type::iterator iterator;
+	typedef typename vector_type::reverse_iterator reverse_iterator;
+	typedef typename vector_type::const_reverse_iterator const_reverse_iterator;
+	typedef typename vector_type::const_pointer const_pointer;
+	typedef typename vector_type::const_reference const_reference;
+	typedef typename vector_type::pointer pointer;
+	typedef typename vector_type::reference reference;
 	typedef typename std::pair<iterator, iterator> range_iterator;
 	typedef typename std::pair<const_iterator, const_iterator> const_range_iterator;
 
@@ -200,10 +201,10 @@ public:
 
 
 	RawVertices(sf::PrimitiveType ptype) : _ptype(ptype) {}
-	RawVertices(const vector& verts) : _verts(verts), _ptype(sf::PrimitiveType::Triangles) {}
-	RawVertices(sf::PrimitiveType ptype, const vector& verts) : _verts(verts), _ptype(ptype) {}
-	RawVertices(vector&& verts) : _verts(std::move(verts)), _ptype(sf::PrimitiveType::Triangles) {}
-	RawVertices(sf::PrimitiveType ptype, vector&& verts) : _verts(std::move(verts)), _ptype(ptype) {}
+	RawVertices(const vector_type& verts) : _verts(verts), _ptype(sf::PrimitiveType::Triangles) {}
+	RawVertices(sf::PrimitiveType ptype, const vector_type& verts) : _verts(verts), _ptype(ptype) {}
+	RawVertices(vector_type&& verts) : _verts(std::move(verts)), _ptype(sf::PrimitiveType::Triangles) {}
+	RawVertices(sf::PrimitiveType ptype, vector_type&& verts) : _verts(std::move(verts)), _ptype(ptype) {}
 	template<class IT, class = typename enable_if<std::is_iterator<IT>::value, void>::type>
 	RawVertices(IT begin, IT end) : _verts(begin, end), _ptype(sf::PrimitiveType::Triangles) {}
 	template<class IT, class = typename enable_if<std::is_iterator<IT>::value, void>::type>
@@ -224,9 +225,9 @@ public:
 	const_reference at(size_t index) const { return _verts.at(index); }
 	size_t size() const { return _verts.size(); }
 	pointer data() { return _verts.data(); }
+	const_pointer data() const { return _verts.data(); }
 	void resize(size_type size) { _verts.resize(size); }
 	void reserve(size_type size) { _verts.reserve(size); }
-	const_pointer data() const { return _verts.data(); }
 	void push_back(const value_type& v) { _verts.push_back(v); }
 	void push_back(value_type&& v) { _verts.push_back(v); }
 	template<class... Args> void emplace_back(Args&&... args) { _verts.emplace_back(std::forward<Args>(args)...); }
@@ -266,7 +267,7 @@ public:
 	typename std::enable_if<std::is_iterator<IT>::value, void>::type
 		append(IT begin, IT end) { _verts.insert(_verts.begin(), begin, end); }
 
-	void append(const vector& verts) { _verts.insert(_verts.begin(), verts.begin(), verts.end()); }
+	void append(const vector_type& verts) { _verts.insert(_verts.begin(), verts.begin(), verts.end()); }
 	void append(const RawVertices& verts) { global::convert(verts._verts, verts.primitive_type(), _verts, primitive_type()); }
 	void append(const sf::VertexArray& verts) { global::convert(verts, _verts, primitive_type()); }
 
@@ -297,6 +298,15 @@ public:
 		copy *= transform;
 		return copy;
 	}
+	// simple move all the verts by offset, faster than trasform?
+	void traslate(const sf::Vector2f& pos) { for (auto& v : _verts) v.position += pos; }
+	void scale(const sf::Vector2f& scale) {
+		for (auto& v : _verts) {
+			v.position.x *= scale.x;
+			v.position.y *= scale.y;
+		} 
+	}
+
 	void fill_color(const sf::Color& color) { for (auto& v : _verts) v.color = color; }
 	sf::FloatRect bounds() const {
 		sf::Vector2f vmin;
@@ -311,21 +321,19 @@ public:
 		return sf::FloatRect(vmin, vmax - vmin);
 	}
 	 sf::PrimitiveType primitive_type() const { return _ptype; }
+
+	 vector_type& vector() {  return _verts;  }
+	 const vector_type& vector() const { return _verts; }
 protected:
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const {
 		if (size() > 0) target.draw(data(), size(), primitive_type(), states);
 	}
-	vector _verts;
+	vector_type _verts;
 	sf::PrimitiveType _ptype;
 };
 
 
-namespace global {
-	 std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color);
-	 void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles); 
-	 void InsertRectangle(RawVertices& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
-	 void InsertRectangle(sf::VertexArray& verts, const sf::FloatRect& rect, sf::Color fill_color);// convert
-};
+
 
 /*
 

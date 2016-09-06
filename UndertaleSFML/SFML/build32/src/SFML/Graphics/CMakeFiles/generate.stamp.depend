@@ -1,0 +1,11 @@
+# CMake generation dependency list for this directory.
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/src/SFML/Graphics/CMakeLists.txt
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/FindOpenGL.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/FindPackageMessage.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/CMakeParseArguments.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/FindJPEG.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/FindPackageMessage.cmake
+C:/Program Files (x86)/CMake/share/cmake-3.4/Modules/CMakeParseArguments.cmake
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/cmake/Modules/FindFreetype.cmake

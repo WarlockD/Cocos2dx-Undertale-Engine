@@ -1,0 +1,8 @@
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/src/SFML/Main/CMakeFiles/sfml-main.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/src/SFML/Audio/CMakeFiles/sfml-audio.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/src/SFML/Graphics/CMakeFiles/sfml-graphics.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/CMakeFiles/ALL_BUILD.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/src/SFML/Window/CMakeFiles/sfml-window.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/src/SFML/System/CMakeFiles/sfml-system.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/CMakeFiles/ZERO_CHECK.dir
+C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/src/SFML/Network/CMakeFiles/sfml-network.dir

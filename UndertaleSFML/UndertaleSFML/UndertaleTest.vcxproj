@@ -159,10 +159,12 @@
     <ClCompile Include="Components.cpp" />
     <ClCompile Include="Drawables.cpp" />
     <ClCompile Include="Global.cpp" />
+    <ClCompile Include="kult.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="math.cpp" />
     <ClCompile Include="obj_face.cpp" />
     <ClCompile Include="obj_writer.cpp" />
+    <ClCompile Include="room.cpp" />
     <ClCompile Include="UndertaleLabel.cpp" />
     <ClCompile Include="UndertaleLib.cpp" />
     <ClCompile Include="UndertaleLoader.cpp" />
@@ -174,6 +176,7 @@
     <ClInclude Include="conmanip.h" />
     <ClInclude Include="Drawables.h" />
     <ClInclude Include="Global.h" />
+    <ClInclude Include="kult.hpp" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="obj_dialoger.h" />
     <ClInclude Include="obj_writer.h" />
@@ -184,6 +187,17 @@
   <ItemGroup>
     <None Include="label.frag" />
     <None Include="label.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SFML\build32\src\SFML\Audio\sfml-audio.vcxproj">
+      <Project>{7aa5ee86-bf83-3963-a3cd-35b20b3ce40e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\SFML\build32\src\SFML\Graphics\sfml-graphics.vcxproj">
+      <Project>{0c14f8df-e1e6-36b2-baa8-8fbc0bcbad58}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\SFML\build32\src\SFML\System\sfml-system.vcxproj">
+      <Project>{b47a4851-0421-389d-8247-a9e599d79c8f}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

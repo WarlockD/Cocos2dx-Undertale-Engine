@@ -7,6 +7,17 @@ namespace global {
 	RawVertices create_line(sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
 	void insert_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
 	void insert_hair_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color);
+
+	void InsertFrame(sf::Vertex* verts, const sf::FloatRect& bounds, const sf::IntRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	void InsertFrame(sf::Vertex* verts, const sf::FloatRect& bounds, const sf::FloatRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+
+	void InsertFrame(std::vector<sf::Vertex>& verts, const sf::FloatRect& bounds, const sf::IntRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	void InsertFrame(std::vector<sf::Vertex>& verts, const sf::FloatRect& bounds, const sf::FloatRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+
+	std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color);
+	void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	void InsertRectangle(RawVertices& verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	void InsertRectangle(sf::VertexArray& verts, const sf::FloatRect& rect, sf::Color fill_color);// convert
 };
 
 
@@ -24,8 +35,11 @@ struct Renderable  {
 	typedef const element_type& const_element_reference;
 	typedef generic_iterator<Renderable, sf::Vertex> iterator;
 	typedef generic_iterator<const Renderable, const sf::Vertex> const_iterator;
+private:
+	int _depth = 0;
 protected: // protected interface
-	virtual int depth() const { return 0; } // used for depth sorting
+	
+	
 											// sent by the engine in an atempt to optimize draw calls by recreating the texture
 											// not sure if I will use
 	virtual bool changeTexture(const sf::Texture& texture, const sf::IntRect& textRect) { return false; }
@@ -33,7 +47,9 @@ protected: // protected interface
 	virtual iterator end()  { return iterator(*this, (int)size()); }
 	// Interface
 public:
-
+	int depth() const { return _depth; } // used for depth sorting
+	int& depth() { return _depth; }
+	void depth(size_t depth) { _depth = depth; }
 	virtual const sf::Texture* texture() const = 0;
 	virtual size_t size() const = 0;
 	virtual const sf::Vertex& at(size_t index) const = 0;
@@ -80,49 +96,15 @@ template<class C> class SFMLDrawable : public sf::Transformable, public sf::Draw
 
 typedef std::reference_wrapper<Renderable> RenderableRef;
 
-
-class Mesh : public Renderable {
-	std::vector<sf::Vertex> _verts;
-	const sf::Texture* _texture;
-	typedef std::vector<sf::Vertex>::const_iterator vector_const_iterator;
-	typedef std::vector<sf::Vertex>::iterator vector_iterator;
-public:
-	virtual const sf::Vertex& at(size_t index) const { return _verts[index]; }
-	sf::Vertex& at(size_t index) { return _verts[index]; }
-	sf::Vertex& operator[](size_t index) { return at(index); }
-	iterator begin() { return iterator(*this, 0); }
-	iterator end() { return iterator(*this, (int)size()); }
-
-	virtual const sf::Texture* texture() const override { return _texture; }
-	void texture(const sf::Texture* texture)  { _texture= texture; }
-	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
-	void clear() { _verts.clear(); }
-	void resize(size_t t) { _verts.resize(t); }
-	void reserve(size_t t) { _verts.reserve(t); }
-	virtual const sf::Vertex& at(size_t index) const = 0;
-	// end interface, the rest is just optimiztion
-	
-	Mesh() : _texture(nullptr) {}
-	Mesh(const sf::Texture* texture, const std::vector<sf::Vertex>& verts) : _texture(texture), _verts(verts) {}
-	Mesh(const sf::Texture* texture, std::vector<sf::Vertex>&& verts) : _texture(texture), _verts(std::move(verts)) {}
-	Mesh(const std::vector<sf::Vertex>& verts) : _texture(nullptr), _verts(verts) {}
-	Mesh(const std::vector<sf::Vertex>&& verts) : _texture(nullptr), _verts(std::move(verts)) {}
-	template<typename... Targs>
-	void emplace_back(Targs&&... Fargs) { _verts.emplace_back(Fargs...); }
-	void push_back(sf::Vertex&&v) { _verts.push_back(std::move(v));}
-	void push_back(const sf::Vertex&v) { _verts.push_back(v); }
-	iterator insert(const_iterator where, sf::Vertex&&v) {  _verts.insert(_verts.begin() + where.pos(), std::move(v)); }
-	iterator insert(const_iterator where, const sf::Vertex&v) { _verts.insert(_verts.begin() + where.pos(), v); }
-	template<typename... Targs>
-	iterator emplace(const_iterator where, Targs&&... Fargs) { return _verts.emplace(_verts.begin() + where.pos(), Fargs...); }
-
-};
+// sprite frames and mesh have continusious illterators, passed by pointer
 class SpriteFrameBase : public Renderable ,public sf::Drawable , public ChangedCass {
 public:
 	const sf::Vertex& at(size_t i) const override final { return ptr()[i]; }
 	size_t size() const override final { return 6; }
-	virtual sf::FloatRect bounds() const override  { return sf::FloatRect(at(0).position, at(5).position- at(0).position); }
+	const sf::Vector2f frame_size() const { return at(5).position; }
+	virtual sf::FloatRect bounds() const override  { return sf::FloatRect(sf::Vector2f(), frame_size());  }
 	sf::IntRect texRect() const { return sf::IntRect(sf::FloatRect(at(0).texCoords, at(5).texCoords - at(0).texCoords));}
+	const sf::Vector2f texture_offset() const { return at(0).texCoords; } // offset of the start of texture, useful for tiles
 	sf::Color color() const { return ptr()[0].color; }
 	std::reference_wrapper<SpriteFrameBase> ref() { return std::ref(*this); }
 	std::reference_wrapper<const SpriteFrameBase> ref() const { return std::ref(*this); }
@@ -137,6 +119,68 @@ public:
 		target.draw(ptr(), size(), sf::PrimitiveType::Triangles, states);
 	}
 };
+// simple ref to data, used for extra stuff
+// assumes the _ptr is valid.
+
+class SpriteFrameRef : public SpriteFrameBase {
+	const sf::Vertex* _ptr;
+	const sf::Texture* _texture;
+public:
+	explicit SpriteFrameRef(const SpriteFrameBase& base) : _ptr(base.ptr()), _texture(base.texture()) {}
+	SpriteFrameRef& operator=(const SpriteFrameBase& other) { _ptr = other.ptr(); _texture = other.texture(); return *this; }
+	explicit SpriteFrameRef(const sf::Vertex* ptr, const sf::Texture* texture=nullptr) : _ptr(ptr), _texture(texture) {}
+	explicit SpriteFrameRef(const sf::Vertex* ptr, const sf::Texture& texture) : SpriteFrameRef(ptr, &texture) {}
+	void ptr(const sf::Vertex* ptr) { _ptr = ptr; }
+	void texture(const sf::Texture* texture) { _texture = texture; }
+	const sf::Texture* texture() const override final { return _texture; }
+	const sf::Vertex* ptr() const override final { return _ptr; }
+};
+
+
+class Mesh : public Renderable {
+	RawVertices _verts;
+	const sf::Texture* _texture;
+	typedef std::vector<sf::Vertex>::const_iterator vector_const_iterator;
+	typedef std::vector<sf::Vertex>::iterator vector_iterator;
+public:
+	RawVertices& verts() { return _verts; }
+	const RawVertices& verts() const { return _verts; }
+	virtual const sf::Vertex& at(size_t index) const { return _verts[index]; }
+	sf::Vertex& at(size_t index) { return _verts[index]; }
+	sf::Vertex& operator[](size_t index) { return at(index); }
+	iterator begin() { return iterator(*this, 0); }
+	iterator end() { return iterator(*this, (int)size()); }
+
+	virtual const sf::Texture* texture() const override { return _texture; }
+	void texture(const sf::Texture* texture) { _texture = texture; }
+	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
+	void clear() { _verts.clear(); }
+	void resize(size_t t) { _verts.resize(t); }
+	void reserve(size_t t) { _verts.reserve(t); }
+
+	// end interface, the rest is just optimiztion
+
+	Mesh() : _texture(nullptr) {}
+	Mesh(const sf::Texture* texture, const std::vector<sf::Vertex>& verts) : _texture(texture), _verts(verts) {}
+	Mesh(const sf::Texture* texture, std::vector<sf::Vertex>&& verts) : _texture(texture), _verts(std::move(verts)) {}
+	Mesh(const std::vector<sf::Vertex>& verts) : _texture(nullptr), _verts(verts) {}
+	Mesh(const std::vector<sf::Vertex>&& verts) : _texture(nullptr), _verts(std::move(verts)) {}
+	template<typename... Targs>
+	void emplace_back(Targs&&... Fargs) { _verts.emplace_back(Fargs...); }
+	void push_back(sf::Vertex&&v) { _verts.push_back(std::move(v)); }
+	void push_back(const sf::Vertex&v) { _verts.push_back(v); }
+	// faster to use the ptr offsets for frames as Renderable has added costs
+	void push_back(const SpriteFrameBase& frame) { assert(frame.texture() == _texture);  _verts.insert(_verts.end(), frame.ptr(), frame.ptr() + frame.size()); }
+	void push_back(const Mesh& mesh) { assert(mesh.texture() == _texture);  _verts.insert(_verts.end(), mesh._verts.begin(),mesh._verts.end()); }
+	///void push_back(const Renderable& r) { assert(r.texture() == _texture);  _verts.emplace(_verts.end(), r.begin(),r.end()); }
+	void push_back(const sf::FloatRect& bounds, const sf::FloatRect& texRect, const sf::Color& color = sf::Color::White);
+	void push_back(const sf::FloatRect& bounds, const sf::IntRect& texRect, const sf::Color& color = sf::Color::White);
+	iterator insert(const_iterator where, sf::Vertex&&v) { _verts.insert(_verts.begin() + where.pos(), std::move(v)); }
+	iterator insert(const_iterator where, const sf::Vertex&v) { _verts.insert(_verts.begin() + where.pos(), v); }
+	template<typename... Targs>
+	iterator emplace(const_iterator where, Targs&&... Fargs) { return _verts.emplace(_verts.begin() + where.pos(), Fargs...); }
+
+};
 
 class SpriteFrame : public SpriteFrameBase {
 	std::array<sf::Vertex, 6> _verts;
@@ -149,6 +193,29 @@ public:
 	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Color& color = sf::Color::White); // if you just want a box, you can use this to get the verts
 	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::Color& color = sf::Color::White);
 	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::IntRect& textureRect, const sf::Color& color = sf::Color::White);
+	
+};
+
+class TileMap : public Renderable {
+	sf::IntRect _textureRect;
+	const sf::Texture* _texture;
+	std::vector<SpriteFrameRef> _tiles;
+	RawVertices _verts;
+public:
+	TileMap() : _texture(nullptr), _textureRect() {}
+	explicit TileMap(const sf::Texture* texture, const sf::IntRect& textureRect) : _texture(texture), _textureRect(textureRect) {}
+	const sf::Vertex& at(size_t i) const override final { return _verts[i]; }
+	size_t size() const override final { return _verts.size(); }
+	virtual sf::FloatRect bounds() const override { return sf::FloatRect(_textureRect); }
+	const sf::Vertex* ptr() const { return _verts.data(); }
+	const sf::Texture* texture() const override final { return _texture; }
+	void texture(const sf::Texture* texture) { _texture = texture; }
+	
+	size_t tile_count() const { return _tiles.size(); }
+	SpriteFrameRef tile_at(size_t index) const { return _tiles.at(index); }
+	SpriteFrameRef tile_create(const sf::Vector2f& pos, const sf::IntRect& rect);
+	RawVertices& verts() { return _verts; }
+	const RawVertices& verts() const { return _verts; }
 };
 
 class SpriteFrameCollection : public SpriteFrameBase  {
@@ -200,12 +267,17 @@ protected:
 public:
 	Body();
 	virtual void setPosition(const sf::Vector2f& v);
-	void setPosition(float x, float y) { setPosition(sf::Vector2f(x, y)); }
 	virtual void setOrigin(const sf::Vector2f& v);
-	void setOrigin(float x, float y) { setOrigin(sf::Vector2f(x, y)); }
 	virtual void setScale(const sf::Vector2f& v);
-	void setScale(float x, float y) { setScale(sf::Vector2f(x, y)); }
-	void setScale(float x) { setScale(sf::Vector2f(x, x)); }
+	// helpers
+	template<typename TX, typename TY, typename = std::enable_if<std::is_arithmetic<TX>::value&&std::is_arithmetic<TY>::value>::type>
+	void setPosition(TX x, TY y) { setPosition(sf::Vector2f(static_cast<float>(x), static_cast<float>(y))); }
+	template<typename TX, typename TY, typename = std::enable_if<std::is_arithmetic<TX>::value&&std::is_arithmetic<TY>::value>::type>
+	void setOrigin(TX x, TY y) { setOrigin(sf::Vector2f(static_cast<float>(x), static_cast<float>(y))); }
+	template<typename TX, typename TY, typename = std::enable_if<std::is_arithmetic<TX>::value&&std::is_arithmetic<TY>::value>::type>
+	void setScale(TX x, TY y) { setScale(sf::Vector2f(static_cast<float>(x), static_cast<float>(y))); }
+	template<typename TX, typename = std::enable_if<std::is_arithmetic<TX>::value>::type>
+	void setScale(TX x) { setScale(sf::Vector2f(static_cast<float>(x), static_cast<float>(x))); }
 	virtual void setRotation(float angle);
 	void move(const sf::Vector2f& v) { setPosition(getPosition() + v); }
 	const sf::Vector2f& getPosition() const { return _position; }
@@ -240,9 +312,3 @@ public:
 	virtual ~GameObject() {}
 };
 
-class Room : public Renderable {
-	std::unordered_map<const sf::Texture*, Mesh> _tiles;
-	std::vector<SpriteFrame> _backgrounds;
-	std::vector<SpriteFrame> _forgrounds;
-	std::vector<std::unique_ptr<GameObject>> _objects;
-};

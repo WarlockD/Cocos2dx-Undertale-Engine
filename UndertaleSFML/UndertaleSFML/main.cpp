@@ -19,10 +19,10 @@
 #pragma comment(lib, "vorbisenc.lib")
 #pragma comment(lib, "vorbisfile.lib")
 
-#pragma comment(lib, "sfml-main-d.lib")
-#pragma comment(lib, "sfml-system-s-d.lib")
-#pragma comment(lib, "sfml-graphics-s-d.lib")
-#pragma comment(lib, "sfml-window-s-d.lib")
+//#pragma comment(lib, "sfml-main-d.lib")
+//#pragma comment(lib, "sfml-system-s-d.lib")
+//#pragma comment(lib, "sfml-graphics-s-d.lib")
+//#pragma comment(lib, "sfml-window-s-d.lib")
 
 static std::unique_ptr<sf::RenderWindow> s_window;// global window
 static std::unique_ptr<Application> s_app;
@@ -180,35 +180,15 @@ void gameLoop() {
 	bool isPlaying = false;
 	auto font = UFont::LoadUndertaleFont(4);
 	sf::View view(sf::FloatRect(0, 0, 640, 480));
-//	window.setView(view);
-//	auto writer = obj_dialoger::create();
-	//writer.setFont(4);
-//	writer->setConfig();
-//	writer->setText("* mind your p \\Yand\n\r q's and I");
-//	writer->start_typing();
-//	//UndertaleLabel debug_label;
-	
-	UndertaleSprite raw_sprite(1986); 
-	UndertaleSprite raw_sprite2(1982);
+
+//	UndertaleSprite raw_sprite(1986);
+//	UndertaleSprite raw_sprite2(1982);
 
 	//SpriteEnity teste = SpriteEnity::create(1986)
 
-	ex::Entity sprite = global::getEntities().create();
-	sprite.assign<Body>();
-	sprite.component<Body>()->setPosition(20, 50);
-	sprite.component<Body>()->setScale(2.0, 2.0);
-	sprite.assign<RenderableCache>(raw_sprite);
-	sprite.assign<Velocity>(0.0f,10.0f);
-//	sprite.assign<LightRenderable>(raw_sprite);
-	//sprite.assign<Animation>(0.25f);
-
-	ex::Entity sprite2 = global::getEntities().create();
-	sprite2.assign<Body>();
-	sprite2.component<Body>()->setPosition(20, 80);
-	sprite2.component<Body>()->setPosition(20, 60);
-	sprite2.component<Body>()->setScale(2.0, 2.0);
-
 	Player& player = systems.system<PlayerOverWorldSystem>()->getPlayer();
+	//auto render_system = systems.system<RenderSystem>();
+	s_app->LoadRoom(52);
 	while (window.isOpen())
 	{
 		// Handle events
@@ -238,16 +218,21 @@ void gameLoop() {
 				case sf::Keyboard::Return:
 					console::test_vt("Testing");
 					break;
-				}
-				
+				case sf::Keyboard::Num9:
+					
+					s_app->LoadRoom(s_app->getRoomIndex()-1);
 				break;
+				case sf::Keyboard::Num0:
+					s_app->LoadRoom(s_app->getRoomIndex() +1);
+				break;
+				}
 			}
 			player.receive(event);
 		}
-	//	window.clear();
+		//	window.clear();
 		sf::Time elapsed = clock.restart();
 		s_app->update(elapsed.asSeconds());
-	//	window.display();
+		//	window.display();
 	}
 }
 int main(int argc, const char* argv[]) {

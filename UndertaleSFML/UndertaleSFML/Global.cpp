@@ -430,7 +430,6 @@ namespace cvt_triangles {
 };
 
 
-
 struct VertexArrayHack { // : public sf::Drawable {
 	sf::Drawable* vtable_ptr_to_drawable;
 	//virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const {}
