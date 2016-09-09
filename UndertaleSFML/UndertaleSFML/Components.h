@@ -93,7 +93,9 @@ using kSprite = kult::component<'sprt', UndertaleSprite>;
 enum class  Direction : char {
 	DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
 };
+class EnityMovement : public ex::Receiver<EnityMovement> {
 
+};
 class Player : public SpriteFrameBase {
 	enum class  PlayerFacing : char {
 		DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3

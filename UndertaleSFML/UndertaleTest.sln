@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sfml-system", "SFML\build32
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sfml-audio", "SFML\build32\src\SFML\Audio\sfml-audio.vcxproj", "{7AA5EE86-BF83-3963-A3CD-35B20B3CE40E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sfml-window", "SFML\build32\src\SFML\Window\sfml-window.vcxproj", "{D08E4DA9-A13B-310C-87B6-2B90E97E6468}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -75,6 +77,18 @@ Global
 		{7AA5EE86-BF83-3963-A3CD-35B20B3CE40E}.RelWithDebInfo|x64.ActiveCfg = RelWithDebInfo|Win32
 		{7AA5EE86-BF83-3963-A3CD-35B20B3CE40E}.RelWithDebInfo|x86.ActiveCfg = RelWithDebInfo|Win32
 		{7AA5EE86-BF83-3963-A3CD-35B20B3CE40E}.RelWithDebInfo|x86.Build.0 = RelWithDebInfo|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.Debug|x64.ActiveCfg = Debug|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.Debug|x86.ActiveCfg = Debug|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.Debug|x86.Build.0 = Debug|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.MinSizeRel|x64.ActiveCfg = MinSizeRel|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.MinSizeRel|x86.ActiveCfg = MinSizeRel|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.MinSizeRel|x86.Build.0 = MinSizeRel|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.Release|x64.ActiveCfg = Release|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.Release|x86.ActiveCfg = Release|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.Release|x86.Build.0 = Release|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.RelWithDebInfo|x64.ActiveCfg = RelWithDebInfo|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.RelWithDebInfo|x86.ActiveCfg = RelWithDebInfo|Win32
+		{D08E4DA9-A13B-310C-87B6-2B90E97E6468}.RelWithDebInfo|x86.Build.0 = RelWithDebInfo|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

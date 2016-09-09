@@ -82,7 +82,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)ext\include;$(SolutionDir)console;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)extlibs\libs-msvc\x86;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(SolutionDir)ext\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -197,6 +197,9 @@
     </ProjectReference>
     <ProjectReference Include="..\SFML\build32\src\SFML\System\sfml-system.vcxproj">
       <Project>{b47a4851-0421-389d-8247-a9e599d79c8f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\SFML\build32\src\SFML\Window\sfml-window.vcxproj">
+      <Project>{d08e4da9-a13b-310c-87b6-2b90e97e6468}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
