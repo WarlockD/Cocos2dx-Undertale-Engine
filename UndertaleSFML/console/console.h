@@ -345,16 +345,31 @@ namespace console {
 	void gotoy(int y);
 	Point cursor();
 	void scroll(int lines);
+	void scroll_up(int start, int end);
+	void scroll_down(int start, int end);
 	void cls(int i=2);
 	void mode(Mode m);
 	void background(Color c);
 	void foreground(Color c);
 
 	void init();
-
+//http://minnie.tuhs.org/cgi-bin/utree.pl?file=4.4BSD/usr/src/lib/libcurses/refresh.c
 
 	std::ostream& vt100(); // stream for vt100 emulation on console, only simple escape codes are supported however
 	void test_vt(const std::string& text);
+	class window : public std::basic_ostream<char>
+	{
+		std::unique_ptr<std::streambuf> _handle;
+	public:
+		window();
+		window(const Point& p, const Point& s);
+		//virtual ~window();
+		Point pos() const;
+		void pos(const Point& p);
+		Point size() const;
+		void size(const Point& p);
+
+	};
 };
 
 namespace con {
@@ -406,8 +421,5 @@ namespace con {
 
 
 namespace logging {
-	void init_cerr();
-	void init_cout();
-	bool init();
-	void error(const std::string& message);
+
 };

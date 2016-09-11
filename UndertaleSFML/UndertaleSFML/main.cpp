@@ -170,6 +170,7 @@ namespace global {
 	ex::SystemManager& getSystems() { return s_app->systems; }
 };
 
+console::window winerr(console::Point(0, 15), console::Point(50, 10));
 
 namespace ex = entityx;
 void gameLoop() {
@@ -186,7 +187,7 @@ void gameLoop() {
 
 	//SpriteEnity teste = SpriteEnity::create(1986)
 
-	Player& player = systems.system<PlayerOverWorldSystem>()->getPlayer();
+//	Player& player = systems.system<PlayerOverWorldSystem>()->getPlayer();
 	//auto render_system = systems.system<RenderSystem>();
 	s_app->LoadRoom(52);
 	while (window.isOpen())
@@ -203,6 +204,9 @@ void gameLoop() {
 					return;
 				}
 				switch (event.key.code) {
+				case sf::Keyboard::Y:
+					winerr << "Testing" << std::endl;
+					break;
 				case sf::Keyboard::Down:
 					console::test_vt("\33[B");
 					break;
@@ -227,7 +231,7 @@ void gameLoop() {
 				break;
 				}
 			}
-			player.receive(event);
+			PlayerControl::update_keys(event);
 		}
 		//	window.clear();
 		sf::Time elapsed = clock.restart();

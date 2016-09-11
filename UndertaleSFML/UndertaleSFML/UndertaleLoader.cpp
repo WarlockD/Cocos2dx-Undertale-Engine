@@ -54,30 +54,31 @@ std::string replace_extension(const std::string& filename, const std::string& ne
 }
 
 
-
+std::unordered_map<size_t, UndertaleSprite::UndertaleSpriteData::type> UndertaleSprite::_cache;
 UndertaleSprite::UndertaleSpriteData::type  UndertaleSprite::UndertaleSpriteData::LoadSprite(size_t sprite_index) {
-	static std::unordered_map<size_t, std::weak_ptr<UndertaleSpriteData>> cache;
-	auto& weak = cache[sprite_index];
-	if (!weak.expired()) return weak.lock();
+	auto& weak = _cache[sprite_index];
+	if (weak) return weak;
 	else {
 		UndertaleLib::Sprite usprite = file.LookupSprite(sprite_index);
 		UndertaleSpriteData* sprite = new UndertaleSpriteData;
 		sprite->_size = sf::Vector2f(float(usprite.width()), float(usprite.height()));
 		sprite->_index = sprite_index;
-		size_t texture_index = usprite.frames().at(0).texture_index;
-		sprite->_texture = &Global::GetUndertaleTexture(texture_index);
-		auto& verts = sprite->_verts;
-		verts.reserve(usprite.frames().size() * 6);
-		for (auto uframe : usprite.frames()) {
-			assert(texture_index == uframe.texture_index); // should be the same for all
-			auto& frame = Global::LoadFrame(uframe);
-			frame.copy(verts);
-		}
+		sprite->_frames.reserve(usprite.frames().size());
+		for (auto uframe : usprite.frames()) sprite->_frames.emplace_back(Global::LoadFrame(uframe));
 		std::shared_ptr<UndertaleSpriteData> shared_ptr(sprite);
-		weak = shared_ptr; // save in cache
+		_cache.emplace(std::make_pair(sprite_index, shared_ptr));
 		return shared_ptr; // return ptr, should move
 	}
 }
+void UndertaleSprite::sprite_index(size_t index) {
+	if (!_sprite || sprite_index() != index) {
+		auto it = _cache.find(index);
+		if (it != _cache.end()) _sprite = it->second;
+		else _cache.emplace(std::make_pair(index, _sprite = UndertaleSpriteData::LoadSprite(index)));
+		_image_index %= _sprite->frame_count();
+	}
+}
+
 UndertaleRoom::type
 UndertaleRoom::LoadRoom(size_t room_index) {
 	static std::unordered_map<size_t, std::weak_ptr<UndertaleRoom>> cache;

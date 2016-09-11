@@ -6,129 +6,89 @@
 using namespace sf;
 
 
-PlayerOverWorldSystem::PlayerOverWorldSystem(ex::EntityX& app,sf::RenderTarget &target) : target(target), app(app) {
-	//_player.load_resources(app);
-}
-void PlayerOverWorldSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt)  {
-	// we update the player
-	static constexpr float movement_amount = 30.0f;
-	if (_player.isMoving()) {
 
-		sf::Vector2f movement;
-		bool turned = false;
-		if (_player.isMoving(Player::PlayerFacing::LEFT)) {
-			//if (self.xprevious == self.x + 3) self.x -= 2; else self.x -= 3;
-			movement.x -= movement_amount;
-			turned = true;
-			if (_player.isMoving(Player::PlayerFacing::UP) && _player._facing == Player::PlayerFacing::UP) turned = false;
-			if (_player.isMoving(Player::PlayerFacing::DOWN) && _player._facing == Player::PlayerFacing::DOWN) turned = false;
-			if (turned) _player._facing = Player::PlayerFacing::LEFT;
-		}
-		if (_player.isMoving(Player::PlayerFacing::UP)) {
-			movement.y -= movement_amount;
-			turned = true;
-			if (_player.isMoving(Player::PlayerFacing::RIGHT) && _player._facing == Player::PlayerFacing::RIGHT) turned = false;
-			if (_player.isMoving(Player::PlayerFacing::LEFT) && _player._facing == Player::PlayerFacing::LEFT) turned = false;
-			if (turned) _player._facing = Player::PlayerFacing::UP;
-		}
-		if (_player.isMoving(Player::PlayerFacing::RIGHT) && !_player.isMoving(Player::PlayerFacing::LEFT)) {
-			movement.x += movement_amount;
-			turned = true;
-			if (_player.isMoving(Player::PlayerFacing::UP) && _player._facing == Player::PlayerFacing::UP) turned = false;
-			if (_player.isMoving(Player::PlayerFacing::DOWN) && _player._facing == Player::PlayerFacing::DOWN) turned = false;
-			if (turned) _player._facing = Player::PlayerFacing::RIGHT;
-		}
-		if (_player.isMoving(Player::PlayerFacing::DOWN) && !_player.isMoving(Player::PlayerFacing::UP)) {
-			movement.y += movement_amount;	
-			turned = true;
-			if (_player.isMoving(Player::PlayerFacing::RIGHT) && _player._facing == Player::PlayerFacing::RIGHT) turned = false;
-			if (_player.isMoving(Player::PlayerFacing::LEFT) && _player._facing == Player::PlayerFacing::LEFT) turned = false;
-			if (turned) _player._facing = Player::PlayerFacing::DOWN;
-		}
-		_player._frameTime += dt;
-		if (_player._frameTime > 0.2f) {
-			_player._frameTime = 0.0f;
-			_player._sprites[(int)_player._facing].next_frame();
-		}
-		_player._enity.component<Body>()->move(movement*dt);
-	} else {
-		_player._sprites[(char)_player._facing].image_index(0);
-		_player._frameTime = 0;
-	}
-}
 
-bool Player::load_resources(ex::EntityX& app) {
-	
-
-	_sprites[0].sprite_index(1043); 
-	_sprites[1].sprite_index(1045); 
-	_sprites[2].sprite_index(1044); 
-	_sprites[3].sprite_index(1046);
-	_facing = PlayerFacing::DOWN;
-	// assign THEN create the enity
-	_ismoving = false;
-	
-	_enity = app.entities.create();
-	_enity.assign<Body>();
-//	_enity.component<Body>()->setScale(1.5f);
-	_enity.assign<RenderableCache>(*this);
-	_enity.assign<Velocity>();
-
-	_enity.component<Body>()->setPosition(50, 50);
-	_directionDown[0] = _directionDown[1] = _directionDown[2] = _directionDown[3] = false;
-	//app.events.subscribe<SystemEvent>(*this);
-	return true;
-}
-Player::~Player() {
-	if (_enity.valid()) {
-		_enity.destroy();
-	}
-}
-void Player::receive(const sf::Event &event) {
+bool PlayerControl::DirectionDown[4]{ false,false,false,false };
+std::unordered_set<sf::Keyboard::Key> PlayerControl::keys_down;
+void PlayerControl::update_keys(const sf::Event &event) {
 	switch (event.type) {
 	case sf::Event::EventType::KeyPressed:
 		switch (event.key.code) {
 		case sf::Keyboard::Key::A:
-			_directionDown[(int)PlayerFacing::LEFT] = true;
+			DirectionDown[(int)Direction::Left] = true;
 			break;
 		case sf::Keyboard::Key::D:
-			_directionDown[(int)PlayerFacing::RIGHT] = true;
+			DirectionDown[(int)Direction::Right] = true;
 			break;
 		case sf::Keyboard::Key::W:
-			_directionDown[(int)PlayerFacing::UP] = true;
+			DirectionDown[(int)Direction::Up] = true;
 			break;
 		case sf::Keyboard::Key::S:
-			_directionDown[(int)PlayerFacing::DOWN] = true;
+			DirectionDown[(int)Direction::Down] = true;
 			break;
 		}
+		keys_down.emplace(event.key.code);
 		break;
 	case sf::Event::EventType::KeyReleased:
 		switch (event.key.code) {
 		case sf::Keyboard::Key::A:
-			_directionDown[(int)PlayerFacing::LEFT] = false;
+			DirectionDown[(int)Direction::Left] = false;
 			break;
 		case sf::Keyboard::Key::D:
-			_directionDown[(int)PlayerFacing::RIGHT] = false;
+			DirectionDown[(int)Direction::Right] = false;
 			break;
 		case sf::Keyboard::Key::W:
-			_directionDown[(int)PlayerFacing::UP] = false;
+			DirectionDown[(int)Direction::Up] = false;
 			break;
 		case sf::Keyboard::Key::S:
-			_directionDown[(int)PlayerFacing::DOWN] = false;
+			DirectionDown[(int)Direction::Down] = false;
 			break;
 		}
+		keys_down.erase(event.key.code);
 		break;
 	}
+}
 
+sf::Vector2f PlayerControl::getMovement() {
+	sf::Vector2f movement;
+	if (isMoving()) {
+		bool turned = false;
+		if (isMoving(Direction::Left)) {
+			//if (self.xprevious == self.x + 3) self.x -= 2; else self.x -= 3;
+			movement.x -= moving_speed;
+			turned = true;
+			if (isMoving(Direction::Up) && facing == Direction::Up) turned = false;
+			if (isMoving(Direction::Down) && facing == Direction::Down) turned = false;
+			if (turned) facing = Direction::Left;
+		}
+		if (isMoving(Direction::Up)) {
+			
+			movement.y -= moving_speed;
+			turned = true;
+			if (isMoving(Direction::Right) && facing == Direction::Right) turned = false;
+			if (isMoving(Direction::Left) && facing == Direction::Left) turned = false;
+			if (turned) facing = Direction::Up;
+		}
+		if (isMoving(Direction::Right) && !isMoving(Direction::Left)) {
+			movement.x += moving_speed;
+			turned = true;
+			if (isMoving(Direction::Up) && facing == Direction::Up) turned = false;
+			if (isMoving(Direction::Down) && facing == Direction::Down) turned = false;
+			if (turned) facing = Direction::Right;
+		}
+		if (isMoving(Direction::Down) && !isMoving(Direction::Up)) {
+			movement.y += moving_speed;
+			turned = true;
+			if (isMoving(Direction::Right) && facing == Direction::Right) turned = false;
+			if (isMoving(Direction::Left) && facing == Direction::Left) turned = false;
+			if (turned) facing = Direction::Down;
+		}
+	}
+	return movement;
 }
 
 
 
-bool Animation::update(Renderable& renderable, float dt) {
-//	if (_watch.test_then_reset(dt)) 
-//		return _reverse ? renderable.prev_frame() : renderable.next_frame();
-	return true; // we havn't gotten to the next frame yet so just assume true
-}
 /*as a fall back to line()*/
 void line_raw(float x1, float y1, float x2, float y2,
 	float w,
@@ -202,94 +162,7 @@ RawVertices createTest() {
 	return vect;
 }
 RawVertices test;
-RenderSystem::RenderSystem(sf::RenderTarget &target) : target(target), debug_lines(sf::PrimitiveType::Lines) {
-	if (!_font.loadFromFile("LiberationSans-Regular.ttf")) {
-		std::cerr << "error: failed to load LiberationSans-Regular.ttf" << std::endl;
-		exit(1);
-	}
-	text.setFont(_font);
-	text.setPosition(sf::Vector2f(2, 2));
-	text.setCharacterSize(18);
-	text.setColor(sf::Color::White);
-	test = createTest();
-	_transform.scale(2.0f, 2.0f);
-}
-std::multimap<int, std::reference_wrapper<const sf::Drawable>> sorting;
-void RenderSystem::LoadRoom(size_t index) {
-	for (auto& e : _roomObjects) e.destroy();
-	_roomObjects.clear();
-	_room.reset();
-	_room = std::move(UndertaleRoom::LoadRoom(index));
-	if (_room) {
-		ex::EntityManager &es = global::getEntities();
-		for (auto& o : _room->objects()) {
-			ex::Entity e = es.create();
-			e.assign<UndertaleObject>(o.obj);
-			auto body = e.assign<Body>(o.body);
-			if (o.obj.sprite_index() >= 0) {
-				auto handle = e.assign<UndertaleSprite>(o.obj.sprite_index());
-				e.assign<RenderableCache>(*handle.get());
-				_roomObjects.push_back(e);
-			}
-		}
-	}
-}
-void RenderSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
-	RawVertices temp_verts;
-	sortedVerts.clear();
-	debug_lines.clear();
-	size_t draw_count = 0;
-	{
-		if (_room) {
-			if (_room->backgrounds().size() > 0) {
-				for (auto& t : _room->backgrounds()) {
-					if (t.forground) continue;
-					int layer = t.depth;
-					auto& verts = (sortedVerts[layer])[t.frame.texture()];
-					verts.append(t.frame.ptr(), t.frame.ptr() + t.frame.size());
-				}
-				if (_room->tiles().size() > 0) {
-					for (auto& t : _room->tiles()) {
-						auto& verts = (sortedVerts[0])[t.first];
-						const auto& f = t.second;
-						verts += f.verts();
-					}
-				}
-			}
-		}
-	}
-		
 
-	es.each<Body, RenderableCache>([this,&draw_count](ex::Entity entity, Body& body, RenderableCache &lrenderable) {
-		constexpr bool draw_all_boxes = true;
-		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
-		auto& verts = (sortedVerts[layer])[lrenderable.texture()];
-		lrenderable.update_cache(body);
-	
-		verts += lrenderable.cache().transform_copy(body.getTransform());
-	//	if (draw_all_boxes) {
-	//		draw_box(temp_verts, transform.transformRect(renderable.bounds()));
-	//	}
-	});
-	{
-		if (_room && _room->backgrounds().size() > 0) {
-			for (auto& t : _room->backgrounds()) {
-				if (!t.forground) continue;
-				int layer = t.depth;
-				auto& verts = (sortedVerts[layer])[t.frame.texture()];
-				verts.append(t.frame.ptr(), t.frame.ptr() + t.frame.size());
-			}
-		}
-	}
-}
-
-void AnimationSystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
-	
-	es.each<RenderableRef, Animation>([this,dt](ex::Entity entity, RenderableRef &renderable_ref, Animation &animation) {
-		//if (!animation.update(renderable_ref, dt)) entity.remove<Animation>();
-		animation.update(renderable_ref, dt);
-	});
-}
 
 std::unordered_map<size_t, size_t> debug_handles;
 static size_t lineindex = 0;
@@ -301,25 +174,11 @@ size_t findDebugLine(size_t value) {
 	}
 	return it->second;
 }
-void VelocitySystem::update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
-	console::output_context context; // save the terminal information
-	es.each<Body, Velocity>([this, dt](ex::Entity entity, Body& body, Velocity &velocity) {
-		const sf::Vector2f& v = velocity.velocity;
-		if (umath::compare(v.x, 0.0f) && umath::compare(v.y, 0.0f)) return;
-		sf::Vector2f pos = body.getPosition();
-		pos += velocity.velocity * dt;
-		body.setPosition(pos); 
-		auto id = (size_t)entity.id().id();
-	//	std::cout << con::gotoy(findDebugLine(id)) << "\rID " << id << " Velocity " << (velocity.velocity * dt) << "Current Position " << pos << std::endl;
-	});
-	//console::redraw();
-}
+
 
 Application::Application(sf::RenderWindow &window) : _window(window), draw_count(0), frame_count(0) {
 	_transform.scale(1.5f, 1.5f);
-	systems.add<PlayerOverWorldSystem>(*this, _window);
-	systems.add<VelocitySystem>(_window);
-	systems.add<AnimationSystem>(_window);
+	//systems.add<PlayerOverWorldSystem>(*this, _window);
 //	systems.add<RenderSystem>(_window);
 //	render_system = systems.system<RenderSystem>().get();
 	systems.configure();
@@ -335,6 +194,139 @@ Application::Application(sf::RenderWindow &window) : _window(window), draw_count
 
 }
 void Application::init(ex::EntityX& app) {
-	systems.system<PlayerOverWorldSystem>()->init(app);
+//	systems.system<PlayerOverWorldSystem>()->init(app);
 	
+}
+void Application::LoadRoom(size_t index) {
+	ex::EntityManager &es = global::getEntities();
+	for (auto& e : _roomEntitys) e.destroy();
+	_roomEntitys.clear();
+	sortedVerts.clear();
+	_roomObjects.clear();
+	 _static_entitys.clear();
+	_dynamic_enitys.clear();
+	_room.reset();
+	_room = UndertaleRoom::LoadRoom(index);
+	if (_room) {
+		if (_room->objects().size() > 0) {
+			for (auto& o : _room->objects()) {
+				ex::Entity e = es.create();
+				e.assign<UndertaleObject>(o.obj);
+				e.assign<Body>(o.body);
+				e.assign<Layer>(o.obj.depth());
+				if (o.obj.sprite_index() >= 0) {
+					e.assign<UndertaleSprite>(o.obj.sprite_index());
+				}
+				_roomEntitys.emplace_back(e);
+				auto parent = o.obj;
+				while (parent.valid()) {
+					_roomObjects.emplace(std::make_pair((size_t)parent.index(), e.id()));
+					parent = Global::LookupObject(parent.parent_index());
+				}
+				if (o.obj.index() == 1570) { // main char
+					e.assign<PlayerControl>(30.0f); // we can move it
+					auto facing = e.assign<SpriteFacing>(1043, 1045, 1044, 1046);
+					e.assign<SpriteAnimation>(0.2f, facing->facing_sprites[0].image_count());
+				}
+
+			}
+			auto static_it = _roomObjects.equal_range(820);
+			if (static_it.first != _roomObjects.end()) {
+				for (auto it = static_it.first; it != static_it.second; it++) {
+					_static_entitys.push_back(it->second);
+				}
+			}
+		}
+	}
+}
+struct Candidate {
+	sf::Vector2f position;
+	float radius;
+	ex::Entity entity;
+};
+
+void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
+	RawVertices temp_verts;
+	sortedVerts.clear();
+	if (_room) {
+		if (_room->backgrounds().size() > 0) {
+			for (auto& t : _room->backgrounds()) {
+				if (t.forground) continue;
+				int layer = t.depth;
+				auto& verts = (sortedVerts[layer])[t.frame.texture()];
+				temp_verts.assign(t.frame.ptr(), t.frame.ptr() + t.frame.size());
+				temp_verts.traslate(t.pos);
+				verts += temp_verts;
+			}
+		}
+		if (_room->tiles().size() > 0) {
+			for (auto& t : _room->tiles()) {
+				auto& verts = (sortedVerts[0])[t.first];
+				const auto& f = t.second;
+				verts.append(f.verts());
+			}
+		}
+	}
+	es.each<SpriteFacing, UndertaleSprite, Body, PlayerControl, SpriteAnimation>([this, dt](ex::Entity entity, SpriteFacing& spritefacing, UndertaleSprite& sprite, Body& body, PlayerControl &control, SpriteAnimation& animation) {
+		if (PlayerControl::isMoving()) {
+			body.move(control.getMovement()*dt);
+			if (control.facing != spritefacing.direction) {
+				sprite = spritefacing.getCurrentFace(control.facing);
+				spritefacing.direction = control.facing;
+			}
+			if (!animation.is_running())animation.start();
+		}
+		else {
+			if (animation.is_running()) {
+				animation.reset();
+				animation.stop();
+				sprite.image_index(0);
+			}
+		}
+	});
+
+	static bool last_state = false;
+	es.each<UndertaleSprite, SpriteAnimation>([this, dt](ex::Entity entity, UndertaleSprite& sprite, SpriteAnimation &animation) {
+		bool pressed = sf::Keyboard::isKeyPressed(sf::Keyboard::N);
+		if (pressed) {
+			if (!last_state) {
+				last_state = true;
+				sprite.image_index(sprite.image_index() + 1);
+			}
+		}
+		else last_state = false;
+		if (animation.update(dt)) {
+			sprite.image_index(animation.current_frame());
+		}
+	});
+	
+	es.each<Body, UndertaleSprite>([this, &temp_verts](ex::Entity entity, Body& body, UndertaleSprite &sprite) {
+		constexpr bool draw_all_boxes = true;
+		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
+		auto& verts = (sortedVerts[layer])[sprite.texture()];
+		temp_verts.assign(sprite.ptr(), sprite.ptr() + 6);
+		temp_verts.transform(body.getTransform());
+		verts += temp_verts;
+	});
+	Candidate canadates;
+	auto mouse_pos = sf::Mouse::getPosition(_window);
+	std::cerr << con::gotoxy(20, 10) << mouse_pos;
+	es.each<Body, UndertaleObject, UndertaleSprite, Velocity>([this, mouse_pos](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite, Velocity &velocity) {
+		sf::FloatRect bounds(body.getPosition(), sprite.frame_size());
+		if (bounds.contains(sf::Vector2f(mouse_pos))) {
+			auto& verts = (sortedVerts[100])[nullptr];
+			draw_box(verts, bounds);
+		}
+
+	});
+	if (_room && _room->backgrounds().size() > 0) {
+		for (auto& t : _room->backgrounds()) {
+			if (!t.forground) continue;
+			int layer = t.depth;
+			auto& verts = (sortedVerts[layer])[t.frame.texture()];
+			temp_verts.assign(t.frame.ptr(), t.frame.ptr() + t.frame.size());
+			temp_verts.traslate(t.pos);
+			verts += temp_verts;
+		}
+	}
 }

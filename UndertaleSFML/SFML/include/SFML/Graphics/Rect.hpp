@@ -50,7 +50,11 @@ public:
     /// Rect(0, 0, 0, 0)).
     ///
     ////////////////////////////////////////////////////////////
-    Rect();
+	Rect() :left(T{}),top(T{}),width(T{}),height(T{}){ }
+
+
+
+
 
     ////////////////////////////////////////////////////////////
     /// \brief Construct the rectangle from its coordinates
@@ -64,7 +68,9 @@ public:
     /// \param rectHeight Height of the rectangle
     ///
     ////////////////////////////////////////////////////////////
-    Rect(T rectLeft, T rectTop, T rectWidth, T rectHeight);
+	template <typename T1,typename T2, typename T3, typename T4>
+	Rect(T1 rectLeft, T2 rectTop, T3 rectWidth, T4 rectHeight) : left(static_cast<T>(rectLeft)),top(static_cast<T>(rectTop)),width(static_cast<T>(rectWidth)),height(static_cast<T>(rectHeight)){}
+
 
     ////////////////////////////////////////////////////////////
     /// \brief Construct the rectangle from position and size
@@ -76,7 +82,8 @@ public:
     /// \param size     Size of the rectangle
     ///
     ////////////////////////////////////////////////////////////
-    Rect(const Vector2<T>& position, const Vector2<T>& size);
+	template<typename T1, typename T2>
+    Rect(const Vector2<T1>& position, const Vector2<T2>& size) : left(static_cast<T>(position.x)), top(static_cast<T>(position.y)), width(static_cast<T>(size.x)), height(static_cast<T>(size.y)){}
 
     ////////////////////////////////////////////////////////////
     /// \brief Construct the rectangle from another type of rectangle
@@ -89,9 +96,14 @@ public:
     /// \param rectangle Rectangle to convert
     ///
     ////////////////////////////////////////////////////////////
-    template <typename U>
-    explicit Rect(const Rect<U>& rectangle);
-
+	template <typename U>
+	explicit Rect(const Rect<U>& rectangle) :
+		left(static_cast<T>(rectangle.left)),
+		top(static_cast<T>(rectangle.top)),
+		width(static_cast<T>(rectangle.width)),
+		height(static_cast<T>(rectangle.height))
+	{
+	}
     ////////////////////////////////////////////////////////////
     /// \brief Check if a point is inside the rectangle's area
     ///

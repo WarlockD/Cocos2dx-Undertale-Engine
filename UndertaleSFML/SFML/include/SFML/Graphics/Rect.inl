@@ -24,51 +24,6 @@
 
 
 ////////////////////////////////////////////////////////////
-template <typename T>
-Rect<T>::Rect() :
-left  (0),
-top   (0),
-width (0),
-height(0)
-{
-
-}
-
-
-////////////////////////////////////////////////////////////
-template <typename T>
-Rect<T>::Rect(T rectLeft, T rectTop, T rectWidth, T rectHeight) :
-left  (rectLeft),
-top   (rectTop),
-width (rectWidth),
-height(rectHeight)
-{
-
-}
-
-
-////////////////////////////////////////////////////////////
-template <typename T>
-Rect<T>::Rect(const Vector2<T>& position, const Vector2<T>& size) :
-left  (position.x),
-top   (position.y),
-width (size.x),
-height(size.y)
-{
-
-}
-
-
-////////////////////////////////////////////////////////////
-template <typename T>
-template <typename U>
-Rect<T>::Rect(const Rect<U>& rectangle) :
-left  (static_cast<T>(rectangle.left)),
-top   (static_cast<T>(rectangle.top)),
-width (static_cast<T>(rectangle.width)),
-height(static_cast<T>(rectangle.height))
-{
-}
 
 
 ////////////////////////////////////////////////////////////

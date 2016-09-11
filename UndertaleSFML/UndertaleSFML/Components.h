@@ -3,6 +3,63 @@
 #include "Drawables.h"
 #include "UndertaleLoader.h"
 
+struct SpriteAnimation {
+	explicit SpriteAnimation(float speed) : _speed(umath::abs(speed)), _current(0.0f), _start_frame(0), _stop_frame(std::numeric_limits<size_t>::max()), _current_frame(0), _forward(speed >= 0.0f), _running(false) {}
+	explicit SpriteAnimation(float speed, size_t frame_count) : _speed(umath::abs(speed)), _current(0.0f), _start_frame(0), _stop_frame(frame_count-1), _current_frame(0), _forward(speed >= 0.0f), _running(false) {}
+	explicit SpriteAnimation(float speed, size_t start_frame, size_t stop_frame) : _speed(umath::abs(speed)), _current(0.0f), _start_frame(start_frame), _stop_frame(stop_frame), _current_frame(0), _forward(speed >= 0.0f), _running(false) {}
+	void reset() { _current = 0.0f;  _current_frame = _start_frame;  }
+	void stop() { _running = false; }
+	void start() { _running = true; }
+	float speed() const { return _speed; }
+	void speed(float s) {  _speed=s; }
+	bool is_running() const { return _running; }
+	size_t start_frame() const { return _start_frame; }
+	size_t stop_frame() const { return _stop_frame; }
+	size_t current_frame() const { return _current_frame; }
+	void start_frame(size_t frame) { _start_frame = frame; _current_frame = _start_frame; }
+	void stop_frame(size_t frame)  { _stop_frame=frame; _current_frame = _start_frame; }
+	void current_frame(size_t frame) {
+		if (frame > _stop_frame) 
+			_current_frame = _start_frame;
+		else if (frame < _start_frame) 
+			_current_frame = _stop_frame;
+		else _current_frame = frame;
+	}
+	void next_frame() { 
+		if (_forward) {
+			if (_current_frame == _stop_frame || _current_frame == std::numeric_limits<size_t>::max())
+				_current_frame = _start_frame;
+			else
+				_current_frame++;
+		} else {
+			if (_current_frame == 0 || _current_frame == _start_frame)
+				_current_frame = _stop_frame;
+			else
+				_current_frame--;
+		}
+	}
+	bool forward() const { return _forward; }
+	void forward(bool direction) { _forward = direction; }
+	bool update(float dt) {
+		if (_running) {
+			_current += dt;
+			if (_current > _speed) {
+				_current = 0.0f;
+				std::cerr << "From: " << _current_frame;
+				next_frame();
+				std::cerr << " To: " << _current_frame << std::endl;
+				return true;
+			}
+		}
+		return false; // no update
+	}
+private:
+	size_t _start_frame, _stop_frame, _current_frame;
+	float _current;
+	bool _running;
+	bool _forward;
+	float _speed;
+};
 
 struct Bounds {
 	explicit Bounds(sf::FloatRect bounds) :bounds(bounds) {}
@@ -62,6 +119,8 @@ struct SystemEvent : public ex::Event<SystemEvent> {
 	explicit SystemEvent() : event() {}
 	explicit SystemEvent(const sf::Event& event) : event(event) {}
 };
+/*
+
 class Animation {
 	StopWatch<float> _watch;
 	bool _reverse;
@@ -70,7 +129,7 @@ public:
 	explicit Animation(float fps) : _watch(std::fabs(fps)), _reverse(fps > 0.0f ? false : true) {}
 	bool update(Renderable& renderable, float dt);
 };
-
+*/
 template<class T, typename EQUAL = std::equal_to<T>>
 class ValueMonitor {
 	T _value;
@@ -91,113 +150,44 @@ using kDepth = kult::component<'dept', ValueMonitor<int>>;
 using kBody = kult::component<'body', Body>;
 using kSprite = kult::component<'sprt', UndertaleSprite>;
 enum class  Direction : char {
-	DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
+	Down = 0, Right = 1, Up = 2, Left = 3
 };
-class EnityMovement : public ex::Receiver<EnityMovement> {
 
-};
-class Player : public SpriteFrameBase {
-	enum class  PlayerFacing : char {
-		DOWN = 0, RIGHT = 1, UP = 2, LEFT = 3
-	};
-	std::array<UndertaleSprite, 4> _sprites;
-	float _frameTime;
-	PlayerFacing _facing;
-	int health;
-	int status;
-	sf::Vector2f _moving_speed;
-	bool _directionDown[4];
-	bool in_overworld;
-	int _direction;
-	ex::Entity _enity;
-	bool _ismoving;
-	friend class PlayerOverWorldSystem;
-public:
-	bool isMoving() const {
-		return _directionDown[0] || _directionDown[1] || _directionDown[2] || _directionDown[3];
+struct PlayerControl {
+	static std::unordered_set<sf::Keyboard::Key> keys_down;
+	static bool DirectionDown[4];
+	inline static bool isKeyDown(sf::Keyboard::Key key) { return keys_down.find(key) != keys_down.end(); }
+	inline static bool isMoving() {
+		return DirectionDown[0] || DirectionDown[1] || DirectionDown[2] || DirectionDown[3];
 	}
-	bool isMoving(PlayerFacing direction) const { return _directionDown[(char)direction]; }
-	virtual bool next_frame() { 
-		bool moving = isMoving(); if (moving) _sprites[(int)_facing].next_frame(); return moving; }; // This interface just tells the sprite to do next frame
-	virtual bool prev_frame() { bool moving = isMoving(); if (moving) _sprites[(int)_facing].prev_frame(); return moving; }; // This interface just tells the sprite to do prev frame
-	virtual const sf::Vertex*  ptr() const { return _sprites[(char)_facing].ptr(); }
-	const sf::Texture* texture() const override final { return _sprites[(char)_facing].texture(); }
-	Player() {} // does NOTHING  use load
-	virtual ~Player();
-	virtual bool load_resources(ex::EntityX& app);
-	virtual void receive(const sf::Event &event);
+	inline static bool isMoving(Direction direction)  { return DirectionDown[(char)direction]; }
+	static void update_keys(const sf::Event &event);
+	float moving_speed;
+	Direction facing;
+	explicit PlayerControl(float speed) : moving_speed(speed), facing(Direction::Down) { }
+	sf::Vector2f getMovement();
+};
+struct SpriteFacing {
+	std::array<UndertaleSprite, 4> facing_sprites;
+	Direction direction = Direction::Down;
+	explicit SpriteFacing(size_t down, size_t right, size_t up, size_t left) :
+		facing_sprites{ UndertaleSprite(down), UndertaleSprite(right), UndertaleSprite(up), UndertaleSprite(left) } {}
+	UndertaleSprite getCurrentFace(Direction direction) { return facing_sprites[(char)direction]; }
 };
 
 
 
-
-class PlayerOverWorldSystem : public ex::System<PlayerOverWorldSystem> {
-	sf::RenderTarget &target;
-	ex::EntityX& app;
-	Player _player;
-public:
-	Player& getPlayer()  { return _player; }
-	explicit PlayerOverWorldSystem(ex::EntityX& app, sf::RenderTarget &target);
-	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override;
-	void init(ex::EntityX& app) { _player.load_resources(app); }
-};
 struct UndertaleObject {
-	UndertaleLib::Object object;
-	explicit UndertaleObject(UndertaleLib::Object o) : object(o) {}
-};
-class RenderSystem : public ex::System<RenderSystem> {
-	typedef std::unordered_map<const sf::Texture*, RawVertices> t_dumb_batch;
-	typedef std::vector<sf::FloatRect> t_debug_boxes;
-	std::map<int, t_dumb_batch> sortedVerts;
-	sf::VertexArray debug_lines;
-	float last_update = 0.0;
-	float frame_count = 0.0;
-	sf::RenderTarget &target;
-	sf::Font _font; 
-	sf::Text text;
-	std::vector<ex::Entity> _roomObjects;
-	sf::Transform _transform;
-public:
-	UndertaleRoom::type _room;
-
-	const std::map<int, t_dumb_batch>& get_verts() const { return sortedVerts; }
-	explicit RenderSystem(sf::RenderTarget &target);
-	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override;
-	void LoadRoom(size_t index);
-	size_t getRoomIndex() const { return _room->index(); }
+	UndertaleLib::Object obj;
+	explicit UndertaleObject(UndertaleLib::Object obj) : obj(obj) {}
 };
 
-class AnimationSystem : public ex::System<AnimationSystem> {
-	sf::RenderTarget &target;
-public:
-	explicit AnimationSystem(sf::RenderTarget &target) :target(target) {}
-	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override;
-};
-
-class VelocitySystem : public ex::System<VelocitySystem> {
-	sf::RenderTarget &target;
-public:
-	explicit VelocitySystem(sf::RenderTarget &target) :target(target) {}
-	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) override;
-};
-
-class RoomSystem {
-
-	float last_update = 0.0;
-	float frame_count = 0.0;
-public:
-//	RoomSystem(sf::RenderTarget& target) : target(target) {}
-	
-//	void update(ex::EntityManager &es, ex::EventManager &events, ex::TimeDelta dt) {
-	
-};
 
 class Application : public ex::EntityX {
 	sf::Clock _clock;
 	sf::Clock _debugUpdate;
 	sf::RenderWindow& _window;
 	sf::Time _lastTime;
-	RenderSystem* render_system;
 	size_t frame_count;
 	size_t draw_count;
 	size_t update_count;
@@ -208,36 +198,13 @@ class Application : public ex::EntityX {
 	typedef std::vector<sf::FloatRect> t_debug_boxes;
 	std::map<int, t_dumb_batch> sortedVerts;
 	std::unordered_multimap<size_t, ex::Entity::Id> _roomObjects;
+	std::vector<ex::Entity::Id> _static_entitys;
+	std::vector<ex::Entity::Id> _dynamic_enitys;
 	std::vector< ex::Entity> _roomEntitys;
 	UndertaleRoom::type _room;
 public:
 	explicit Application(sf::RenderWindow &window);
-	void LoadRoom(size_t index) {
-		ex::EntityManager &es = global::getEntities();
-		for (auto& e : _roomEntitys) e.destroy();
-		_roomEntitys.clear();
-		sortedVerts.clear();
-		_roomObjects.clear();
-		_room.reset();
-		_room = UndertaleRoom::LoadRoom(index);
-		if (_room) {
-			for (auto& o : _room->objects()) {
-				ex::Entity e = es.create();
-				e.assign<UndertaleObject>(o.obj);
-				e.assign<Body>(o.body);
-				e.assign<Layer>(o.obj.depth());
-				if (o.obj.sprite_index() >= 0) {
-					e.assign<UndertaleSprite>(o.obj.sprite_index());
-				}
-				_roomEntitys.emplace_back(e);
-				auto parent = o.obj;
-				while (parent.valid()) {
-					_roomObjects.emplace(std::make_pair((size_t)parent.index(), e.id()));
-					parent = Global::LookupObject(parent.parent_index());
-				}				
-			}
-		}
-	}
+	void LoadRoom(size_t index);
 	size_t getRoomIndex() const { return _room ? _room->index() : 0; }
 	void init(ex::EntityX& app); 
 	void draw() {
@@ -260,59 +227,19 @@ public:
 		_window.draw(_text);
 		_window.display();
 	}
-	void update_verts(ex::EntityManager& es) {
-		RawVertices temp_verts;
-		sortedVerts.clear();
-		if (_room) {
-			if (_room->backgrounds().size() > 0) {
-				for (auto& t : _room->backgrounds()) {
-					if (t.forground) continue;
-					int layer = t.depth;
-					auto& verts = (sortedVerts[layer])[t.frame.texture()];
-					temp_verts.assign(t.frame.ptr(), t.frame.ptr() + t.frame.size());
-					temp_verts.traslate(t.pos);
-					verts += temp_verts;
-				}
-				if (_room->tiles().size() > 0) {
-					for (auto& t : _room->tiles()) {
-						auto& verts = (sortedVerts[0])[t.first];
-						const auto& f = t.second;
-						verts.append(f.verts());
-					}
-				}
-			}
-		}
-		es.each<Body, UndertaleSprite>([this, &temp_verts](ex::Entity entity, Body& body, UndertaleSprite &sprite) {
-			constexpr bool draw_all_boxes = true;
-			int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
-			auto& verts = (sortedVerts[layer])[sprite.texture()];
-			temp_verts.assign(sprite.ptr(), sprite.ptr() + 6);
-			temp_verts.transform(body.getTransform());
-			verts += temp_verts;
-		});
-
-		if (_room && _room->backgrounds().size() > 0) {
-			for (auto& t : _room->backgrounds()) {
-				if (!t.forground) continue;
-				int layer = t.depth;
-				auto& verts = (sortedVerts[layer])[t.frame.texture()];
-				temp_verts.assign(t.frame.ptr(), t.frame.ptr() + t.frame.size());
-				temp_verts.traslate(t.pos);
-				verts += temp_verts;
-			}
-		}
-	}
-	static constexpr size_t room_fps = (1000/ 30);
+	void update_verts(ex::TimeDelta dt, ex::EntityManager& es);
+	static constexpr size_t room_fps = (1000/ 60);
 	void update(ex::TimeDelta dt) { 
 		sf::Time current = _clock.getElapsedTime();
 		if (current.asMilliseconds() > room_fps) {
 			update_count++;
 			float delta = _clock.restart().asSeconds();
-			systems.system<PlayerOverWorldSystem>()->update(entities, events, delta);
-			systems.system<VelocitySystem>()->update(entities, events, delta);
-			systems.system<AnimationSystem>()->update(entities, events, delta);
+			
+			//systems.system<PlayerOverWorldSystem>()->update(entities, events, delta);
+		//	systems.system<VelocitySystem>()->update(entities, events, delta);
+		//	systems.system<AnimationSystem>()->update(entities, events, delta);
 			//systems.system<RenderSystem>()->update(entities, events, delta);
-			update_verts(entities);
+			update_verts(delta, entities);
 		}
 		if (_debugUpdate.getElapsedTime().asSeconds() >= 1.0) {
 			float last_update = _debugUpdate.restart().asSeconds();

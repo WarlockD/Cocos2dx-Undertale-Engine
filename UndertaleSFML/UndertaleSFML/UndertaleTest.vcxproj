@@ -71,7 +71,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)ext\include;$(SolutionDir)console;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)ext\include;$(SolutionDir)console;$(SolutionDir)SFML\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)ext\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

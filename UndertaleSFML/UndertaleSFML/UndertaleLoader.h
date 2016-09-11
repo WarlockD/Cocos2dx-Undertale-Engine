@@ -26,52 +26,45 @@ public:
 
 class UndertaleSprite  : public SpriteFrameBase {
 public:
-	
 	class UndertaleSpriteData : std::enable_shared_from_this<UndertaleSpriteData> {
 	protected:
 		sf::Vector2f _size;
 		size_t _index;
-		std::vector<sf::Vertex> _verts;
-		const sf::Texture* _texture;
-		UndertaleSpriteData() : _index(0), _texture(nullptr) {}
+		std::vector<SpriteFrame> _frames;
+		UndertaleSpriteData() : _index(0) {}
 	public:
 		typedef std::shared_ptr<UndertaleSpriteData> type;
 		type ptr() { return shared_from_this(); }
 		static type LoadSprite(size_t sprite_index);
-		inline const sf::Vertex* frame(size_t i) const { return _verts.data() + (i * 6); }
-		inline size_t frame_count() const { return _verts.size() / 6; }
-		inline const sf::Texture* texture() const { return _texture; }
+		inline const SpriteFrame& frame(size_t i) const { return _frames[i%_frames.size()]; }
+		inline size_t frame_count() const { return _frames.size(); }
 		inline size_t index() const { return _index; }
 		inline const sf::Vector2f size() const { return _size; }
 	};
 	UndertaleSpriteData::type _sprite;
-	std::unordered_map<size_t, UndertaleSpriteData::type> _cache; 
+	static std::unordered_map<size_t, UndertaleSpriteData::type> _cache; 
 	// we use this so if we change this sprite, we don't lose the old one in case we need to switch fast
 	size_t _image_index;
 public:
 	UndertaleSprite() : _image_index(0), _sprite(nullptr) {}
-	
-	explicit UndertaleSprite(size_t index) : _image_index(0), _sprite(UndertaleSpriteData::LoadSprite(index)), _cache({ std::make_pair(index, _sprite) }) {}
+	explicit UndertaleSprite(size_t index) : _image_index(0), _sprite(UndertaleSpriteData::LoadSprite(index)) {}
 	// interface
-	const sf::Texture* texture() const override final { return _sprite ? _sprite->texture() : nullptr; }
-	const sf::Vertex* ptr() const override final { return _sprite ? _sprite->frame(_image_index) : nullptr; }
+	const sf::Texture* texture() const override final { return _sprite ? _sprite->frame(_image_index).texture(): nullptr; }
+	const sf::Vertex* ptr() const override final { return _sprite ? _sprite->frame(_image_index).ptr() : nullptr; }
 	sf::FloatRect bounds() const override final { return _sprite ? sf::FloatRect(sf::Vector2f(), _sprite->size()) : sf::FloatRect(); }
 	// sprite stuff
 	bool valid() const { return (bool)_sprite; }
 	size_t sprite_index() const { return _sprite ? _sprite->index() : 0; }
-	void sprite_index(size_t index) { 
-		if (!_sprite || sprite_index() != index) {
-			auto it = _cache.find(index);
-			if (it != _cache.end()) _sprite = it->second;
-			else _cache.emplace(std::make_pair(index, _sprite = UndertaleSpriteData::LoadSprite(index)));
-			_image_index %=  _sprite->frame_count();
-		}
-	}
-	void clear_cache() { _cache.clear(); }
+	void sprite_index(size_t index);
+	// this clears the static cache, but dosn't free up the already exisiting ptrs
+	inline static void clear_cache() { _cache.clear(); }
 	size_t image_index() const { return _image_index; }
-	void image_index(size_t index) { _image_index = index % _sprite->frame_count(); }
-	virtual bool next_frame() { image_index(_image_index + 1);  return true; }; // This interface just tells the Renderable to do next frame
-	virtual bool prev_frame() { image_index(_image_index - 1); return true; }; // This interface just tells the Renderable to do prev frame
+	size_t image_count() const { return _sprite->frame_count(); }
+	void image_index(size_t index) {  
+		_image_index =       index % _sprite->frame_count();  
+	}
+	virtual bool next_frame() { _image_index = (_image_index + 1) % _sprite->frame_count(); return true; }; // This interface just tells the Renderable to do next frame
+	virtual bool prev_frame() { _image_index = (_image_index - 1) % _sprite->frame_count(); return true; }; // This interface just tells the Renderable to do prev frame
 };
 
 // font texture algorithm 

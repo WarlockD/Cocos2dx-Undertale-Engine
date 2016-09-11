@@ -15,132 +15,323 @@ inline COORD operator*(SHORT r, const COORD& l) { return COORD{ l.X * r, l.Y * r
 
 inline COORD& operator*=(COORD& l, const COORD& r) { l.X *= r.X; l.Y *= l.Y; return l; }
 
-// all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
-class basic_debugbuf : public std::streambuf {
-protected:
-	std::array<char, 1024> _buffer;
-	std::streambuf * _oldBuffer;
-	int _lastc;
-	int_type overflow(int_type ch) override
-	{
-		if (ch == '\n' || ch == '\r')
-		{
-			if (_lastc != ch && (_lastc == '\n' || _lastc == '\r')) {
-				// skip, throw it away
-				_lastc = 0;
-				return 0;
-			}
-			*pptr() = '\n';
-			pbump(1);
-			sync();
-		}
-		else if (ch == traits_type::eof()) {
-			*pptr() = '\n';
-			pbump(1);
-			sync();
-			return traits_type::eof();
-		}
-		else {
-			*pptr() = ch;
-			pbump(1);
-		}
-		return 0;
-	}
-	static bool is_string_empty_or_whitespace(const std::string& str) {
-		bool empty = true;
-		if (str.length() > 0) {
-			for (char c : str) if (!isspace(c)) { empty = false; break; }
-		}
-		return empty;
-	}
-	int sync() override
-	{
-		std::string str(pbase(), pptr());
-		if (!is_string_empty_or_whitespace(str)) { // check for empty sync
-			auto now = std::chrono::system_clock::now();
-			auto in_time_t = std::chrono::system_clock::to_time_t(now);
-			std::stringstream ss;
-			ss << "[" << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X") << "]:" << str << std::endl;
-
-			output_debug_string(ss.str().c_str());
-			if (_oldBuffer) _oldBuffer->sputn(ss.str().c_str(), ss.str().length());
-		}
-		std::ptrdiff_t n = pptr() - pbase();
-		pbump(-n); // clear the buffer
-		return 0;
-	}
-
-	void output_debug_string(const char *text) {
-		::OutputDebugStringA(text);
-	}
-
-public:
-	virtual ~basic_debugbuf()
-	{
-		sync();
-	}
-	basic_debugbuf() : std::streambuf(), _oldBuffer(nullptr), _lastc(0) {
-		char *base = _buffer.data();
-		setp(base, base + _buffer.size() - 1); // -1 to make overflow() easier
-	}
-	void setOldBuffer(std::streambuf* old_buffer) { _oldBuffer = old_buffer; }
-};
-
-
-
-
-template<class CharT, class TraitsT = std::char_traits<CharT> >
-class basic_dostream : public std::basic_ostream<CharT, TraitsT>
-{
-public:
-	basic_dostream() : std::basic_ostream<CharT, TraitsT>
-		(new basic_debugbuf<CharT, TraitsT>()) {}
-	~basic_dostream()
-	{
-		//std::stringstream ss;
-		delete rdbuf();
-	}
-
-	void setOldBuffer(std::basic_stringbuf<CharT, TraitsT>* old_buffer) {
-		auto debug_stream = dynamic_cast<basic_debugbuf<CharT, TraitsT>*>(rdbuf());
-		debug_stream->setOldBuffer(old_buffer);
-	}
-};
-
-typedef basic_dostream<char>    dostream;
-typedef basic_dostream<wchar_t> wdostream;
-
-basic_debugbuf s_cerr_debug_buffer;
-basic_debugbuf s_cout_debug_buffer;
-
-namespace logging {
-	void init_cerr() {
-		s_cerr_debug_buffer.setOldBuffer(std::cerr.rdbuf());
-		std::cerr.rdbuf(&s_cerr_debug_buffer);
-		std::cerr << "cerr redirected" << std::endl;
-	}
-	void init_cout() {
-		s_cout_debug_buffer.setOldBuffer(std::cout.rdbuf());
-		std::cout.rdbuf(&s_cout_debug_buffer);
-		std::cout << "cout redirected" << std::endl;
-	}
-	bool init() {
-		return true;
-	}
-	void error(const std::string& message) {
-
-	}
-};
 #define PERR(bSuccess, api){if(!(bSuccess)) printf("%s:Error %d from %s on line %d\n", __FILE__, GetLastError(), api, __LINE__);}
+namespace {
+	void 	init_cerr();
+	void init_cout();
+};
 namespace console {
 	const Point Point::Up(0, -1);
 	const Point Point::Down(0, 1);
 	const Point Point::Left(-1, 0);
 	const Point Point::Right(1, 0);
+	COORD qd_coord;           /* current screen position */
+	short qd_normattr = 0x07, /* normal, ...      */
+		qd_boldattr = 0x0f, /* ...bold, and...  */
+		qd_revattr = 0x70, /* ...reverse video */
+		qd_saveattr = 0x07, /* save original attribute */
+		qd_clrattr = 0x07; /* used to clear to end of line */
+	short qd_numcols = 0,
+		qd_numrows = 0,
+		qd_drawtop = -1,    /* line to draw (-1: none, qd_numrows: all) */
+		qd_drawcol = -1,    /* first column to redraw if one line only */
+		qd_drawbot = 0;     /* draw status (bottom) line? */
+	HANDLE qd_out, qd_back,   /* output and backbuffer consoles */
+		qd_orig;           /* original console (to restore at end) */
+	std::vector<CHAR_INFO> qd_buff;
+	/* assuming we are drawing on line "row", set redrawing flags accordingly */
+	void touchline(short row, short col)
+	{
+		if (row == -1) {                /* request for whole screen */
+			qd_drawtop = qd_numrows;    /* ..the whole top section */
+			qd_drawcol = -1;
+			qd_drawbot = 1;             /*.. and the status line */
+		}
+		else if (row == qd_numrows - 1) /* is the status line */
+			qd_drawbot = 1;
+		else if (qd_drawtop == -1) {    /* is the first time drawing in the top */
+			qd_drawtop = row;           /* ..just redraw this line */
+			qd_drawcol = col;
+		}
+		else if (qd_drawtop != row) {   /* at least one other line in the top */
+			qd_drawtop = qd_numrows;    /* ..so do the whole top */
+			qd_drawcol = -1;
+		}
+		else if (col < qd_drawcol)      /* same line as before but left of prev */
+			qd_drawcol = -1;
+	}
+	void qd_clearline(int row)
+	{
+		DWORD junk;
+		qd_coord.X = 0;
+		qd_coord.Y = row;
+		FillConsoleOutputCharacter(qd_back, ' ', qd_numcols, qd_coord, &junk);
+		FillConsoleOutputAttribute(qd_back, qd_normattr, qd_numcols, qd_coord, &junk);
+		SetConsoleCursorPosition(qd_back, qd_coord);
+		touchline(-1, -1);
+	}
+	void qd_clear(void)
+	{
+		DWORD junk;
+		qd_coord.X = qd_coord.Y = 0;
+		FillConsoleOutputCharacter(qd_back, ' ', qd_numrows * qd_numcols,
+			qd_coord, &junk);
+		FillConsoleOutputAttribute(qd_back, qd_normattr, qd_numrows * qd_numcols,
+			qd_coord, &junk);
+		SetConsoleCursorPosition(qd_back, qd_coord);
+		touchline(-1, -1);
+	}
+	void qd_color(int color)
+	{
+		qd_normattr = color;
+		qd_boldattr = color | 0x08;
+		qd_revattr = ((color & 0x07) << 4) | ((color & 0x070) >> 4);
+		qd_clrattr = qd_normattr;
+		SetConsoleTextAttribute(qd_out, qd_normattr);
+		SetConsoleTextAttribute(qd_back, qd_normattr);
+	}
+
+	int qd_cols(void)
+	{
+		return qd_numcols;
+	}
+
+	void qd_eeol(void)
+	{
+		DWORD junk;
+		FillConsoleOutputCharacter(qd_back, ' ', qd_numcols - qd_coord.X,
+			qd_coord, &junk);
+		FillConsoleOutputAttribute(qd_back, qd_clrattr, qd_numcols - qd_coord.X,
+			qd_coord, &junk);
+		touchline(qd_coord.Y, qd_coord.X);
+	}
+
+	void qd_fixterm(void)
+	{
+		COORD c, orig;
+		SMALL_RECT r;
+		CONSOLE_SCREEN_BUFFER_INFO scr;
+
+		/* copy screen into backbuffer */
+		c.X = qd_numcols;
+		c.Y = qd_numrows;
+		orig.X = r.Left = 0;
+		orig.Y = r.Top = 0;
+		r.Right = qd_numcols - 1;
+		r.Bottom = qd_numrows - 1;
+		PERR(ReadConsoleOutput(qd_out, qd_buff.data(), c, orig, &r), "ReadConsoleOutput");
+		PERR(WriteConsoleOutput(qd_back, qd_buff.data(), c, orig, &r), "WriteConsoleOutput");
+
+		GetConsoleScreenBufferInfo(qd_out, &scr);
+		qd_coord = scr.dwCursorPosition;
+		SetConsoleCursorPosition(qd_back, qd_coord);
+	}
+
+	void qd_flush(void)
+	{
+		COORD c, orig;
+		SMALL_RECT r;
+
+		/* cut data from backbuffer and place it on screen console */
+		if (qd_drawtop == qd_numrows && qd_drawbot) {
+			c.X = qd_numcols;
+			c.Y = qd_numrows;
+			orig.X = orig.Y = 0;
+			r.Left = 0;
+			r.Right = qd_numcols - 1;
+			r.Top = 0;
+			r.Bottom = qd_numrows - 1;
+			ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
+			WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
+		}
+		else {
+			if (qd_drawbot) {
+				c.X = qd_numcols;
+				c.Y = qd_numrows;
+				orig.X = r.Left = 0;
+				orig.Y = r.Top = qd_numrows - 1;
+				r.Right = qd_numcols - 1;
+				r.Bottom = qd_numrows - 1;
+				ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
+				WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
+			}
+			if (qd_drawtop == qd_numrows) {
+				c.X = qd_numcols;
+				c.Y = qd_numrows;
+				orig.X = r.Left = 0;
+				orig.Y = r.Top = 0;
+				r.Right = qd_numcols - 1;
+				r.Bottom = qd_numrows - 2;
+				ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
+				WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
+			}
+			else if (qd_drawtop != -1) {
+				c.X = qd_numcols;
+				c.Y = qd_numrows;
+				orig.X = r.Left = (qd_drawcol == -1 ? 0 : qd_drawcol);
+				orig.Y = r.Top = qd_drawtop;
+				r.Right = qd_numcols - 1;
+				r.Bottom = qd_drawtop;
+				ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
+				WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
+			}
+		}
+		qd_drawtop = qd_drawcol = -1;
+		qd_drawbot = 0;
+
+		SetConsoleCursorPosition(qd_out, qd_coord);
+	}
+	int qd_getch(void)
+	{
+		int c = 0;
+		//c = _getch();
+		if (c == 224 || c == 0) {
+			//	c = _getch() | 0xFF00;
+			if (c == 0xFF86)
+				c = 0xFF84; /* ctrl PgUp has changed */
+		}
+		return c;
+	}
+	void qd_move(int row, int col)
+	{
+		qd_coord.X = col;
+		qd_coord.Y = row;
+		SetConsoleCursorPosition(qd_back, qd_coord);
+	}
+	void qd_close(void)
+	{
+		DWORD junk;
+		extern void qd_flush(void);
+		touchline(-1, -1);
+		qd_flush();
+
+		/*  old Windows code that moved down one line before exiting:
+
+		qd_coord.X = 0;
+		qd_coord.Y = qd_numrows - 1;
+		FillConsoleOutputAttribute(qd_out, qd_saveattr, qd_numcols, qd_coord,
+		&junk);
+		SetConsoleTextAttribute(qd_out, qd_saveattr);
+		SetConsoleCursorPosition(qd_out, qd_coord);
+		*/
+
+		SetConsoleActiveScreenBuffer(qd_orig);
+		CloseHandle(qd_out);
+		CloseHandle(qd_back);
+		qd_buff.clear();
+	}
+	void qd_open(void)
+	{
+		DWORD mode;
+		CONSOLE_SCREEN_BUFFER_INFO scr;
+		CONSOLE_CURSOR_INFO cursinfo;
+		COORD c, orig;
+		SMALL_RECT r;
+
+		qd_orig = GetStdHandle(STD_OUTPUT_HANDLE);
+		qd_out = CreateConsoleScreenBuffer(GENERIC_WRITE | GENERIC_READ, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+		qd_back = CreateConsoleScreenBuffer(GENERIC_WRITE | GENERIC_READ, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+		if (qd_orig && qd_out && qd_back) {
+			GetConsoleCursorInfo(qd_orig, &cursinfo);
+			GetConsoleScreenBufferInfo(qd_orig, &scr);
+			c.Y = qd_numrows = scr.srWindow.Bottom - scr.srWindow.Top + 1;
+			c.X = qd_numcols = scr.srWindow.Right - scr.srWindow.Left + 1;
+
+			SetConsoleScreenBufferSize(qd_out, c);
+			SetConsoleScreenBufferSize(qd_back, c);
+
+			SetConsoleActiveScreenBuffer(qd_out);
+
+			SetConsoleTitle("NLED");
+			SetConsoleMode(qd_out, 0);
+			SetConsoleMode(qd_back, 0);
+			cursinfo.bVisible = FALSE;
+			SetConsoleCursorInfo(qd_back, &cursinfo);
+
+			qd_saveattr = scr.wAttributes;
+			qd_buff.resize(qd_numrows * qd_numcols);
+			qd_fixterm();
+
+			/* In fullscreen mode only, fixterm turns off qd_out's */
+			/* cursor, so this MUST be done down here !?!?!        */
+			cursinfo.bVisible = TRUE;
+			SetConsoleCursorInfo(qd_out, &cursinfo);
+		}
+	}
+	void qd_puts(int length, const char *string)
+	{
+		DWORD junk;
+		int i;
+		char c;
+		for (i = 0; i < length; i++) {
+			switch (c = string[i]) {
+			case '\b': case '\r': case '\n': break; // skip
+			default:
+				WriteConsole(qd_back, &c, 1, &junk, NULL);
+				break;
+			}
+		}
+		touchline(qd_coord.Y, qd_coord.X);
+		qd_coord.X += length;
+	}
+
+	void qd_resetterm(void)
+	{
+		qd_flush();
+		SetConsoleTextAttribute(qd_out, qd_normattr);
+		SetConsoleCursorPosition(qd_out, qd_coord);
+	}
+	int qd_rows(void)
+	{
+		return qd_numrows;
+	}
+	void qd_scrollup(int startrow, int endrow)
+	{
+		SMALL_RECT tot, scr;
+		COORD dest;
+		CHAR_INFO ch;
+		tot.Left = 0;
+		tot.Right = qd_numcols - 1;
+		tot.Top = startrow;
+		tot.Bottom = endrow;
+		scr.Left = 0;
+		scr.Right = qd_numcols - 1;
+		scr.Top = startrow + 1;
+		scr.Bottom = endrow;
+		dest.X = 0;
+		dest.Y = startrow;
+		ch.Char.AsciiChar = ' ';
+		ch.Attributes = qd_normattr;
+		ScrollConsoleScreenBuffer(qd_back, &scr, &tot, dest, &ch);
+		touchline(startrow, 0);
+		touchline(endrow, 0);
+	}
+
+	void qd_scrolldown(int startrow, int endrow)
+	{
+		SMALL_RECT tot, scr;
+		COORD dest;
+		CHAR_INFO ch;
+		tot.Left = 0;
+		tot.Right = qd_numcols - 1;
+		tot.Top = startrow;
+		tot.Bottom = endrow;
+		scr.Left = 0;
+		scr.Right = qd_numcols - 1;
+		scr.Top = startrow;
+		scr.Bottom = endrow - 1;
+		dest.X = 0;
+		dest.Y = startrow + 1;
+		ch.Char.AsciiChar = ' ';
+		ch.Attributes = qd_normattr;
+		ScrollConsoleScreenBuffer(qd_back, &scr, &tot, dest, &ch);
+		touchline(startrow, 0);
+		touchline(endrow, 0);
+	}
 
 	namespace _details
 	{
-		
+
 		void _settextcolor(HANDLE const console, console::Color const color)
 		{
 			CONSOLE_SCREEN_BUFFER_INFO info;
@@ -158,12 +349,12 @@ namespace console {
 			::GetConsoleScreenBufferInfo(console, &info);
 
 			WORD attr = info.wAttributes & 0xFF0F;
-			attr |= static_cast<WORD>(color)<<4;
+			attr |= static_cast<WORD>(color) << 4;
 
 			::SetConsoleTextAttribute(console, attr);
 		}
 
-		void _setcolors(HANDLE const console, console::Color const fg,  console::Color const bg)
+		void _setcolors(HANDLE const console, console::Color const fg, console::Color const bg)
 		{
 			CONSOLE_SCREEN_BUFFER_INFO info;
 			::GetConsoleScreenBufferInfo(console, &info);
@@ -282,22 +473,22 @@ namespace console {
 			PERR(WriteConsoleOutput(hConsole, console_buffer.data(), console_buffer_size, ZERO_COORD, &rect), "SetConsoleScreenBufferInfoEx");
 		}
 	}
-	
+
 	void init() {
 		if (hConsole) return;
-
-		logging::init_cerr();
-		logging::init_cout();
-		hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-		PERR(hConsole, "GetStdHandle");
-		PERR(GetConsoleScreenBufferInfo(hConsole, &console_info), "GetConsoleScreenBufferInfo");
-		console_window = console_info.srWindow;
-		console_buffer_size = { console_window.Right - console_window.Left , console_window.Bottom - console_window.Top };
-		console_buffer.resize(console_buffer_size.X * console_buffer_size.Y, { ' ', console_info.wAttributes });
+		qd_open();
+		//	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+		init_cerr();
+		init_cout();
+		//	PERR(hConsole, "GetStdHandle");
+		//	PERR(GetConsoleScreenBufferInfo(hConsole, &console_info), "GetConsoleScreenBufferInfo");
+		//	console_window = console_info.srWindow;
+		//	console_buffer_size = { console_window.Right - console_window.Left , console_window.Bottom - console_window.Top };
+		//	console_buffer.resize(console_buffer_size.X * console_buffer_size.Y, { ' ', console_info.wAttributes });
 	}
 	/* Standard error macro for reporting API errors */
 	void gotoxy(int x, int y) {
-		_details::_setpos(hConsole, Point(x,y));
+		_details::_setpos(hConsole, Point(x, y));
 	}
 	void gotoxy(const Point& p) {
 		_details::_setpos(hConsole, p);
@@ -334,21 +525,21 @@ namespace console {
 		DWORD count;
 		switch (i) {
 		case 1:
-			start = COORD{ 0,0 }; 
-			count = csbi.dwSize.X  + (csbi.dwSize.X * (start.Y-1)); 
+			start = COORD{ 0,0 };
+			count = csbi.dwSize.X + (csbi.dwSize.X * (start.Y - 1));
 			break;
 		case 2:start = COORD{ 0,0 }; count = csbi.dwSize.X* csbi.dwSize.Y; break;
 		case 0:
 		default: // 0
 			start = csbi.dwCursorPosition;
-			count = csbi.dwSize.X - csbi.dwCursorPosition.X + (csbi.dwSize.X * (csbi.dwSize.Y - start.Y));	
+			count = csbi.dwSize.X - csbi.dwCursorPosition.X + (csbi.dwSize.X * (csbi.dwSize.Y - start.Y));
 			assert(i == 0);
 			break;
 		}
 		/* fill the entire screen with blanks */
 		DWORD written;
-		PERR(FillConsoleOutputCharacterA(hConsole, ' ',count,start,&written), "FillConsoleOutputCharacter");
-		PERR(FillConsoleOutputAttribute(hConsole, csbi.wAttributes, count, start, &written),  "FillConsoleOutputCharacter");
+		PERR(FillConsoleOutputCharacterA(hConsole, ' ', count, start, &written), "FillConsoleOutputCharacter");
+		PERR(FillConsoleOutputAttribute(hConsole, csbi.wAttributes, count, start, &written), "FillConsoleOutputCharacter");
 	}
 	void scroll(int lines) {
 		if (lines == 0) return; // no lines to scroll;
@@ -367,7 +558,51 @@ namespace console {
 		PERR(ScrollConsoleScreenBuffer(hConsole, &srctScrollRect, &srctClipRect, coordDest, &chiFill), "ScrollConsoleScreenBuffer");
 	}
 
+	void scroll_down(int startrow, int endrow) {
+		CONSOLE_SCREEN_BUFFER_INFO info;
+		PERR(GetConsoleScreenBufferInfo(hConsole, &info), "GetConsoleScreenBufferInfo");
+		SMALL_RECT tot, scr;
+		COORD dest;
+		CHAR_INFO ch;
+		tot.Left = 0;
+		tot.Right = info.dwSize.X - 1;
+		tot.Top = startrow;
+		tot.Bottom = endrow;
+		scr.Left = 0;
+		scr.Right = info.dwSize.X - 1;
+		scr.Top = startrow;
+		scr.Bottom = endrow - 1;
+		dest.X = 0;
+		dest.Y = startrow + 1;
+		ch.Char.AsciiChar = ' ';
+		ch.Attributes = BACKGROUND_GREEN | FOREGROUND_RED;
+		ScrollConsoleScreenBuffer(hConsole, &scr, &tot, dest, &ch);
+		//touchline(startrow, 0);
+	//	touchline(endrow, 0);
+	}
 
+	void scroll_up(int startrow, int endrow) {
+		CONSOLE_SCREEN_BUFFER_INFO info;
+		PERR(GetConsoleScreenBufferInfo(hConsole, &info), "GetConsoleScreenBufferInfo");
+		SMALL_RECT tot, scr;
+		COORD dest;
+		CHAR_INFO ch;
+		tot.Left = 0;
+		tot.Right = info.dwSize.X - 1;
+		tot.Top = startrow;
+		tot.Bottom = endrow;
+		scr.Left = 0;
+		scr.Right = info.dwSize.X - 1;
+		scr.Top = startrow + 1;
+		scr.Bottom = endrow;
+		dest.X = 0;
+		dest.Y = startrow;
+		ch.Char.AsciiChar = ' ';
+		ch.Attributes = BACKGROUND_GREEN | FOREGROUND_RED;
+		ScrollConsoleScreenBuffer(hConsole, &scr, &tot, dest, &ch);
+		//touchline(startrow, 0);
+		//touchline(endrow, 0);
+	}
 
 	// putch has a bare bones scrolling interface.  It handles stuff like /n/r /b etc and keeps the cursor within the window
 
@@ -405,10 +640,10 @@ namespace console {
 			csi_ignore,
 			count_csi,
 			dcs_entry,
-			
+
 			exit
 		};
-	
+
 		std::stack<State> _states;
 		std::queue<char> _chars;
 		State _state = State::ground;
@@ -425,25 +660,26 @@ namespace console {
 			if (c >= 0x30 && c <= 0x39) {
 				_current_parm = (_current_parm * 10) + (0x30 - c);
 				return true;
-			} else if (c == 0x3B) {
+			}
+			else if (c == 0x3B) {
 				_parms.push_back(_current_parm);
 				_current_parm = 0;
 				return true;
 			}
-			return false;	
+			return false;
 		}
 		void collect(char c) {
 			_collect.push_back(c);
 		}
-		bool execute(char c) { 
+		bool execute(char c) {
 
 			if ((c >= 0x00 && c <= 0x17) || c == 0x19 || (c >= 0x1C && c <= 0x1F)) {
 				return true; // execute, happens in any state
 			}
-			
+
 			// we do the execute commands here
 			// return if it was executed
-			
+
 			return false;
 		}
 		void csi_dispatch(char c) {
@@ -452,15 +688,15 @@ namespace console {
 			COORD cursor = info.dwCursorPosition;
 			switch (c) {
 			case 'A': cursor = info.dwCursorPosition + COORD{ 0,-1 } *(_current_parm ? _current_parm : 1); break;
-			case 'B': cursor = info.dwCursorPosition + COORD{ 0, 1 } * (_current_parm ? _current_parm : 1); break;
-			case 'C': cursor = info.dwCursorPosition + COORD{ 1,0 } * (_current_parm ? _current_parm : 1); break;
-			case 'D': cursor = info.dwCursorPosition + COORD{ -1,0 } * (_current_parm ? _current_parm : 1); break;
+			case 'B': cursor = info.dwCursorPosition + COORD{ 0, 1 } *(_current_parm ? _current_parm : 1); break;
+			case 'C': cursor = info.dwCursorPosition + COORD{ 1,0 } *(_current_parm ? _current_parm : 1); break;
+			case 'D': cursor = info.dwCursorPosition + COORD{ -1,0 } *(_current_parm ? _current_parm : 1); break;
 			case 'E': cursor.X = 0; info.dwCursorPosition.Y += (_current_parm ? _current_parm : 1);  break;
 			case 'F': cursor.X = 0; info.dwCursorPosition.Y -= (_current_parm ? _current_parm : 1);  break;
-			case 'G': cursor.X = (_current_parm ? _current_parm-1 : 0);  break;
-			case 'H': 
+			case 'G': cursor.X = (_current_parm ? _current_parm - 1 : 0);  break;
+			case 'H':
 				cursor.Y = (_current_parm ? _current_parm - 1 : 0);
-				cursor.X = (_parms.size()>0 && _parms[0] ? _parms[0] - 1 : 0);
+				cursor.X = (_parms.size() > 0 && _parms[0] ? _parms[0] - 1 : 0);
 				break;
 			case'J': // erase display
 				assert(false);
@@ -475,18 +711,18 @@ namespace console {
 	public:
 		void putch(char c) {
 			if (_state == State::csi_ignore) {
-				if (!execute(c) && c != 0x7f  && !(c >= 0x40 && c <= 0x7e))_state = State::ground;
+				if (!execute(c) && c != 0x7f && !(c >= 0x40 && c <= 0x7e))_state = State::ground;
 				else return;
 			}
 			switch (c) {
-				case 0x1B: _state = State::escape; clear(); return;// escape
-			//	case 0x9D: _state = State::osc_string; return;// escape
+			case 0x1B: _state = State::escape; clear(); return;// escape
+		//	case 0x9D: _state = State::osc_string; return;// escape
 			}
 			if (is_csi_state()) {
 				if (c == 0x7f || execute(c)) return;
 				if (c >= 0x40 && c <= 0x7e) _state = State::csi_dispatch;
 			}
-			while (true){
+			while (true) {
 				switch (_state) {
 				case State::ground:
 				{
@@ -494,8 +730,8 @@ namespace console {
 					DWORD writin;
 					WriteConsoleA(hConsole, &buffer, 1, &writin, NULL);
 				}
-					
-					break;
+
+				break;
 				case State::csi_ignore:
 					if (!execute(c) && c >= 0x40 && c <= 0x7e) {
 						_state = State::ground;
@@ -549,7 +785,8 @@ namespace console {
 					if (c >= 0x40 && c <= 0x7E) {
 						_state = State::csi_dispatch;
 						continue;
-					}else if (c >= 0x30 && c <= 0x3F) {
+					}
+					else if (c >= 0x30 && c <= 0x3F) {
 						_state = State::csi_ignore;
 						continue;
 					}
@@ -563,7 +800,7 @@ namespace console {
 						_state = State::csi_intermediate;
 						continue;
 					}
-					else if (c == 0x3A || c >= 0x3C && c <= 0x3F) 
+					else if (c == 0x3A || c >= 0x3C && c <= 0x3F)
 						_state = State::csi_ignore;
 					else if (!parm(c)) {
 						assert(false);
@@ -571,17 +808,95 @@ namespace console {
 					break;
 				}
 				break;
-			} 
-		}		
+			}
+		}
 	};
 	std::ostream& vt100() {
 		return std::cout;
 	} // stream for vt100 emulation on console, only simple escape codes are supported however
 	static VT100 vt;
 	void test_vt(const std::string& text) {
-		for (char c : text) 
+		for (char c : text)
 			vt.putch(c);
 	}
+	class window_handle : public std::streambuf {
+	public:
+		int sync() override
+		{
+			std::ptrdiff_t n = pptr() - pbase();
+			DWORD dummy;
+			::WriteConsoleA(con_buffer, pbase(), n, &dummy, NULL);
+
+			
+			refresh();
+			return 0;
+		}
+		HANDLE con_buffer;
+		COORD pos;
+		COORD size;
+		std::vector<CHAR_INFO> screen;
+		CONSOLE_CURSOR_INFO cursinfo;
+		CONSOLE_SCREEN_BUFFER_INFO scrinfo;
+		void refresh() {
+			COORD c, orig;
+			SMALL_RECT r;
+			CONSOLE_SCREEN_BUFFER_INFO scr;
+			GetConsoleScreenBufferInfo(qd_out, &scr);
+			/* copy screen into backbuffer */
+			c.X = qd_numcols;
+			c.Y = qd_numrows;
+			orig.X = r.Left = 0;
+			orig.Y = r.Top = 0;
+			r.Right = size.X - 1;
+			r.Bottom = size.Y - 1;
+			PERR(ReadConsoleOutput(con_buffer, screen.data(), size, { 0,0 }, &r), "ReadConsoleOutput");
+			PERR(WriteConsoleOutput(qd_back, screen.data(), size, pos, &r), "WriteConsoleOutput");
+
+			touchline(-1, -1);
+			qd_flush();
+		}
+		void set_pos(const Point& p) {
+			pos = { p.x, p.y };
+		}
+		void set_size(const Point& s) {
+			size = { s.x, s.y };
+			SetConsoleScreenBufferSize(con_buffer, size);
+			screen.resize(size.X * size.Y);
+		}
+		char textBuffer[512];
+		window_handle() :con_buffer(CreateConsoleScreenBuffer(GENERIC_WRITE | GENERIC_READ, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL)) {
+			char* base = textBuffer;
+			setp(base, base + 512 - 1); // -1 to make overflow() easier
+		}
+		virtual ~window_handle() { CloseHandle(con_buffer); con_buffer = nullptr; }
+	};
+	//struct Handle { virtual ~Handle() {} };
+	//std::unique_ptr<Handle> _handle;
+	window::window() : _handle(new window_handle), std::ostream(_handle.get()) {
+		rdbuf(_handle.get());
+	}
+	window::window(const Point& p, const Point& s) : _handle(new window_handle), std::ostream(_handle.get()) {
+		rdbuf(_handle.get());
+		pos(p);
+		size(s);
+	}
+	Point  window::pos() const {
+		auto ptr = static_cast<window_handle*>(_handle.get());
+		return Point(ptr->pos.X, ptr->pos.Y);
+	}
+	void  window::pos(const Point& p) {
+		auto ptr = static_cast<window_handle*>(_handle.get());
+		ptr->set_pos(p);
+	}
+	Point  window::size() const {
+		auto ptr = static_cast<window_handle*>(_handle.get());
+		return Point(ptr->size.X, ptr->size.Y);
+	}
+	void  window::size(const Point& p) {
+		auto ptr = static_cast<window_handle*>(_handle.get());
+		ptr->set_size(p);
+	}
+
 };
 
 namespace con {
@@ -595,4 +910,120 @@ namespace con {
 	std::ostream& operator<<(std::ostream& os, const gotox& l) { console::gotox(l.x); return os; }
 	std::ostream& operator<<(std::ostream& os, const gotoy& l) { console::gotoy(l.y); return os; }
 	*/
+};
+
+
+// all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
+// https://cdot.senecacollege.ca/software/nled/nled_2_52_src/qkdisp.c
+// alot of helper functions up there
+class basic_debugbuf : public std::streambuf {
+protected:
+	std::array<char, 1024> _buffer;
+	std::streambuf * _oldBuffer;
+	std::string _outBuffer;
+	bool _endOfLineSeen = false;
+	int _lastc = 0;
+	COORD _cursor;
+	void output() {
+		if (!is_string_empty_or_whitespace(_outBuffer)) { // check for empty sync
+			//console::qd_move(_cursor.Y, _cursor.X);
+			if (_cursor.Y >= console::qd_rows()-1) console::qd_scrollup(15, _cursor.Y - 2);
+			else _cursor.Y++;
+			console::qd_clearline(_cursor.Y-1);
+			//console::qd_clear();
+			auto now = std::chrono::system_clock::now();
+			auto in_time_t = std::chrono::system_clock::to_time_t(now);
+			std::stringstream ss;
+			ss << "[" << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X") << "]:" << _outBuffer << std::endl;
+			//ss << "[]" << _outBuffer;//  << std::endl;
+			
+			console::qd_puts(ss.str().length(), ss.str().c_str());
+
+			::OutputDebugStringA(ss.str().c_str());
+			//if (_oldBuffer) _oldBuffer->sputn(ss.str().c_str(), ss.str().length());
+			//PERR(GetConsoleScreenBufferInfo(console::hConsole, &info), "GetConsoleScreenBufferInfo");
+			console::qd_flush();
+			
+		}
+		_outBuffer.clear();
+	}
+	void add_buffer(int_type ch) {
+		if (ch == '\n' || ch == '\r')
+		{
+			if (_lastc != ch && (_lastc == '\n' || _lastc == '\r')) {
+				// skip, throw it away
+				_lastc = 0;
+				return;
+			}
+			output();
+		}
+		else if (ch == traits_type::eof()) {
+			output();
+		}
+		else
+			_outBuffer.push_back(_lastc = ch);
+	}
+	static bool is_string_empty_or_whitespace(const std::string& str) {
+		if (str.length() > 0) for (char c : str) if (!isspace(c))return false;
+		return true;
+	}
+
+	int sync() override
+	{
+		for (auto ptr = pbase(); ptr != pptr(); ptr++) add_buffer(*ptr);
+		std::ptrdiff_t n = pptr() - pbase();
+		pbump(-n);
+		return 0;
+	}
+
+public:
+	basic_debugbuf() : std::streambuf(), _oldBuffer(nullptr), _lastc(0) {
+		char *base = _buffer.data();
+		setp(base, base + _buffer.size() - 1); // -1 to make overflow() easier
+		_cursor.X = 0; _cursor.Y = 15;
+	}
+	void setOldBuffer(std::streambuf* old_buffer) { _oldBuffer = old_buffer; _cursor.X = 0; _cursor.Y = 15; };
+};
+
+
+
+
+template<class CharT, class TraitsT = std::char_traits<CharT> >
+class basic_dostream : public std::basic_ostream<CharT, TraitsT>
+{
+public:
+	basic_dostream() : std::basic_ostream<CharT, TraitsT>
+		(new basic_debugbuf<CharT, TraitsT>()) {}
+	~basic_dostream()
+	{
+		//std::stringstream ss;
+		delete rdbuf();
+	}
+	
+	void setOldBuffer(std::basic_stringbuf<CharT, TraitsT>* old_buffer) {
+		auto debug_stream = dynamic_cast<basic_debugbuf<CharT, TraitsT>*>(rdbuf());
+		debug_stream->setOldBuffer(old_buffer);
+	}
+};
+
+typedef basic_dostream<char>    dostream;
+typedef basic_dostream<wchar_t> wdostream;
+
+basic_debugbuf s_cerr_debug_buffer;
+basic_debugbuf s_cout_debug_buffer;
+
+namespace  {
+	void init_cerr() {
+	//	s_cerr_debug_buffer.setOldBuffer(std::cerr.rdbuf());
+		std::cerr.rdbuf(&s_cerr_debug_buffer);
+		std::cerr << "cerr redirected" << std::endl;
+	}
+	void init_cout() {
+	//	s_cout_debug_buffer.setOldBuffer(std::cout.rdbuf());
+		std::cout.rdbuf(&s_cout_debug_buffer);
+		std::cout << "cout redirected" << std::endl;
+	}
+	void error(const std::string& message) {
+
+	}
 };

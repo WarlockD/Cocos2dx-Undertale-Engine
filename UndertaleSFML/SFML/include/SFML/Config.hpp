@@ -156,36 +156,98 @@
 
 #endif
 
+#include <type_traits>
 
 ////////////////////////////////////////////////////////////
 // Define portable fixed-size types
 ////////////////////////////////////////////////////////////
 namespace sf
 {
-    // All "common" platforms use the same size for char, short and int
-    // (basically there are 3 types for 3 sizes, so no other match is possible),
-    // we can use them without doing any kind of check
+	// All "common" platforms use the same size for char, short and int
+	// (basically there are 3 types for 3 sizes, so no other match is possible),
+	// we can use them without doing any kind of check
 
-    // 8 bits integer types
-    typedef signed   char Int8;
-    typedef unsigned char Uint8;
+	// 8 bits integer types
+	typedef signed   char Int8;
+	typedef unsigned char Uint8;
 
-    // 16 bits integer types
-    typedef signed   short Int16;
-    typedef unsigned short Uint16;
+	// 16 bits integer types
+	typedef signed   short Int16;
+	typedef unsigned short Uint16;
 
-    // 32 bits integer types
-    typedef signed   int Int32;
-    typedef unsigned int Uint32;
+	// 32 bits integer types
+	typedef signed   int Int32;
+	typedef unsigned int Uint32;
 
-    // 64 bits integer types
-    #if defined(_MSC_VER)
-        typedef signed   __int64 Int64;
-        typedef unsigned __int64 Uint64;
-    #else
-        typedef signed   long long Int64;
-        typedef unsigned long long Uint64;
-    #endif
+	// 64 bits integer types
+#if defined(_MSC_VER)
+	typedef signed   __int64 Int64;
+	typedef unsigned __int64 Uint64;
+#else
+	typedef signed   long long Int64;
+	typedef unsigned long long Uint64;
+#endif
+	// constexpr abs, used in a few compares
+// http://codereview.stackexchange.com/questions/60140/generic-absolute-value-function
+	namespace detail
+	{
+		//https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+		// generic abs algorithm
+		template<typename T> constexpr auto abs(T value)->T { return (T{} < value) ? value : -value; }
+	}
+	template<class T> constexpr typename std::enable_if<std::is_integral<T>::value, T>::type abs(const T& value) { return (T{} < value) ? value : -value; }
+	template<class T> constexpr typename std::enable_if<std::is_integral<T>::value, T>::type min(const T& a, const T& b) { return a < b ? a : b; }
+	template<class T> constexpr typename std::enable_if<std::is_integral<T>::value, T>::type max(const T& a, const T& b) { return a < b ? b : a; }
+	template<class T> constexpr typename std::enable_if<!std::is_integral<T>::value, const T&>::type abs(const T& value) { return (T{} < value) ? value : -value; }
+	template<class T> constexpr typename std::enable_if<!std::is_integral<T>::value, const T&>::type min(const T& a, const T& b) { return a < b ? a : b; }
+	template<class T> constexpr typename std::enable_if<!std::is_integral<T>::value, const T&>::type max(const T& a, const T& b) { return a < b ? b : a; }
+	
+	template<typename T>
+	constexpr auto abs_diff(const T& right, const T& left)->decltype(abs(abs(left)-abs(right))) { return abs(abs(left) - abs(right)); }
+
+	template<typename T, typename U>
+	typename std::enable_if<std::is_integral<T>::value  && std::is_integral<U>::value, bool>::type
+		constexpr is_equal(T left, U right) { return left == right; }
+
+	template<typename T, typename U, typename V>
+	typename std::enable_if<std::is_same<T, U>::value && std::is_floating_point<T>::value, bool>::type
+		constexpr is_almost_equal(T left, U right, V maxDiff) {
+		// Check if the numbers are really close -- needed
+		// when comparing numbers near zero.
+		return abs(left - right) <= (max(abs(right), abs(left)) *maxRelDiff);
+	}
+
+	template<typename T, typename U>
+	typename std::enable_if<std::is_same<T, U>::value && std::is_floating_point<T>::value, bool>::type
+		constexpr is_almost_equal(T left, U right) {
+		return is_close(left, right, std::numerical_limits<T>::epsilon());
+	}
+
+	template<typename T, typename U, typename V>
+	typename std::enable_if<std::is_same<T, U>::value && std::is_floating_point<T>::value, bool>::type
+		constexpr is_almost_equal_abs(T left, U right, V maxDiff, V maxRelDiff) {
+		// Check if the numbers are really close -- needed
+		// when comparing numbers near zero.
+		return (abs(left - right) <= maxDiff) || abs(left - right) <= (max(abs(right), abs(left)) *maxRelDiff);
+	}
+
+	template<typename T, typename U, typename V>
+	typename std::enable_if<std::is_same<T, U>::value && std::is_floating_point<T>::value, bool>::type
+		constexpr is_almost_equal_abs(T left, U right, V maxDiff) {
+		return is_almost_equal_abs(left, right, maxDiff, std::numerical_limits<T>::epsilon());
+	}
+
+	template<typename T, typename U>
+	typename std::enable_if<std::is_floating_point<T>::value  && std::is_floating_point<U>::value, bool>::type
+		constexpr is_equal(T left, U right) { return is_almost_equal(left,right); }
+
+	template<typename T, typename U>
+	typename std::enable_if<std::is_floating_point<T>::value  && std::is_integral<U>::value, bool>::type
+		constexpr is_equal(T left, U right) { return is_equal(left, static_cast<T>(right)); }
+
+	template<typename T, typename U>
+	typename std::enable_if<std::is_integral<T>::value  && std::is_floating_point<U>::value, bool>::type
+		constexpr is_equal(T left, U right) { return is_equal(static_cast<U>(left), right); }
 
 } // namespace sf
 

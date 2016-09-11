@@ -411,10 +411,7 @@ public:
 };
 
 
-inline std::ostream& operator<<(std::ostream& os, const sf::Vector2f& v) {
-	os << std::fixed << std::setprecision(3) << '('  << v.x << ',' << v.y << ')';
-	return os;
-}
+
 
 
 
