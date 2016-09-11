@@ -180,7 +180,8 @@ namespace console {
 
 
 	struct Point {
-		union { struct { int16_t x; int16_t y; }; int16_t ptr[2]; uint32_t int_value; };
+		int16_t x; 
+		int16_t y;
 		static constexpr size_t dimensions = 2;
 		static const Point Up;
 		static const Point Down;
@@ -189,8 +190,7 @@ namespace console {
 		Point() : x(0), y(0) {}
 		Point& set(int16_t X, int16_t Y) {x = X; y = Y;return *this;} 
 		Point(int16_t X, int16_t Y) : x(X), y(Y) {}
-
-
+		uint32_t hash() const { return static_cast<uint32_t>(y) << 16 | static_cast<uint32_t>(x); }
 		inline Point operator-() const { return Point(-x, -y); }
 		inline Point& operator/=(const int16_t r) { x /= r; y /= r;  return *this; }
 		inline Point& operator*=(const int16_t r) { x *= r; y *= r;  return *this; }
@@ -199,8 +199,8 @@ namespace console {
 		inline Point& operator+=(const Point &r) { x -= r.x; y -= r.y;  return *this; }
 		inline Point& operator-=(const Point &r) { x += r.x; y += r.y;  return *this; }
 	};
-	inline bool operator==(const Point &l, const Point &r) { return l.int_value == r.int_value; }
-	inline bool operator!=(const Point &l, const Point &r) { return l.int_value != r.int_value; }
+	inline bool operator==(const Point &l, const Point &r) { return l.hash() == r.hash(); }
+	inline bool operator!=(const Point &l, const Point &r) { return l.hash() != r.hash(); }
 	inline Point operator+(const Point &l, const Point &r) { return Point(l.x + r.x, l.y + r.y); }
 	inline Point operator-(const Point &l, const Point &r) { return Point(l.x - r.x, l.y - r.y); }
 	inline Point operator*(const Point &l, const Point &r) { return Point(l.x * r.x, l.y * r.y); }
@@ -208,12 +208,16 @@ namespace console {
 	inline Point operator*(int16_t r, const Point &l) { return Point(l.x * r, l.y * r); }
 
 	struct Rect {
-		union { struct { int16_t top; int16_t left; int16_t right; int16_t bottom; }; int16_t ptr[4]; uint64_t int_value; };
+		int16_t top; 
+		int16_t left; 
+		int16_t right; 
+		int16_t bottom;
 		int16_t width() const { return right - left; }
 		int16_t height() const { return bottom - top; }
+		uint32_t hash() const { return (static_cast<uint32_t>(top) << 16 | static_cast<uint32_t>(left)) ^ (static_cast<uint32_t>(bottom) << 16 | static_cast<uint32_t>(right)); }
 		void width(int16_t width) { right += width - right - left; }
 		void height(int16_t height) { right += height - bottom - top; }
-		Rect() : int_value(0) {}
+		Rect() : top(0), left(0), right(0), bottom(0) {}
 		explicit Rect(const Point& top_left, const Point& bottom_right) : top(top_left.y), left(top_left.x), bottom(bottom_right.y), right(bottom_right.x) {}
 		explicit Rect(int16_t top, int16_t left, int16_t right, int16_t bottom) : top(top), left(left), bottom(bottom), right(right) {}
 		Rect& set(int16_t top, int16_t left, int16_t right, int16_t bottom) { return *this = Rect(top, left, right, bottom); }
@@ -295,36 +299,77 @@ namespace console {
 		CharInfo default;
 		TerminalSettings() : scroll_on_linefeed(true), return_on_linefeed(true) ,default(CharInfo::Blank) {}
 	};
-	class Image
+	class Window
 	{
 		Point _size;
 		std::vector<CharInfo> _chars;
 		CharInfo _default;
+		CharInfo _current;
 		typedef std::vector<CharInfo>::iterator iterator;
 		typedef std::vector<CharInfo>::const_iterator const_iterator;
+		Point _cursor;
 	public:
-		Image() : _size(0, 0), _default(' ', Color::White, Color::Black) {}
-		Image(int16_t width, int16_t height, const char fill = ' ', Color fg = Color::White, Color bg = Color::Black) : _size(width, height),
-			_default(fill, fg, bg), _chars(width*height, _default) {}
-		Image(int16_t width, int16_t height, Color fg = Color::White, Color bg = Color::Black) : _size(width, height),
+		Window() : _size(0, 0), _cursor(0,0), _default(' ', Color::Gray, Color::Black) {}
+		Window(int width, int height) : _size(width, height), _cursor(0, 0), _default(' ', Color::Gray, Color::Black), _chars(width*height, _default) {}
+		Window(int width, int height, const CharInfo& default) : _size(width, height), _cursor(0, 0), _default(default), _chars(width*height, _default) {}
+		Window(int width, int height, Color fg, Color bg) : _size(width, height), _cursor(0, 0),
 			_default(' ', fg, bg), _chars(width*height, _default) {}
+		void clear() { _current = _default;  _chars.assign(_chars.size(), _current); }
 		int16_t width() const { return _size.x; }
 		int16_t height() const { return _size.y; }
+		int16_t row() const { return _cursor.y; }
+		int16_t col() const { return _cursor.x; }
+		void row(int r) { _cursor.y = r >= _size.y ? _size.y - 1 : r; }
+		void col(int c) { _cursor.x = c >= _size.x ? _size.x - 1 : c; }
+		std::pair<int16_t, int16_t> cursor() const { return std::make_pair(_cursor.x, _cursor.y); }
+		void cursor(int x, int y) { row(y); col(x); }
 		CharInfo& at(size_t x, size_t y) { return _chars[x + y * _size.x]; }
 		const CharInfo& at(size_t x, size_t y) const { return _chars[x + y * _size.x]; }
+		CharInfo& at() { return at(_cursor.x, _cursor.y); }
+		const CharInfo& at() const { at(_cursor.x, _cursor.y); }
 		iterator begin() { return _chars.begin(); }
 		iterator end() { return _chars.end(); }
 		const_iterator begin() const { return _chars.begin(); }
 		const_iterator end() const { return _chars.end(); }
-		iterator lbegin(int16_t y) { return _chars.begin() + (y * _size.x); }
-		iterator lend(int16_t y) { return _chars.end() + (y * _size.x) + _size.x; }
-		const_iterator lbegin(int16_t y) const { return _chars.begin() + (y * _size.x); }
-		const_iterator lend(int16_t y) const { return _chars.end() + (y * _size.x) + _size.x;; }
+		iterator ybegin(int y) { return _chars.begin() + (y * _size.x); }
+		iterator yend(int y) { return _chars.end() + (y * _size.x) + _size.x; }
+		const_iterator ybegin(int y) const { return _chars.begin() + (y * _size.x); }
+		const_iterator yend(int y) const { return _chars.end() + (y * _size.x) + _size.x;; }
+		iterator xybegin(int x, int y) { return _chars.begin() + x+ (y * _size.x); }
+		iterator xyend(int x, int y) { return _chars.end() + (y * _size.x) + _size.x; }
+		const_iterator xybegin(int x, int y) const { return _chars.begin() + x +  (y * _size.x); }
+		const_iterator xyend(int x, int y) const { return _chars.end() + x +  (y * _size.x); }
 		CharInfo* data() { return _chars.data(); }
 		const CharInfo* data() const { return _chars.data(); }
 		size_t size() const { return _chars.size(); }
 		CharInfo& operator[](size_t i) { return _chars[i]; }
 		const CharInfo& operator[](size_t i) const { return _chars[i]; }
+		void linefeed() {
+			if (_cursor.y >= (_size.y-1)) {
+				std::copy(ybegin(1), end(), begin());
+				_cursor.y = _size.y - 1;
+			}
+			else _cursor.y++;
+		}
+		void background(Color color) { _current.bg(color); }
+		void foreground(Color color) { _current.fg(color); }
+		Color background() const { return _current.bg(); }
+		Color foreground() const { return _current.fg(); }
+		void putch(int i);
+		void putstr(const char* str, size_t len) {
+			while (len--) putch(*str++);
+		}
+		void putstr(const char* str) {
+			while (*str) putch(*str++);
+		}
+		template<typename T>
+		void putstr(const std::basic_string<T>& str) {
+			for (auto c : str) putch(c);
+		}
+		// refresh window to console
+		void refresh(int x, int y);
+
+		void print(const char* fmt, ...);
 	};
 
 	class output_context

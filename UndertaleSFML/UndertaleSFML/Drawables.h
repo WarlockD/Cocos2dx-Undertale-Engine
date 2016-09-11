@@ -261,7 +261,6 @@ protected:
 	sf::Vector2f _position;
 	sf::Vector2f _origin;
 	sf::Vector2f _scale;
-	sf::Vector2f _size;
 	float _rotation;
 	mutable bool _transformNeedUpdate;
 	mutable sf::Transform _transform;
@@ -284,7 +283,9 @@ public:
 	const sf::Vector2f& getPosition() const { return _position; }
 	const sf::Vector2f& getOrigin() const { return _origin; }
 	const sf::Vector2f& getScale() const { return _scale; }
-	sf::Vector2f getSize() const { return _size * _scale; }
+	template<typename U>
+	sf::Vector2f getSize(const sf::Vector2<U>& size) const { return size * _scale; }
+	
 	float getRotation() const { return _rotation; }
 	const sf::Transform& getTransform() const;
 };

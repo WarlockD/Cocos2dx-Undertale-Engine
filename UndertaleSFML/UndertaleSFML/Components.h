@@ -179,7 +179,14 @@ struct SpriteFacing {
 
 struct UndertaleObject {
 	UndertaleLib::Object obj;
-	explicit UndertaleObject(UndertaleLib::Object obj) : obj(obj) {}
+	std::set<UndertaleLib::Object> parents;
+	explicit UndertaleObject(UndertaleLib::Object obj) : obj(obj) {
+		UndertaleLib::Object parent = Global::LookupObject(obj.parent_index());
+		while (parent.valid()) {
+			parents.emplace(parent);
+			parent = Global::LookupObject(parent.parent_index());
+		}
+	}
 };
 
 

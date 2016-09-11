@@ -25,309 +25,7 @@ namespace console {
 	const Point Point::Down(0, 1);
 	const Point Point::Left(-1, 0);
 	const Point Point::Right(1, 0);
-	COORD qd_coord;           /* current screen position */
-	short qd_normattr = 0x07, /* normal, ...      */
-		qd_boldattr = 0x0f, /* ...bold, and...  */
-		qd_revattr = 0x70, /* ...reverse video */
-		qd_saveattr = 0x07, /* save original attribute */
-		qd_clrattr = 0x07; /* used to clear to end of line */
-	short qd_numcols = 0,
-		qd_numrows = 0,
-		qd_drawtop = -1,    /* line to draw (-1: none, qd_numrows: all) */
-		qd_drawcol = -1,    /* first column to redraw if one line only */
-		qd_drawbot = 0;     /* draw status (bottom) line? */
-	HANDLE qd_out, qd_back,   /* output and backbuffer consoles */
-		qd_orig;           /* original console (to restore at end) */
-	std::vector<CHAR_INFO> qd_buff;
-	/* assuming we are drawing on line "row", set redrawing flags accordingly */
-	void touchline(short row, short col)
-	{
-		if (row == -1) {                /* request for whole screen */
-			qd_drawtop = qd_numrows;    /* ..the whole top section */
-			qd_drawcol = -1;
-			qd_drawbot = 1;             /*.. and the status line */
-		}
-		else if (row == qd_numrows - 1) /* is the status line */
-			qd_drawbot = 1;
-		else if (qd_drawtop == -1) {    /* is the first time drawing in the top */
-			qd_drawtop = row;           /* ..just redraw this line */
-			qd_drawcol = col;
-		}
-		else if (qd_drawtop != row) {   /* at least one other line in the top */
-			qd_drawtop = qd_numrows;    /* ..so do the whole top */
-			qd_drawcol = -1;
-		}
-		else if (col < qd_drawcol)      /* same line as before but left of prev */
-			qd_drawcol = -1;
-	}
-	void qd_clearline(int row)
-	{
-		DWORD junk;
-		qd_coord.X = 0;
-		qd_coord.Y = row;
-		FillConsoleOutputCharacter(qd_back, ' ', qd_numcols, qd_coord, &junk);
-		FillConsoleOutputAttribute(qd_back, qd_normattr, qd_numcols, qd_coord, &junk);
-		SetConsoleCursorPosition(qd_back, qd_coord);
-		touchline(-1, -1);
-	}
-	void qd_clear(void)
-	{
-		DWORD junk;
-		qd_coord.X = qd_coord.Y = 0;
-		FillConsoleOutputCharacter(qd_back, ' ', qd_numrows * qd_numcols,
-			qd_coord, &junk);
-		FillConsoleOutputAttribute(qd_back, qd_normattr, qd_numrows * qd_numcols,
-			qd_coord, &junk);
-		SetConsoleCursorPosition(qd_back, qd_coord);
-		touchline(-1, -1);
-	}
-	void qd_color(int color)
-	{
-		qd_normattr = color;
-		qd_boldattr = color | 0x08;
-		qd_revattr = ((color & 0x07) << 4) | ((color & 0x070) >> 4);
-		qd_clrattr = qd_normattr;
-		SetConsoleTextAttribute(qd_out, qd_normattr);
-		SetConsoleTextAttribute(qd_back, qd_normattr);
-	}
-
-	int qd_cols(void)
-	{
-		return qd_numcols;
-	}
-
-	void qd_eeol(void)
-	{
-		DWORD junk;
-		FillConsoleOutputCharacter(qd_back, ' ', qd_numcols - qd_coord.X,
-			qd_coord, &junk);
-		FillConsoleOutputAttribute(qd_back, qd_clrattr, qd_numcols - qd_coord.X,
-			qd_coord, &junk);
-		touchline(qd_coord.Y, qd_coord.X);
-	}
-
-	void qd_fixterm(void)
-	{
-		COORD c, orig;
-		SMALL_RECT r;
-		CONSOLE_SCREEN_BUFFER_INFO scr;
-
-		/* copy screen into backbuffer */
-		c.X = qd_numcols;
-		c.Y = qd_numrows;
-		orig.X = r.Left = 0;
-		orig.Y = r.Top = 0;
-		r.Right = qd_numcols - 1;
-		r.Bottom = qd_numrows - 1;
-		PERR(ReadConsoleOutput(qd_out, qd_buff.data(), c, orig, &r), "ReadConsoleOutput");
-		PERR(WriteConsoleOutput(qd_back, qd_buff.data(), c, orig, &r), "WriteConsoleOutput");
-
-		GetConsoleScreenBufferInfo(qd_out, &scr);
-		qd_coord = scr.dwCursorPosition;
-		SetConsoleCursorPosition(qd_back, qd_coord);
-	}
-
-	void qd_flush(void)
-	{
-		COORD c, orig;
-		SMALL_RECT r;
-
-		/* cut data from backbuffer and place it on screen console */
-		if (qd_drawtop == qd_numrows && qd_drawbot) {
-			c.X = qd_numcols;
-			c.Y = qd_numrows;
-			orig.X = orig.Y = 0;
-			r.Left = 0;
-			r.Right = qd_numcols - 1;
-			r.Top = 0;
-			r.Bottom = qd_numrows - 1;
-			ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
-			WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
-		}
-		else {
-			if (qd_drawbot) {
-				c.X = qd_numcols;
-				c.Y = qd_numrows;
-				orig.X = r.Left = 0;
-				orig.Y = r.Top = qd_numrows - 1;
-				r.Right = qd_numcols - 1;
-				r.Bottom = qd_numrows - 1;
-				ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
-				WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
-			}
-			if (qd_drawtop == qd_numrows) {
-				c.X = qd_numcols;
-				c.Y = qd_numrows;
-				orig.X = r.Left = 0;
-				orig.Y = r.Top = 0;
-				r.Right = qd_numcols - 1;
-				r.Bottom = qd_numrows - 2;
-				ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
-				WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
-			}
-			else if (qd_drawtop != -1) {
-				c.X = qd_numcols;
-				c.Y = qd_numrows;
-				orig.X = r.Left = (qd_drawcol == -1 ? 0 : qd_drawcol);
-				orig.Y = r.Top = qd_drawtop;
-				r.Right = qd_numcols - 1;
-				r.Bottom = qd_drawtop;
-				ReadConsoleOutput(qd_back, qd_buff.data(), c, orig, &r);
-				WriteConsoleOutput(qd_out, qd_buff.data(), c, orig, &r);
-			}
-		}
-		qd_drawtop = qd_drawcol = -1;
-		qd_drawbot = 0;
-
-		SetConsoleCursorPosition(qd_out, qd_coord);
-	}
-	int qd_getch(void)
-	{
-		int c = 0;
-		//c = _getch();
-		if (c == 224 || c == 0) {
-			//	c = _getch() | 0xFF00;
-			if (c == 0xFF86)
-				c = 0xFF84; /* ctrl PgUp has changed */
-		}
-		return c;
-	}
-	void qd_move(int row, int col)
-	{
-		qd_coord.X = col;
-		qd_coord.Y = row;
-		SetConsoleCursorPosition(qd_back, qd_coord);
-	}
-	void qd_close(void)
-	{
-		DWORD junk;
-		extern void qd_flush(void);
-		touchline(-1, -1);
-		qd_flush();
-
-		/*  old Windows code that moved down one line before exiting:
-
-		qd_coord.X = 0;
-		qd_coord.Y = qd_numrows - 1;
-		FillConsoleOutputAttribute(qd_out, qd_saveattr, qd_numcols, qd_coord,
-		&junk);
-		SetConsoleTextAttribute(qd_out, qd_saveattr);
-		SetConsoleCursorPosition(qd_out, qd_coord);
-		*/
-
-		SetConsoleActiveScreenBuffer(qd_orig);
-		CloseHandle(qd_out);
-		CloseHandle(qd_back);
-		qd_buff.clear();
-	}
-	void qd_open(void)
-	{
-		DWORD mode;
-		CONSOLE_SCREEN_BUFFER_INFO scr;
-		CONSOLE_CURSOR_INFO cursinfo;
-		COORD c, orig;
-		SMALL_RECT r;
-
-		qd_orig = GetStdHandle(STD_OUTPUT_HANDLE);
-		qd_out = CreateConsoleScreenBuffer(GENERIC_WRITE | GENERIC_READ, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
-		qd_back = CreateConsoleScreenBuffer(GENERIC_WRITE | GENERIC_READ, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
-		if (qd_orig && qd_out && qd_back) {
-			GetConsoleCursorInfo(qd_orig, &cursinfo);
-			GetConsoleScreenBufferInfo(qd_orig, &scr);
-			c.Y = qd_numrows = scr.srWindow.Bottom - scr.srWindow.Top + 1;
-			c.X = qd_numcols = scr.srWindow.Right - scr.srWindow.Left + 1;
-
-			SetConsoleScreenBufferSize(qd_out, c);
-			SetConsoleScreenBufferSize(qd_back, c);
-
-			SetConsoleActiveScreenBuffer(qd_out);
-
-			SetConsoleTitle("NLED");
-			SetConsoleMode(qd_out, 0);
-			SetConsoleMode(qd_back, 0);
-			cursinfo.bVisible = FALSE;
-			SetConsoleCursorInfo(qd_back, &cursinfo);
-
-			qd_saveattr = scr.wAttributes;
-			qd_buff.resize(qd_numrows * qd_numcols);
-			qd_fixterm();
-
-			/* In fullscreen mode only, fixterm turns off qd_out's */
-			/* cursor, so this MUST be done down here !?!?!        */
-			cursinfo.bVisible = TRUE;
-			SetConsoleCursorInfo(qd_out, &cursinfo);
-		}
-	}
-	void qd_puts(int length, const char *string)
-	{
-		DWORD junk;
-		int i;
-		char c;
-		for (i = 0; i < length; i++) {
-			switch (c = string[i]) {
-			case '\b': case '\r': case '\n': break; // skip
-			default:
-				WriteConsole(qd_back, &c, 1, &junk, NULL);
-				break;
-			}
-		}
-		touchline(qd_coord.Y, qd_coord.X);
-		qd_coord.X += length;
-	}
-
-	void qd_resetterm(void)
-	{
-		qd_flush();
-		SetConsoleTextAttribute(qd_out, qd_normattr);
-		SetConsoleCursorPosition(qd_out, qd_coord);
-	}
-	int qd_rows(void)
-	{
-		return qd_numrows;
-	}
-	void qd_scrollup(int startrow, int endrow)
-	{
-		SMALL_RECT tot, scr;
-		COORD dest;
-		CHAR_INFO ch;
-		tot.Left = 0;
-		tot.Right = qd_numcols - 1;
-		tot.Top = startrow;
-		tot.Bottom = endrow;
-		scr.Left = 0;
-		scr.Right = qd_numcols - 1;
-		scr.Top = startrow + 1;
-		scr.Bottom = endrow;
-		dest.X = 0;
-		dest.Y = startrow;
-		ch.Char.AsciiChar = ' ';
-		ch.Attributes = qd_normattr;
-		ScrollConsoleScreenBuffer(qd_back, &scr, &tot, dest, &ch);
-		touchline(startrow, 0);
-		touchline(endrow, 0);
-	}
-
-	void qd_scrolldown(int startrow, int endrow)
-	{
-		SMALL_RECT tot, scr;
-		COORD dest;
-		CHAR_INFO ch;
-		tot.Left = 0;
-		tot.Right = qd_numcols - 1;
-		tot.Top = startrow;
-		tot.Bottom = endrow;
-		scr.Left = 0;
-		scr.Right = qd_numcols - 1;
-		scr.Top = startrow;
-		scr.Bottom = endrow - 1;
-		dest.X = 0;
-		dest.Y = startrow + 1;
-		ch.Char.AsciiChar = ' ';
-		ch.Attributes = qd_normattr;
-		ScrollConsoleScreenBuffer(qd_back, &scr, &tot, dest, &ch);
-		touchline(startrow, 0);
-		touchline(endrow, 0);
-	}
+	
 
 	namespace _details
 	{
@@ -476,8 +174,8 @@ namespace console {
 
 	void init() {
 		if (hConsole) return;
-		qd_open();
-		//	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 		init_cerr();
 		init_cout();
 		//	PERR(hConsole, "GetStdHandle");
@@ -821,11 +519,14 @@ namespace console {
 	}
 	class window_handle : public std::streambuf {
 	public:
+		void refresh() {
+
+		}
 		int sync() override
 		{
 			std::ptrdiff_t n = pptr() - pbase();
 			DWORD dummy;
-			::WriteConsoleA(con_buffer, pbase(), n, &dummy, NULL);
+			::WriteConsoleA(hConsole, pbase(), n, &dummy, NULL);
 
 			
 			refresh();
@@ -837,24 +538,7 @@ namespace console {
 		std::vector<CHAR_INFO> screen;
 		CONSOLE_CURSOR_INFO cursinfo;
 		CONSOLE_SCREEN_BUFFER_INFO scrinfo;
-		void refresh() {
-			COORD c, orig;
-			SMALL_RECT r;
-			CONSOLE_SCREEN_BUFFER_INFO scr;
-			GetConsoleScreenBufferInfo(qd_out, &scr);
-			/* copy screen into backbuffer */
-			c.X = qd_numcols;
-			c.Y = qd_numrows;
-			orig.X = r.Left = 0;
-			orig.Y = r.Top = 0;
-			r.Right = size.X - 1;
-			r.Bottom = size.Y - 1;
-			PERR(ReadConsoleOutput(con_buffer, screen.data(), size, { 0,0 }, &r), "ReadConsoleOutput");
-			PERR(WriteConsoleOutput(qd_back, screen.data(), size, pos, &r), "WriteConsoleOutput");
 
-			touchline(-1, -1);
-			qd_flush();
-		}
 		void set_pos(const Point& p) {
 			pos = { p.x, p.y };
 		}
@@ -896,7 +580,40 @@ namespace console {
 		auto ptr = static_cast<window_handle*>(_handle.get());
 		ptr->set_size(p);
 	}
+	// refresh window to console
 
+	void Window::refresh(int x, int y) {
+		COORD bufSize = { _size.x, _size.y }; // one line
+		COORD bufPos = { 0,0 };
+		SMALL_RECT sr;
+		const CHAR_INFO* info = reinterpret_cast<const CHAR_INFO*>(_chars.data());
+		sr.Top = y;   y;// lineno;
+		sr.Bottom = y + _size.y-1; 
+		sr.Left = x;
+		sr.Right = x + _size.x - 1;
+		WriteConsoleOutput(console::hConsole, info, bufSize, bufPos, &sr);
+	}
+	void Window::print(const char* fmt, ...) {
+		va_list va;
+		va_start(va, fmt);
+		char buffer[256];
+		auto count = vsnprintf(buffer, 256, fmt, va);
+		va_end(va);
+		putstr(buffer, count);
+	}
+	void Window::putch(int i) {
+		switch (i) {
+		case '\n':linefeed(); break;
+		case '\r': _cursor.x = 0; break;
+		case '\b': if (_cursor.x != 0) { _cursor.x--; at() = _current; } break;
+		case 0x7F: break; // ignore
+		default:
+			at().ch = i;
+			at().attrib = _current.attrib;
+			_cursor.x++;
+			if (_cursor.x >= _size.x) { _cursor.x = 0; linefeed(); }
+		}
+	}
 };
 
 namespace con {
@@ -916,101 +633,73 @@ namespace con {
 // all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
 // https://cdot.senecacollege.ca/software/nled/nled_2_52_src/qkdisp.c
 // alot of helper functions up there
-class basic_debugbuf : public std::streambuf {
-protected:
-	std::array<char, 1024> _buffer;
-	std::streambuf * _oldBuffer;
-	std::string _outBuffer;
-	bool _endOfLineSeen = false;
-	int _lastc = 0;
-	COORD _cursor;
-	void output() {
-		if (!is_string_empty_or_whitespace(_outBuffer)) { // check for empty sync
-			//console::qd_move(_cursor.Y, _cursor.X);
-			if (_cursor.Y >= console::qd_rows()-1) console::qd_scrollup(15, _cursor.Y - 2);
-			else _cursor.Y++;
-			console::qd_clearline(_cursor.Y-1);
-			//console::qd_clear();
-			auto now = std::chrono::system_clock::now();
-			auto in_time_t = std::chrono::system_clock::to_time_t(now);
-			std::stringstream ss;
-			ss << "[" << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X") << "]:" << _outBuffer << std::endl;
-			//ss << "[]" << _outBuffer;//  << std::endl;
-			
-			console::qd_puts(ss.str().length(), ss.str().c_str());
 
-			::OutputDebugStringA(ss.str().c_str());
-			//if (_oldBuffer) _oldBuffer->sputn(ss.str().c_str(), ss.str().length());
-			//PERR(GetConsoleScreenBufferInfo(console::hConsole, &info), "GetConsoleScreenBufferInfo");
-			console::qd_flush();
-			
-		}
-		_outBuffer.clear();
+template<class CharT, class TraitsT = std::char_traits<CharT> >
+class basic_debugbuf : public std::basic_streambuf<CharT, TraitsT> {
+public:
+	std::array<char, 512> _buffer;
+	std::basic_string<CharT, TraitsT> _str;
+	bool write_console;
+	bool write_visualstudio;
+	int _lastc;
+	void output_visualstudio(const std::basic_string<char>& str) {
+		auto now = std::chrono::system_clock::now();
+		auto in_time_t = std::chrono::system_clock::to_time_t(now);
+		std::basic_stringstream<CharT, TraitsT> ss;
+		ss << "[" << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X") << "]:" << str << std::endl;
+		::OutputDebugStringA(ss.str().c_str());
 	}
-	void add_buffer(int_type ch) {
-		if (ch == '\n' || ch == '\r')
-		{
-			if (_lastc != ch && (_lastc == '\n' || _lastc == '\r')) {
-				// skip, throw it away
-				_lastc = 0;
-				return;
-			}
-			output();
-		}
-		else if (ch == traits_type::eof()) {
-			output();
-		}
-		else
-			_outBuffer.push_back(_lastc = ch);
+	void output_visualstudio(const std::basic_string<wchar_t>& str) {
+		auto now = std::chrono::system_clock::now();
+		auto in_time_t = std::chrono::system_clock::to_time_t(now);
+		std::basic_stringstream<wchar_t> ss;
+		ss << "[" << std::put_time(std::localtime(&in_time_t), L"%Y-%m-%d %X") << "]:" << str << std::endl;
+		::OutputDebugStringA(ss.str().c_str());
 	}
-	static bool is_string_empty_or_whitespace(const std::string& str) {
-		if (str.length() > 0) for (char c : str) if (!isspace(c))return false;
-		return true;
+	void output_console(const char* str, size_t len) {
+		DWORD dummy;
+		::WriteConsoleA(console::hConsole, str, len, &dummy, NULL);
 	}
-
+	void output_console(const wchar_t* str, size_t len) {
+		DWORD dummy;
+		::WriteConsoleW(console::hConsole, str, len, &dummy, NULL);
+	}
 	int sync() override
 	{
-		for (auto ptr = pbase(); ptr != pptr(); ptr++) add_buffer(*ptr);
 		std::ptrdiff_t n = pptr() - pbase();
+		_str.reserve(n);
+		if (write_visualstudio) {
+			for (auto ptr = pbase(); ptr != pptr(); ptr++) {
+				CharT ch = *ptr;
+				if (ch == '\r' || ch == '\n') {
+					if (_lastc != ch && (_lastc == '\r' || _lastc == '\n')) {
+						ch = 0;
+					}
+					else {
+						output_visualstudio(_str);
+						_str.clear();
+					}
+				}
+				else _str.push_back(ch);
+				_lastc = ch;
+			}
+		}
+		if (write_console) output_console(pbase(), n);
 		pbump(-n);
 		return 0;
 	}
-
 public:
-	basic_debugbuf() : std::streambuf(), _oldBuffer(nullptr), _lastc(0) {
+	basic_debugbuf(bool write_console, bool write_visualstudio) : write_visualstudio(write_visualstudio), write_console(write_console), std::streambuf(), _lastc(0) {
+		_str.reserve(512);
 		char *base = _buffer.data();
 		setp(base, base + _buffer.size() - 1); // -1 to make overflow() easier
-		_cursor.X = 0; _cursor.Y = 15;
-	}
-	void setOldBuffer(std::streambuf* old_buffer) { _oldBuffer = old_buffer; _cursor.X = 0; _cursor.Y = 15; };
-};
-
-
-
-
-template<class CharT, class TraitsT = std::char_traits<CharT> >
-class basic_dostream : public std::basic_ostream<CharT, TraitsT>
-{
-public:
-	basic_dostream() : std::basic_ostream<CharT, TraitsT>
-		(new basic_debugbuf<CharT, TraitsT>()) {}
-	~basic_dostream()
-	{
-		//std::stringstream ss;
-		delete rdbuf();
 	}
 	
-	void setOldBuffer(std::basic_stringbuf<CharT, TraitsT>* old_buffer) {
-		auto debug_stream = dynamic_cast<basic_debugbuf<CharT, TraitsT>*>(rdbuf());
-		debug_stream->setOldBuffer(old_buffer);
-	}
 };
 
-typedef basic_dostream<char>    dostream;
-typedef basic_dostream<wchar_t> wdostream;
 
-basic_debugbuf s_cerr_debug_buffer;
-basic_debugbuf s_cout_debug_buffer;
+basic_debugbuf<char> s_cerr_debug_buffer(false, true);
+basic_debugbuf<char> s_cout_debug_buffer(true, false);
 
 namespace  {
 	void init_cerr() {

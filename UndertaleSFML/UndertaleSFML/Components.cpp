@@ -211,18 +211,16 @@ void Application::LoadRoom(size_t index) {
 		if (_room->objects().size() > 0) {
 			for (auto& o : _room->objects()) {
 				ex::Entity e = es.create();
-				e.assign<UndertaleObject>(o.obj);
-				e.assign<Body>(o.body);
+				auto obj = e.assign<UndertaleObject>(o.obj);
+				auto body = e.assign<Body>(o.body);
 				e.assign<Layer>(o.obj.depth());
 				if (o.obj.sprite_index() >= 0) {
 					e.assign<UndertaleSprite>(o.obj.sprite_index());
 				}
 				_roomEntitys.emplace_back(e);
-				auto parent = o.obj;
-				while (parent.valid()) {
-					_roomObjects.emplace(std::make_pair((size_t)parent.index(), e.id()));
-					parent = Global::LookupObject(parent.parent_index());
-				}
+				_roomObjects.emplace(std::make_pair(o.obj.index(), e.id()));
+				for(auto p : obj->parents) _roomObjects.emplace(std::make_pair(p.index(), e.id()));
+
 				if (o.obj.index() == 1570) { // main char
 					e.assign<PlayerControl>(30.0f); // we can move it
 					auto facing = e.assign<SpriteFacing>(1043, 1045, 1044, 1046);
@@ -244,6 +242,7 @@ struct Candidate {
 	float radius;
 	ex::Entity entity;
 };
+static console::Window info_window(50, 20);
 
 void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 	RawVertices temp_verts;
@@ -309,16 +308,7 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 		verts += temp_verts;
 	});
 	Candidate canadates;
-	auto mouse_pos = sf::Mouse::getPosition(_window);
-	std::cerr << con::gotoxy(20, 10) << mouse_pos;
-	es.each<Body, UndertaleObject, UndertaleSprite, Velocity>([this, mouse_pos](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite, Velocity &velocity) {
-		sf::FloatRect bounds(body.getPosition(), sprite.frame_size());
-		if (bounds.contains(sf::Vector2f(mouse_pos))) {
-			auto& verts = (sortedVerts[100])[nullptr];
-			draw_box(verts, bounds);
-		}
 
-	});
 	if (_room && _room->backgrounds().size() > 0) {
 		for (auto& t : _room->backgrounds()) {
 			if (!t.forground) continue;
@@ -329,4 +319,26 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 			verts += temp_verts;
 		}
 	}
+	// object debug
+	auto mouse_pos = sf::Mouse::getPosition(_window);
+	info_window.cursor(0, 0);
+	info_window.print("mouse (%2.2i,%2.2i)     \r\n", mouse_pos.x, mouse_pos.y);
+	
+	es.each<Body, UndertaleObject, UndertaleSprite>([this, mouse_pos](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
+		sf::FloatRect bounds(body.getPosition(), body.getSize(sprite.frame_size()));
+		if (bounds.contains(sf::Vector2f(mouse_pos))) {
+			auto& verts = (sortedVerts[100])[nullptr];
+			draw_box(verts, bounds);
+			auto& o = obj.obj;
+			if (o.valid()) {
+				info_window.print("Object(%i, %s) (%2.2f,%2.2f}\r\n", o.index(),o.name().c_str(), bounds.left,bounds.top);
+				if (obj.parents.size() > 0) {
+					for(auto& p : obj.parents)
+						info_window.print("->(%i, %s)   \r\n", p.index(), p.name().c_str());
+				}
+			}
+			else info_window.print("invalid obj");
+		}
+		info_window.refresh(10, 5);
+	});
 }

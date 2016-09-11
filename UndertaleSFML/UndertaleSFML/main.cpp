@@ -234,6 +234,7 @@ void gameLoop() {
 			PlayerControl::update_keys(event);
 		}
 		//	window.clear();
+		
 		sf::Time elapsed = clock.restart();
 		s_app->update(elapsed.asSeconds());
 		//	window.display();
@@ -242,9 +243,7 @@ void gameLoop() {
 int main(int argc, const char* argv[]) {
 	//array_helpers::example_sum();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
-	console::init();
-	//logging::init_cerr();
-	//logging::init_cout();
+	
 	const int gameWidth = 800;
 	const int gameHeight = 600;
 
@@ -252,6 +251,7 @@ int main(int argc, const char* argv[]) {
 	s_window.reset(new sf::RenderWindow(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close));
 	s_app.reset(new Application(*s_window));
 	s_app->init(*s_app.get());
+	console::init();
 	gameLoop();
 	// we got to run this to delete all the loaded textures we have or visual studio blows a fit
 	s_window->close();

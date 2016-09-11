@@ -119,6 +119,9 @@ namespace UndertaleLib {
 		std::string to_string() const { return "(" + std::to_string(_index) + ")" + _name.c_str(); }
 		inline bool operator==(const Resource& other) const { return _name == other._name; } // its name will be unique cause the pointer is
 	};
+	// for sets
+	inline bool operator<(const Resource& l, const Resource& r) { return l.index() < r.index(); }
+
 	template<class T> class OffsetVectorIt;
 	template<class T> class OffsetVector {
 		const uint8_t* _data;
@@ -172,6 +175,12 @@ namespace std {
 	{
 		std::size_t operator()(const UndertaleLib::Resource& r) const { return r.hash(); }
 	};
+	template <>
+	struct std::less<UndertaleLib::Resource>
+	{
+		bool operator()(const UndertaleLib::Resource& l, const UndertaleLib::Resource& r) const { return l.index() < r.index(); }
+	};
+
 	template <>
 	struct std::hash<UndertaleLib::String>
 	{
