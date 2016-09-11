@@ -303,6 +303,7 @@ namespace console {
 	{
 		Point _size;
 		std::vector<CharInfo> _chars;
+		std::vector<CharInfo> _back;
 		CharInfo _default;
 		CharInfo _current;
 		typedef std::vector<CharInfo>::iterator iterator;
@@ -310,11 +311,11 @@ namespace console {
 		Point _cursor;
 	public:
 		Window() : _size(0, 0), _cursor(0,0), _default(' ', Color::Gray, Color::Black) {}
-		Window(int width, int height) : _size(width, height), _cursor(0, 0), _default(' ', Color::Gray, Color::Black), _chars(width*height, _default) {}
-		Window(int width, int height, const CharInfo& default) : _size(width, height), _cursor(0, 0), _default(default), _chars(width*height, _default) {}
+		Window(int width, int height) : _size(width, height), _cursor(0, 0), _default(' ', Color::Gray, Color::Black), _chars(width*height, _default) , _back(width*height, _default) {}
+		Window(int width, int height, const CharInfo& default) : _size(width, height), _cursor(0, 0), _default(default), _chars(width*height, _default), _back(width*height, _default) {}
 		Window(int width, int height, Color fg, Color bg) : _size(width, height), _cursor(0, 0),
-			_default(' ', fg, bg), _chars(width*height, _default) {}
-		void clear() { _current = _default;  _chars.assign(_chars.size(), _current); }
+			_default(' ', fg, bg), _chars(width*height, _default), _back(width*height, _default) {}
+		void clear();
 		int16_t width() const { return _size.x; }
 		int16_t height() const { return _size.y; }
 		int16_t row() const { return _cursor.y; }
@@ -347,6 +348,7 @@ namespace console {
 		void linefeed() {
 			if (_cursor.y >= (_size.y-1)) {
 				std::copy(ybegin(1), end(), begin());
+				std::copy(_back.begin() + _size.x, _back.end(), _back.begin());
 				_cursor.y = _size.y - 1;
 			}
 			else _cursor.y++;

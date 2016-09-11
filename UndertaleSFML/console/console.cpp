@@ -583,15 +583,26 @@ namespace console {
 	// refresh window to console
 
 	void Window::refresh(int x, int y) {
-		COORD bufSize = { _size.x, _size.y }; // one line
-		COORD bufPos = { 0,0 };
-		SMALL_RECT sr;
+		const COORD bufSize = { _size.x, _size.y }; // one line
+		const COORD bufPos = { 0,0 };
+		SMALL_RECT sr = { x, y, x + _size.x - 1, y + _size.y - 1 };
 		const CHAR_INFO* info = reinterpret_cast<const CHAR_INFO*>(_chars.data());
-		sr.Top = y;   y;// lineno;
-		sr.Bottom = y + _size.y-1; 
-		sr.Left = x;
-		sr.Right = x + _size.x - 1;
-		WriteConsoleOutput(console::hConsole, info, bufSize, bufPos, &sr);
+	//	WriteConsoleOutput(console::hConsole, info, bufSize, bufPos, &sr)
+		DWORD written;
+		for (int16_t yy = 0; yy < _size.y; yy++) {
+			for (int16_t xx = 0; xx < _size.x; xx++) {
+				auto& ch = _chars[xx + yy * _size.x];
+				auto& bch = _back[xx + yy * _size.x];
+				if (ch != bch) {
+					bch = ch;
+					const COORD pos = { x+xx, y+yy }; // one char
+					SetConsoleCursorPosition(console::hConsole, pos);
+					putchar(ch.ch);
+					//::WriteConsole(console::hConsole, &_chars.at(xx + yy * _size.x).ch, 1, &written, NULL);
+					//WriteConsoleOutput(console::hConsole, info, bufSize, cbufPos, &csr);
+				}
+			}
+		}
 	}
 	void Window::print(const char* fmt, ...) {
 		va_list va;
@@ -601,6 +612,9 @@ namespace console {
 		va_end(va);
 		putstr(buffer, count);
 	}
+	void Window::clear() { 
+		std::fill(_chars.begin(), _chars.end(), _default);
+	}
 	void Window::putch(int i) {
 		switch (i) {
 		case '\n':linefeed(); break;
@@ -608,10 +622,14 @@ namespace console {
 		case '\b': if (_cursor.x != 0) { _cursor.x--; at() = _current; } break;
 		case 0x7F: break; // ignore
 		default:
-			at().ch = i;
-			at().attrib = _current.attrib;
+		{
+			auto& c = at();
+			c.ch = i;
+			c.attrib = _current.attrib;
 			_cursor.x++;
 			if (_cursor.x >= _size.x) { _cursor.x = 0; linefeed(); }
+		}
+		break;
 		}
 	}
 };

@@ -214,56 +214,9 @@ public:
 	void LoadRoom(size_t index);
 	size_t getRoomIndex() const { return _room ? _room->index() : 0; }
 	void init(ex::EntityX& app); 
-	void draw() {
-		draw_count = 0;
-		_window.clear();
-		sf::RenderStates states = sf::RenderStates::Default;
-		states.transform = _transform;
-		frame_count++;
-		auto& verts = sortedVerts;
-		if (verts.size() > 0) {
-			for (auto& sv : verts) {
-				if (sv.second.size() == 0) continue;
-				for (auto& b : sv.second) {
-					draw_count++;
-					states.texture = b.first;
-					_window.draw(b.second.data(), b.second.size(), sf::PrimitiveType::Triangles, states);
-				}
-			}
-		}
-		_window.draw(_text);
-		_window.display();
-	}
+	void draw();
 	void update_verts(ex::TimeDelta dt, ex::EntityManager& es);
 	static constexpr size_t room_fps = (1000/ 60);
-	void update(ex::TimeDelta dt) { 
-		sf::Time current = _clock.getElapsedTime();
-		if (current.asMilliseconds() > room_fps) {
-			update_count++;
-			float delta = _clock.restart().asSeconds();
-			
-			//systems.system<PlayerOverWorldSystem>()->update(entities, events, delta);
-		//	systems.system<VelocitySystem>()->update(entities, events, delta);
-		//	systems.system<AnimationSystem>()->update(entities, events, delta);
-			//systems.system<RenderSystem>()->update(entities, events, delta);
-			update_verts(delta, entities);
-		}
-		if (_debugUpdate.getElapsedTime().asSeconds() >= 1.0) {
-			float last_update = _debugUpdate.restart().asSeconds();
-			std::ostringstream out;
-			const float fps = frame_count / last_update;
-			out << "Draw FPS(";
-			out << std::setprecision(2) << std::fixed << (float)((float)frame_count / last_update);
-			out << ") Update FPS(";
-			out << std::setprecision(2) << std::fixed << (float)((float)update_count / last_update);
-			out << ")" << std::endl;
-			out << "Objects(" << entities.size() << ") DrawCount(" << draw_count << ")" << std::endl;
-			_text.setString(out.str());
-			draw_count = 0;
-			update_count = 0;
-			frame_count = 0;
-		}
-		draw();
-	}
+	void update(ex::TimeDelta dt);
 };
 
