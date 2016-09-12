@@ -12,6 +12,7 @@
 #include <functional>
 #include <type_traits>
 #include <chrono>
+#include <list>
 
 #ifndef CONSOLE_SCREEN_BUFFER_INFO
 struct _CONSOLE_SCREEN_BUFFER_INFOEX;
@@ -159,10 +160,10 @@ namespace console {
 	};
 	ENUM_OPERATIONS(MouseState);
 
-
+	typedef unsigned int chtype;
 	struct CharInfo {
 		static const CharInfo Blank; // default, space that is on a white forground with a black bachkground
-		union { struct { union { wchar_t wch; char ch; }; uint16_t attrib; }; uint32_t int_value; };
+		union { struct { union { wchar_t wch; char ch; }; uint16_t attrib; }; chtype value; };
 		CharInfo() : CharInfo(Blank) {}
 		constexpr CharInfo(char ch, Color fg = Color::White, Color bg = Color::Black) : ch(' '), attrib(static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4)) {}
 		//  with black background and white forground
@@ -171,8 +172,8 @@ namespace console {
 		void fg(Color c) { attrib = (attrib & 0xF0) | static_cast<uint8_t>(c); }
 		void bg(Color c) { attrib = (attrib & 0x0F) | (static_cast<uint8_t>(c) << 4); }
 	};
-	inline bool operator==(const CharInfo &l, const CharInfo &r) { return l.int_value == r.int_value; }
-	inline bool operator!=(const CharInfo &l, const CharInfo &r) { return l.int_value != r.int_value; }
+	inline bool operator==(const CharInfo &l, const CharInfo &r) { return l.value == r.value; }
+	inline bool operator!=(const CharInfo &l, const CharInfo &r) { return l.value != r.value; }
 	inline bool operator==(const CharInfo &l, char r) { return l.ch == r; }
 	inline bool operator!=(const CharInfo &l, char r) { return l.ch != r; }
 	inline bool operator==(const CharInfo &l, wchar_t r) { return l.wch == r; }
@@ -299,22 +300,59 @@ namespace console {
 		CharInfo default;
 		TerminalSettings() : scroll_on_linefeed(true), return_on_linefeed(true) ,default(CharInfo::Blank) {}
 	};
+
 	class Window
 	{
+		static constexpr short NO_CHANGE = (short)-1;
+		static constexpr CharInfo DefaultAttributes = CharInfo(' ', Color::Gray, Color::Black);
 		Point _size;
-		std::vector<CharInfo> _chars;
-		std::vector<CharInfo> _back;
+		struct Range { 
+			short first; 
+			short last; 
+			constexpr Range() : first(-1), last(-1) {} 
+			template<typename T>
+			constexpr Range(T first, T last) : first(static_cast<T>(first)), last(static_cast<T>(last)) {}
+			
+
+		};
+		struct Line {
+			short first;
+			short last;
+			std::vector<CharInfo> chars;
+			explicit Line(size_t size, const CharInfo& fill = DefaultAttributes) : first(0), last(static_cast<short>(size - 1)), chars(size, fill) {}
+			void clear(const CharInfo& fill = DefaultAttributes) {  for (size_t i = 0; i < chars.size(); i++) set(i, fill); }
+			size_t size() const { return chars.size(); }
+			const CharInfo& get(int x) const { return chars.at(x); }
+			const CharInfo& operator[](int x) const { return chars.at(x); }
+			void set(size_t x, const CharInfo& n) {
+				auto& c = chars.at(x);
+				short pos = static_cast<short>(x);
+				if (c != n) {
+					if (first == NO_CHANGE)
+						first = last = pos;
+					else if (pos < first)
+						first = pos;
+					else if (pos > last)
+						last = pos;
+				}
+				c = n;
+			}
+			void touchline() { first = 0; last = static_cast<short>(chars.size() - 1); }
+			void untouchline() { last = first = NO_CHANGE;}
+			bool touched() const { return first != NO_CHANGE; }
+		};
+		
+		std::vector<Line> _lines;
 		CharInfo _default;
 		CharInfo _current;
 		typedef std::vector<CharInfo>::iterator iterator;
 		typedef std::vector<CharInfo>::const_iterator const_iterator;
 		Point _cursor;
 	public:
-		Window() : _size(0, 0), _cursor(0,0), _default(' ', Color::Gray, Color::Black) {}
-		Window(int width, int height) : _size(width, height), _cursor(0, 0), _default(' ', Color::Gray, Color::Black), _chars(width*height, _default) , _back(width*height, _default) {}
-		Window(int width, int height, const CharInfo& default) : _size(width, height), _cursor(0, 0), _default(default), _chars(width*height, _default), _back(width*height, _default) {}
-		Window(int width, int height, Color fg, Color bg) : _size(width, height), _cursor(0, 0),
-			_default(' ', fg, bg), _chars(width*height, _default), _back(width*height, _default) {}
+		Window();
+		Window(int width, int height);
+		Window(int width, int height, const CharInfo& default);
+		Window(int width, int height, Color fg, Color bg);
 		void clear();
 		int16_t width() const { return _size.x; }
 		int16_t height() const { return _size.y; }
@@ -324,40 +362,21 @@ namespace console {
 		void col(int c) { _cursor.x = c >= _size.x ? _size.x - 1 : c; }
 		std::pair<int16_t, int16_t> cursor() const { return std::make_pair(_cursor.x, _cursor.y); }
 		void cursor(int x, int y) { row(y); col(x); }
-		CharInfo& at(size_t x, size_t y) { return _chars[x + y * _size.x]; }
-		const CharInfo& at(size_t x, size_t y) const { return _chars[x + y * _size.x]; }
-		CharInfo& at() { return at(_cursor.x, _cursor.y); }
-		const CharInfo& at() const { at(_cursor.x, _cursor.y); }
-		iterator begin() { return _chars.begin(); }
-		iterator end() { return _chars.end(); }
-		const_iterator begin() const { return _chars.begin(); }
-		const_iterator end() const { return _chars.end(); }
-		iterator ybegin(int y) { return _chars.begin() + (y * _size.x); }
-		iterator yend(int y) { return _chars.end() + (y * _size.x) + _size.x; }
-		const_iterator ybegin(int y) const { return _chars.begin() + (y * _size.x); }
-		const_iterator yend(int y) const { return _chars.end() + (y * _size.x) + _size.x;; }
-		iterator xybegin(int x, int y) { return _chars.begin() + x+ (y * _size.x); }
-		iterator xyend(int x, int y) { return _chars.end() + (y * _size.x) + _size.x; }
-		const_iterator xybegin(int x, int y) const { return _chars.begin() + x +  (y * _size.x); }
-		const_iterator xyend(int x, int y) const { return _chars.end() + x +  (y * _size.x); }
-		CharInfo* data() { return _chars.data(); }
-		const CharInfo* data() const { return _chars.data(); }
-		size_t size() const { return _chars.size(); }
-		CharInfo& operator[](size_t i) { return _chars[i]; }
-		const CharInfo& operator[](size_t i) const { return _chars[i]; }
-		void linefeed() {
-			if (_cursor.y >= (_size.y-1)) {
-				std::copy(ybegin(1), end(), begin());
-				std::copy(_back.begin() + _size.x, _back.end(), _back.begin());
-				_cursor.y = _size.y - 1;
-			}
-			else _cursor.y++;
-		}
+		const CharInfo& at(size_t x, size_t y) const { return _lines[y][x]; }
+		const CharInfo& at() const { return _lines[_cursor.y][_cursor.x]; }
+		void scroll(int i);
+		void touchwin() { for (auto& line : _lines) line.touchline(); }
+		
+		void untouchwin() { for (auto& line : _lines) line.untouchline(); }
+		void touchline(int start, int count, bool changed) { for (auto& line : _lines) if (changed) line.touchline(); else line.untouchline(); }
+		void touchline(size_t start, size_t count) { touchline(start, count, true); }
+		bool is_linetouched(int line) const { return _lines.at(line).touched(); }
+		bool is_wintouched() const { for (auto& line : _lines) if (line.touched()) return true; return false; }
 		void background(Color color) { _current.bg(color); }
 		void foreground(Color color) { _current.fg(color); }
 		Color background() const { return _current.bg(); }
 		Color foreground() const { return _current.fg(); }
-		void putch(int i);
+		void putch(chtype i);
 		void putstr(const char* str, size_t len) {
 			while (len--) putch(*str++);
 		}
@@ -369,7 +388,7 @@ namespace console {
 			for (auto c : str) putch(c);
 		}
 		// refresh window to console
-		void refresh(int x, int y);
+		void refresh(size_t x, size_t y,bool clearall=false);
 
 		void print(const char* fmt, ...);
 	};

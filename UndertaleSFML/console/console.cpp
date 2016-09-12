@@ -93,11 +93,7 @@ namespace console {
 			::GetConsoleScreenBufferInfo(console, reinterpret_cast<CONSOLE_SCREEN_BUFFER_INFO*>(&info));
 			return info;
 		}
-		ScreenInfo setScreenInfo(HANDLE const console) {
-			ScreenInfo info;
-			::GetConsoleScreenBufferInfo(console, reinterpret_cast<CONSOLE_SCREEN_BUFFER_INFO*>(&info));
-			return info;
-		}
+
 		void _setposx(HANDLE const console, int const x)
 		{
 			CONSOLE_SCREEN_BUFFER_INFO info;
@@ -581,26 +577,93 @@ namespace console {
 		ptr->set_size(p);
 	}
 	// refresh window to console
+	void transform_line(int lineno, int x, int len, const CharInfo *srcp) {
+		//CHAR_INFO ci[512];
+		const CHAR_INFO* ci = reinterpret_cast<const CHAR_INFO*>(srcp);
+		COORD bufPos = { 0, 0 };
+		COORD bufSize = { len, 1 };
+	//	COORD bufSize, bufPos;
+		SMALL_RECT sr = { x, lineno, x + len - 1, lineno };
+		/*
+		
+		for (int j = 0; j < len; j++)
+		{
+			chtype ch = srcp[j];
 
-	void Window::refresh(int x, int y) {
-		const COORD bufSize = { _size.x, _size.y }; // one line
-		const COORD bufPos = { 0,0 };
-		SMALL_RECT sr = { x, y, x + _size.x - 1, y + _size.y - 1 };
-		const CHAR_INFO* info = reinterpret_cast<const CHAR_INFO*>(_chars.data());
-	//	WriteConsoleOutput(console::hConsole, info, bufSize, bufPos, &sr)
-		DWORD written;
-		for (int16_t yy = 0; yy < _size.y; yy++) {
-			for (int16_t xx = 0; xx < _size.x; xx++) {
-				auto& ch = _chars[xx + yy * _size.x];
-				auto& bch = _back[xx + yy * _size.x];
-				if (ch != bch) {
-					bch = ch;
-					const COORD pos = { x+xx, y+yy }; // one char
-					SetConsoleCursorPosition(console::hConsole, pos);
-					putchar(ch.ch);
-					//::WriteConsole(console::hConsole, &_chars.at(xx + yy * _size.x).ch, 1, &written, NULL);
-					//WriteConsoleOutput(console::hConsole, info, bufSize, cbufPos, &csr);
+			ci[j].Attributes = pdc_atrtab[ch >> PDC_ATTR_SHIFT];
+			if (sizeof(chtype) == 4) {
+				if (ch & A_ALTCHARSET && !(ch & 0xff80))
+					ch = acs_map[ch & 0x7f];
+			}
+			ci[j].Char.UnicodeChar = ch & A_CHARTEXT;
+		}
+		WriteConsoleOutput(console::hConsole, ci, bufSize, bufPos, &sr);
+		*/
+		WriteConsoleOutput(console::hConsole, ci, bufSize, bufPos, &sr);
+	}
+	
+	static bool clearall = false;
+	Window con_win;
+
+	void refresh_console() {
+		if (con_win.width() == 0) {
+			// resize the window
+			auto info = _details::getScreenInfo(console::hConsole);
+			con_win = Window(info.size.x, info.size.y);
+		}
+	}
+	Window::Window() : _size(0, 0), _cursor(0, 0), _default(' ', Color::Gray, Color::Black) {}
+	Window::Window(int width, int height) : _size(width, height), _cursor(0, 0), _default(' ', Color::Gray, Color::Black), _lines(height, Line(width, _default)), _current(_default) {}
+	Window::Window(int width, int height, const CharInfo& default) : _size(width, height), _cursor(0, 0), _default(default), _lines(height, Line(width, _default)), _current(_default) {}
+	Window::Window(int width, int height, Color fg, Color bg) : _size(width, height), _cursor(0, 0),
+		_default(' ', fg, bg), _lines(height, Line(width, _default)), _current(_default) {}
+
+	void Window::refresh(size_t begx, size_t begy, bool clearall) {
+		//static std::vector<CharInfo> back_buffer(100 * 200); // stupid back buffer
+		refresh_console();
+		//if (back_buffer.size() < 100 * 200) back_buffer.resize(100 * 200);
+		for (size_t i = 0, j = begy; i < static_cast<size_t>(_size.y); i++, j++)
+		{
+			auto& line = _lines.at(i);
+			if (clearall || line.touched()) {
+				short first = clearall ? 0 : line.first, last = clearall ? _size.x - 1 : line.last;
+				CharInfo *src = line.chars.data();
+				CharInfo *dest = con_win._lines[begy].chars.data() + begx;
+
+				while (first <= last)
+				{
+					int len = 0;
+
+					/* build up a run of changed cells; if two runs are
+					separated by a single unchanged cell, ignore the
+					break */
+
+					if (clearall)
+						len = last - first + 1;
+					else
+						while (first + len <= last &&
+							(src[first + len] != dest[first + len] ||
+							(len && first + len < last &&
+								src[first + len + 1] != dest[first + len + 1])
+								)
+							)
+							len++;
+
+					/* update the screen, and pdc_lastscr */
+
+					if (len)
+					{
+						transform_line(j, first+begx, len, src + first);
+						std::memcpy(dest + first, src + first, len * sizeof(chtype));
+						first += len;
+					}
+
+					/* skip over runs of unchanged cells */
+
+					while (first <= last && src[first] == dest[first])
+						first++;
 				}
+				line.untouchline();
 			}
 		}
 	}
@@ -613,24 +676,56 @@ namespace console {
 		putstr(buffer, count);
 	}
 	void Window::clear() { 
-		std::fill(_chars.begin(), _chars.end(), _default);
+		for (auto& line : _lines) line.clear(_default);
 	}
-	void Window::putch(int i) {
+	void Window::scroll(int n) {
+		if (n == 0) return; // don't scroll with 0
+		std::vector<Line>::iterator start, end;
+		int dir = 0;
+		/* Check if window scrolls. Valid for window AND pad */
+		if (n > 0)
+		{
+
+			start = _lines.begin();
+			end = _lines.end() - 1;
+			dir = 1;
+		}
+		else
+		{
+			start = _lines.end() - 1;
+			end = _lines.begin();
+			dir = -1;
+		}
+		for (int l = 0; l < (n * dir); l++) {
+			auto temp = start;
+			for (auto i = start; i != end; i += dir)
+				std::swap(*i, *(i + dir));
+			std::swap(*end, *temp);
+		}
+		touchline(0, _size.y - 1); // touch eveything, but change this when we have margens
+	}
+	void Window::putch(chtype i) {
 		switch (i) {
-		case '\n':linefeed(); break;
+		case '\n':
+			_cursor.y++;
+			if (_cursor.y >= _size.y) { scroll(1); _cursor.y = _size.y - 1; }
+			break;
 		case '\r': _cursor.x = 0; break;
-		case '\b': if (_cursor.x != 0) { _cursor.x--; at() = _current; } break;
+		case '\b': if (_cursor.x != 0) { _cursor.x--; _lines.at(_cursor.y).set(_cursor.x, _current); } break;
 		case 0x7F: break; // ignore
 		default:
 		{
-			auto& c = at();
+			CharInfo c;
 			c.ch = i;
 			c.attrib = _current.attrib;
+			_lines.at(_cursor.y).set(_cursor.x, c);
 			_cursor.x++;
-			if (_cursor.x >= _size.x) { _cursor.x = 0; linefeed(); }
+			if (_cursor.x >= _size.x) { _cursor.y++; _cursor.x = 0; }
+			if (_cursor.y >= _size.y) { scroll(1); _cursor.y = _size.y - 1; }
 		}
 		break;
 		}
+
 	}
 };
 

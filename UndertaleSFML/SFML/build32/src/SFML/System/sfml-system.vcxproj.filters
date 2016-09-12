@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\src\SFML\System\Clock.cpp" />
@@ -48,6 +48,7 @@
     <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\Utf.hpp" />
     <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\Utf.inl" />
     <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\Vector2.hpp" />
+    <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\Vector2.inl" />
     <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\Vector3.hpp" />
     <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\Vector3.inl" />
     <ClInclude Include="C:\Users\Paul\Documents\GitHub\Cocos2dx-Undertale-Engine\UndertaleSFML\SFML\include\SFML\System\FileInputStream.hpp" />

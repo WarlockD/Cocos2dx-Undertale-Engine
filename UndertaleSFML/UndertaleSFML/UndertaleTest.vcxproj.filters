@@ -22,6 +22,9 @@
     <Filter Include="enityx">
       <UniqueIdentifier>{f6615d88-4395-44b6-8236-6358893f708e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="console">
+      <UniqueIdentifier>{7c45a0f2-a033-48ce-b981-82f1fe84530f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -72,14 +75,17 @@
     <ClCompile Include="Global.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\console\console.cpp">
-      <Filter>Header Files</Filter>
-    </ClCompile>
     <ClCompile Include="room.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
     <ClCompile Include="kult.cpp">
       <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\console\console.cpp">
+      <Filter>console</Filter>
+    </ClCompile>
+    <ClCompile Include="..\console\curses.cpp">
+      <Filter>console</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -113,14 +119,17 @@
     <ClInclude Include="Math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="conmanip.h">
+    <ClInclude Include="kult.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\console\console.h">
-      <Filter>Header Files</Filter>
+      <Filter>console</Filter>
     </ClInclude>
-    <ClInclude Include="kult.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="..\console\curses.h">
+      <Filter>console</Filter>
+    </ClInclude>
+    <ClInclude Include="conmanip.h">
+      <Filter>console</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -209,9 +209,6 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/ZERO_CHECK.vcxproj">
-      <Project>77EEF79F-178E-3E56-95EB-3355FFCCE811</Project>
-    </ProjectReference>
     <ProjectReference Include="C:/Users/Paul/Documents/GitHub/Cocos2dx-Undertale-Engine/UndertaleSFML/SFML/build32/ALL_BUILD.vcxproj">
       <Project>7940A072-8529-371C-808C-4BE1A61965D9</Project>
     </ProjectReference>

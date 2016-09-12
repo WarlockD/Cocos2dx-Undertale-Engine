@@ -340,9 +340,9 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 			}
 			else info_window.print("invalid obj");
 		}
-		info_window.refresh(10, 5);
+		
 	});
-
+//	info_window.refresh(10, 5);
 }
 void Application::draw() {
 	draw_count = 0;
@@ -377,7 +377,7 @@ void Application::update(ex::TimeDelta dt) {
 		//systems.system<RenderSystem>()->update(entities, events, delta);
 		update_verts(delta, entities);
 	}
-	if (_debugUpdate.getElapsedTime().asSeconds() >= 0.5) {
+	if (_debugUpdate.getElapsedTime().asSeconds() >= 0.1) {
 		float last_update = _debugUpdate.restart().asSeconds();
 		info_window.refresh(10, 10);
 		std::ostringstream out;
