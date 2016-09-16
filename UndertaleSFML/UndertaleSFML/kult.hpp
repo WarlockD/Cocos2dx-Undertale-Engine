@@ -135,82 +135,32 @@ namespace kult {
 	template<typename T> inline decltype(T::value_type) &add(const type &id);
 	template<typename T> inline bool has(const type &id);
 	template<typename T> inline bool del(const type &id);
-
-	typedef std::function<void(entity&)> event_func;
-
-	
+	//template<typename T, typename ... Args> inline decltype(T::value_type) &assign(const type &id, Args && ... args);
+	//template<typename T, typename Args> inline decltype(T::value_type) &assign(const type &id, Args &&  args);
 	struct entity {
-		static  map<t_event, set<entity*>>& regestered_events() {
-			static map<t_event, set<entity*>> statics;
-			return statics;
-		}
-		static void regester_entity(entity& e) {
-			auto & regestered = regestered_events();
-			for (auto& evt : e.events) regestered[evt.first].insert(&e);
-		}
-		static void unregester_entity(entity& e) {
-			auto & regestered = regestered_events();
-			for (auto& evt : e.events) regestered[evt.first].erase(&e);
-		}
-		static map<t_event, event_func>& event_funcs(const type& id) {
-			static map <type, map<t_event, event_func>> statics;
-			return statics[id];
-		}
-
-		map<t_event, event_func> & events;
 		const type id;
-	
-
 		static set<entity*> &all() { // all live instances are reflected here
 			static set<entity*> statics;
 			return statics;
 		}
-		void subscribe(const t_event& event_id, event_func func) {
-			auto &regestered = regestered_events();
-			regestered[event_id].insert(this);
-			auto it = events.find(event_id);
-			if (it == events.end())  
-				events.insert(std::make_pair(event_id, func));
-		}
-		void unsubscribe(const t_event& event_id) {
-			auto &regestered = regestered_events();
-			regestered[event_id].erase(this);
-			auto it = events.find(event_id);
-			if (it != events.end()) 
-				events.erase(it);
-		}
-
-		static void emit(const t_event& event_id, entity& caller ) {
-			auto &regestered = regestered_events();
-			auto &it = regestered.find(event_id);
-			if (it != regestered.end()) {  
-				for (auto& e : it->second) {
-					if(&caller != e)
-					e->events[event_id](caller);
-				}
-			}
-		}
-		void emit(const t_event& event_id) { emit(event_id, *this); }
-		entity(const type &id_ = kult::id()) : id(id_), events(event_funcs(id_)) {
+		entity(const type &id_ = kult::id()) : id(id_) {
 			KULT_DEBUG(
 				assert(all().insert(this).second);
 			)
 				KULT_RELEASE(
 					all().insert(this);
 			)
-				regester_entity(*this);
 		}
 		~entity() {
-			auto& events = event_funcs(id);
-			for (auto it : events) unsubscribe(it.first);
-			unregester_entity(*this);
 			all().erase(this);
 		}
-
 		operator type const () const {
 			return id;
 		}
-
+		template<typename T>
+		inline decltype(T::value_type) &add() {
+			return kult::add<T>(id);
+		}
 		template<typename component>
 		decltype(component::value_type) &operator [](const component &t) const {
 			return kult::add<component>(id), kult::get<component>(id);
@@ -233,6 +183,18 @@ namespace kult {
 		void purge() {
 			kult::purge(id);
 			*const_cast<type*>(&id) = none<type>();
+		}
+		template<typename CC,typename C>
+		typename std::enable_if<std::is_same<decltype(CC::value_type),C>::value, decltype(CC::value_type)&>::type
+		 assign(C&& value) const;
+
+		template<typename component> 
+		decltype(component::value_type) &get() const {
+			return kult::get<component>(id);
+		}
+		template<typename component>
+		bool has() const {
+			return kult::has<component>(id);
 		}
 	};
 
@@ -309,20 +271,33 @@ namespace kult {
 	}
 	template<typename T>
 	inline decltype(T::value_type) &get(const type &id) {
-		KULT_DEBUG(
+	//	KULT_DEBUG(
 			// safe
-			static decltype(T::value_type) invalid, reset;
-		return has<T>(id) ? components<T>()[id].value_type : invalid = decltype(T::value_type)();// reset;
-		)
-			KULT_RELEASE(
+	//		static decltype(T::value_type) invalid, reset;
+			//return has<T>(id) ? components<T>()[id].value_type : invalid = decltype(T::value_type)();// reset;
+	//	)
+		//	KULT_RELEASE(
 				// fast
 				return components<T>()[id].value_type;
-		)
+		//)
 	}
 	template<typename T>
 	inline decltype(T::value_type) &add(const type &id) {
 		any<T>().insert(id);
 		return components<T>()[id].value_type;
+	}
+	template<typename CC, typename C>
+	typename std::enable_if<std::is_same<decltype(CC::value_type), C>::value, decltype(CC::value_type)&>::type
+		assign(const type &id, C&& value) {
+		any<T>().emplace(value);
+		return components<T>()[id].value_type;
+	}
+
+	template<typename CC, typename C>
+	typename std::enable_if<std::is_same<decltype(CC::value_type), C>::value, decltype(CC::value_type)&>::type
+		entity::assign(C&& value) const{
+		any<CC>().emplace(value);
+		return components<CC>()[id].value_type;
 	}
 	template<typename T>
 	inline bool del(const type &id) {
@@ -352,7 +327,9 @@ namespace kult {
 	template<type NAME, typename T>
 	struct component : interface {		
 	public:
+		typedef typename T type;
 		T value_type;
+
 		component(bool reentrant = 0) {
 			if (!reentrant) {
 				static struct registerme {
@@ -362,6 +339,10 @@ namespace kult {
 				} st;
 			}
 		}
+
+		component(const T& v) : value_type(v) {}
+		component(T&& v) : value_type(std::move(v)) {}
+
 		~component() {
 			auto &list = interface::registered();
 			for (auto &it : list) {
@@ -396,7 +377,7 @@ namespace kult {
 		virtual void swap(const type &dst, const type &src) const {
 			KULT_DEBUG(
 				// safe
-				if (has<component>(dst) && has<component>(src)) {
+				if (kult::has<component>(dst) && kult::has<component>(src)) {
 					std::swap(get<component>(dst), get<component>(src));
 				}
 			)
@@ -412,7 +393,7 @@ namespace kult {
 			//_assign(add<component>(dst), get<component>(src),_can_move());
 		}
 		virtual void copy(const type &dst, const type &src) const {
-			if (has<component>(src)) {
+			if (kult::has<component>(src)) {
 				merge(dst, src);
 			}
 			else {
@@ -452,9 +433,9 @@ namespace kult {
 			}
 		}
 	public:
-		virtual void dump(std::ostream &os, const type &id) const override {
-			if (has<component>(id)) generic_dump(os, id, t_has_stream_operator());
-		}
+		//virtual void dump(std::ostream &os, const type &id) const  {
+		//	if (has<component>(id)) generic_dump(os, id, t_has_stream_operator());
+		//}
 		inline T &operator()(const type &id) {
 			return get<component>(id);
 		}

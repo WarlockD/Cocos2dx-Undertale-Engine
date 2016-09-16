@@ -601,7 +601,30 @@ namespace console {
 		*/
 		WriteConsoleOutput(console::hConsole, ci, bufSize, bufPos, &sr);
 	}
-	
+	void transform_buffer(int x, int y, int width, int height, const CharInfo *srcp) {
+		//CHAR_INFO ci[512];
+		const CHAR_INFO* ci = reinterpret_cast<const CHAR_INFO*>(srcp);
+		COORD bufPos = { 0, 0 };
+		COORD bufSize = { width, height };
+		//	COORD bufSize, bufPos;
+		SMALL_RECT sr = { x, y, x + width - 1, y + height -1 };
+		/*
+
+		for (int j = 0; j < len; j++)
+		{
+		chtype ch = srcp[j];
+
+		ci[j].Attributes = pdc_atrtab[ch >> PDC_ATTR_SHIFT];
+		if (sizeof(chtype) == 4) {
+		if (ch & A_ALTCHARSET && !(ch & 0xff80))
+		ch = acs_map[ch & 0x7f];
+		}
+		ci[j].Char.UnicodeChar = ch & A_CHARTEXT;
+		}
+		WriteConsoleOutput(console::hConsole, ci, bufSize, bufPos, &sr);
+		*/
+		WriteConsoleOutput(console::hConsole, ci, bufSize, bufPos, &sr);
+	}
 	static bool clearall = false;
 	Window con_win;
 
@@ -621,6 +644,23 @@ namespace console {
 	void Window::refresh(size_t begx, size_t begy, bool clearall) {
 		//static std::vector<CharInfo> back_buffer(100 * 200); // stupid back buffer
 		refresh_console();
+	//	for (int lineno = 0; lineno < _size.y; lineno++) {
+	//		auto& line = _lines.at(lineno);
+	//		transform_line(lineno+begy,  begx, line.chars.size(), line.chars.data());
+	//	}
+	//	return;
+		
+		static std::vector<CharInfo> buffer;
+		if (buffer.size() < (_size.x * _size.y)) buffer.resize(_size.x * _size.y);
+
+		for (int lineno = 0; lineno < _size.y; lineno++) {
+		auto& line = _lines.at(lineno);
+			CharInfo* ptr = buffer.data() + lineno * _size.x;
+			std::memcpy(ptr, line.chars.data(), sizeof(CharInfo) * line.chars.size());
+		}
+
+		transform_buffer(begx, begy, _size.x, _size.y, buffer.data());
+		return;
 		//if (back_buffer.size() < 100 * 200) back_buffer.resize(100 * 200);
 		for (size_t i = 0, j = begy; i < static_cast<size_t>(_size.y); i++, j++)
 		{
@@ -741,78 +781,76 @@ namespace con {
 	std::ostream& operator<<(std::ostream& os, const gotoy& l) { console::gotoy(l.y); return os; }
 	*/
 };
-
-
+template<class T>
+struct is_c_str
+	: std::integral_constant<
+	bool,
+	std::is_same<char *, typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value ||
+	std::is_same<char const *, typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value
+	> {};
+template<class T>
+struct is_c_wstr
+	: std::integral_constant<
+	bool,
+	std::is_same<wchar_t *, typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value ||
+	std::is_same<wchar_t const *, typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value
+	> {};
 // all from http://www.codeproject.com/Articles/1053/Using-an-output-stream-for-debugging
 // https://cdot.senecacollege.ca/software/nled/nled_2_52_src/qkdisp.c
 // alot of helper functions up there
-
 template<class CharT, class TraitsT = std::char_traits<CharT> >
-class basic_debugbuf : public std::basic_streambuf<CharT, TraitsT> {
-public:
-	std::array<char, 512> _buffer;
-	std::basic_string<CharT, TraitsT> _str;
-	bool write_console;
-	bool write_visualstudio;
+class visual_studio_debugbuf : public std::basic_streambuf<CharT, TraitsT> {
+	std::array<CharT, 512> _buffer;
+	std::vector<CharT> _linebuffer;
 	int _lastc;
-	void output_visualstudio(const std::basic_string<char>& str) {
-		auto now = std::chrono::system_clock::now();
-		auto in_time_t = std::chrono::system_clock::to_time_t(now);
-		std::basic_stringstream<CharT, TraitsT> ss;
-		ss << "[" << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X") << "]:" << str << std::endl;
-		::OutputDebugStringA(ss.str().c_str());
+protected:
+	template<typename T>
+	typename std::enable_if<is_c_str<T>::value,void>::type
+	 output_visualstudio(T str) {
+		::OutputDebugStringA(str);
 	}
-	void output_visualstudio(const std::basic_string<wchar_t>& str) {
-		auto now = std::chrono::system_clock::now();
-		auto in_time_t = std::chrono::system_clock::to_time_t(now);
-		std::basic_stringstream<wchar_t> ss;
-		ss << "[" << std::put_time(std::localtime(&in_time_t), L"%Y-%m-%d %X") << "]:" << str << std::endl;
-		::OutputDebugStringA(ss.str().c_str());
-	}
-	void output_console(const char* str, size_t len) {
-		DWORD dummy;
-		::WriteConsoleA(console::hConsole, str, len, &dummy, NULL);
-	}
-	void output_console(const wchar_t* str, size_t len) {
-		DWORD dummy;
-		::WriteConsoleW(console::hConsole, str, len, &dummy, NULL);
+	template<typename T>
+	typename std::enable_if<is_c_wstr<T>::value, void>::type
+	 output_visualstudio(T str) {
+		::OutputDebugStringW(str); 
 	}
 	int sync() override
 	{
 		std::ptrdiff_t n = pptr() - pbase();
-		_str.reserve(n);
-		if (write_visualstudio) {
-			for (auto ptr = pbase(); ptr != pptr(); ptr++) {
-				CharT ch = *ptr;
-				if (ch == '\r' || ch == '\n') {
-					if (_lastc != ch && (_lastc == '\r' || _lastc == '\n')) {
-						ch = 0;
-					}
-					else {
-						output_visualstudio(_str);
-						_str.clear();
-					}
+
+		for (auto ptr = pbase(); ptr != pptr(); ptr++) {
+			CharT ch = *ptr;
+			if (ch == '\r' || ch == '\n') {
+				if (_lastc != ch && (_lastc == '\r' || _lastc == '\n')) {
+					ch = 0;
 				}
-				else _str.push_back(ch);
-				_lastc = ch;
+				else {
+					_linebuffer.push_back(0);
+					auto now = std::chrono::system_clock::now();
+					auto in_time_t = std::chrono::system_clock::to_time_t(now);
+					std::basic_stringstream<CharT, TraitsT> ss;
+					ss << "[" << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X") << "]:" << _linebuffer.data() << std::endl;
+					output_visualstudio(ss.str().c_str());
+					_linebuffer.clear();
+				}
 			}
+			else _linebuffer.push_back(ch);
+			_lastc = ch;
 		}
-		if (write_console) output_console(pbase(), n);
 		pbump(-n);
 		return 0;
 	}
 public:
-	basic_debugbuf(bool write_console, bool write_visualstudio) : write_visualstudio(write_visualstudio), write_console(write_console), std::streambuf(), _lastc(0) {
-		_str.reserve(512);
+	visual_studio_debugbuf() :  std::streambuf(), _lastc(0) {
 		char *base = _buffer.data();
 		setp(base, base + _buffer.size() - 1); // -1 to make overflow() easier
 	}
-	
+
 };
 
 
-basic_debugbuf<char> s_cerr_debug_buffer(false, true);
-basic_debugbuf<char> s_cout_debug_buffer(true, false);
+visual_studio_debugbuf<char> s_cerr_debug_buffer;
+//basic_debugbuf<char> s_cout_debug_buffer(true, false);
 
 namespace  {
 	void init_cerr() {
@@ -822,7 +860,7 @@ namespace  {
 	}
 	void init_cout() {
 	//	s_cout_debug_buffer.setOldBuffer(std::cout.rdbuf());
-		std::cout.rdbuf(&s_cout_debug_buffer);
+		//std::cout.rdbuf(&s_cout_debug_buffer);
 		std::cout << "cout redirected" << std::endl;
 	}
 	void error(const std::string& message) {

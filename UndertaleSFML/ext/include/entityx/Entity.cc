@@ -14,6 +14,10 @@
 namespace entityx {
 
 const Entity::Id Entity::INVALID;
+
+
+
+
 BaseComponent::Family BaseComponent::family_counter_ = 0;
 
 void Entity::invalidate() {

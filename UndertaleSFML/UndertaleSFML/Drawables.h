@@ -264,6 +264,7 @@ protected:
 	float _rotation;
 	mutable bool _transformNeedUpdate;
 	mutable sf::Transform _transform;
+	sf::FloatRect _bounds;
 public:
 	Body();
 	virtual void setPosition(const sf::Vector2f& v);
@@ -283,9 +284,13 @@ public:
 	const sf::Vector2f& getPosition() const { return _position; }
 	const sf::Vector2f& getOrigin() const { return _origin; }
 	const sf::Vector2f& getScale() const { return _scale; }
+	const sf::FloatRect& getBounds() const { return _bounds; }
+	void setBounds(const sf::FloatRect& rect) { _bounds = rect; }
+	void fixBounds(const sf::FloatRect& rect) { _bounds = rect; }
 	template<typename U>
-	sf::Vector2f getSize(const sf::Vector2<U>& size) const { return size * _scale; }
-	
+	void fixBounds(const sf::Vector2<U>& size)  { 
+		setBounds(getTransform().transformRect(sf::FloatRect(0,0,size.x,size.y)));
+	}
 	float getRotation() const { return _rotation; }
 	const sf::Transform& getTransform() const;
 };

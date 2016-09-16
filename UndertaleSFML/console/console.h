@@ -163,17 +163,20 @@ namespace console {
 	typedef unsigned int chtype;
 	struct CharInfo {
 		static const CharInfo Blank; // default, space that is on a white forground with a black bachkground
-		union { struct { union { wchar_t wch; char ch; }; uint16_t attrib; }; chtype value; };
+		union { chtype chattrib; struct { union { wchar_t wch; char ch; }; uint16_t attrib; };  };
 		CharInfo() : CharInfo(Blank) {}
-		constexpr CharInfo(char ch, Color fg = Color::White, Color bg = Color::Black) : ch(' '), attrib(static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4)) {}
+		// order is important
+		constexpr CharInfo(char ch, Color fg = Color::White, Color bg = Color::Black) : chattrib(0), wch(' '), attrib(static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4)) {}
+		operator chtype() const { return chattrib; }
+		operator chtype&() { return chattrib; }
 		//  with black background and white forground
 		Color fg() const { return static_cast<Color>(attrib & 0xF); }
 		Color bg() const { return static_cast<Color>((attrib >> 4) & 0xF); }
 		void fg(Color c) { attrib = (attrib & 0xF0) | static_cast<uint8_t>(c); }
 		void bg(Color c) { attrib = (attrib & 0x0F) | (static_cast<uint8_t>(c) << 4); }
 	};
-	inline bool operator==(const CharInfo &l, const CharInfo &r) { return l.value == r.value; }
-	inline bool operator!=(const CharInfo &l, const CharInfo &r) { return l.value != r.value; }
+	inline bool operator==(const CharInfo &l, const CharInfo &r) { return l.attrib == r.attrib; }
+	inline bool operator!=(const CharInfo &l, const CharInfo &r) { return l.attrib != r.attrib; }
 	inline bool operator==(const CharInfo &l, char r) { return l.ch == r; }
 	inline bool operator!=(const CharInfo &l, char r) { return l.ch != r; }
 	inline bool operator==(const CharInfo &l, wchar_t r) { return l.wch == r; }
@@ -300,7 +303,7 @@ namespace console {
 		CharInfo default;
 		TerminalSettings() : scroll_on_linefeed(true), return_on_linefeed(true) ,default(CharInfo::Blank) {}
 	};
-
+\
 	class Window
 	{
 		static constexpr short NO_CHANGE = (short)-1;
@@ -354,6 +357,7 @@ namespace console {
 		Window(int width, int height, const CharInfo& default);
 		Window(int width, int height, Color fg, Color bg);
 		void clear();
+		void clearline(int lineno) { _lines[lineno].clear(); }
 		int16_t width() const { return _size.x; }
 		int16_t height() const { return _size.y; }
 		int16_t row() const { return _cursor.y; }

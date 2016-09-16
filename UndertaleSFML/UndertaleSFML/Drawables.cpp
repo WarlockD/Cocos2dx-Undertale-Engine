@@ -299,7 +299,7 @@ SpriteFrameRef TileMap::tile_create(const sf::Vector2f& pos, const sf::IntRect& 
 SpriteFrame::SpriteFrame(const sf::FloatRect& bounds, const sf::Color& color) : SpriteFrame(bounds, nullptr, sf::IntRect(0, 0, 1, 1), color) {}
 SpriteFrame::SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::Color& color) : SpriteFrame(bounds, texture, sf::IntRect(0, 0, texture->getSize().x, texture->getSize().y), color) {}
 
-Body::Body() : LockingObject(), _transform(sf::Transform::Identity), _position(), _origin(), _scale(1.0f, 1.0f), _rotation(0),  _transformNeedUpdate(true) {}
+Body::Body() : LockingObject(), _transform(sf::Transform::Identity), _position(), _origin(), _scale(1.0f, 1.0f), _rotation(0),  _transformNeedUpdate(true), _bounds() {}
 void Body::setPosition(const sf::Vector2f& v) {
 	auto lock = safeLock();
 	if (!global::AlmostEqualRelative(v, _position)) {

@@ -35,6 +35,40 @@
 #include "entityx/help/NonCopyable.h"
 
 namespace entityx {
+	struct NumberMonitor {
+		size_t _value = 0;
+		template<typename T>
+		void assign(T v) {
+			std::cerr << "Value Assigned: " << v << " from " << _value << std::endl;
+			_value = v;
+		}
+		operator size_t() const { return _value; }
+		template<typename T>
+		NumberMonitor& operator=(T v) { assign(v) return *this; }
+		NumberMonitor& operator++() {
+			_value++;
+			std::cerr << "Value inc " << _value << std::endl;
+			return *this;
+		}
+		NumberMonitor operator++(int) {
+			NumberMonitor copy(_value);
+			operator++();
+			return copy;
+		}
+		NumberMonitor(size_t v) : _value(v) { std::cerr << "Value Constructed: " << v << std::endl; }
+	};
+	inline bool operator==(const NumberMonitor& l, const NumberMonitor& r) { return l._value == r._value; }
+	inline bool operator==(const NumberMonitor& l, size_t r) { return l._value == r; }
+	inline bool operator==(size_t r, const NumberMonitor& l) { return l._value == r; }
+
+	inline bool operator!=(const NumberMonitor& l, const NumberMonitor& r) { return l._value != r._value; }
+
+	inline bool operator<(const NumberMonitor& l, const NumberMonitor& r) { return l._value < r._value; }
+	inline bool operator<(const NumberMonitor& l, size_t r) { return l._value < r; }
+	inline bool operator<(size_t r, const NumberMonitor& l) { return r < l._value; }
+	inline bool operator>(const NumberMonitor& l, const NumberMonitor& r) { return l._value > r._value; }
+	inline bool operator>(const NumberMonitor& l, size_t r) { return l._value > r; }
+	inline bool operator>(size_t r, const NumberMonitor& l) { return r > l._value; }
 
 typedef std::uint32_t uint32_t;
 typedef std::uint64_t uint64_t;
@@ -239,6 +273,8 @@ private:
 };
 
 
+
+
 /**
  * Base component class, only used for insertion into collections.
  *
@@ -246,7 +282,8 @@ private:
  */
 struct BaseComponent {
  public:
-  typedef size_t Family;
+ // typedef size_t Family;
+  typedef typename NumberMonitor Family;
 
   // NOTE: Component memory is *always* managed by the EntityManager.
   // Use Entity::destroy() instead.
@@ -265,7 +302,6 @@ struct BaseComponent {
 
   static Family family_counter_;
 };
-
 
 /**
  * Component implementations should inherit from this.
@@ -641,6 +677,32 @@ class EntityManager : entityx::help::NonCopyable {
     return Entity::Id(index, entity_version_[index]);
   }
 
+  /**
+  * Adds a component with the default constructor
+  *
+  *     Position &position = em.add<Position>(e);
+  *
+  * @returns Smart pointer to newly created component.
+  */
+  template <typename C>
+  ComponentHandle<C> add(Entity::Id id) {
+	  static_cast(std::has_default_)
+	  assert_valid(id);
+	  const BaseComponent::Family family = component_family<C>();
+	  assert(!entity_component_mask_[id.index()].test(family));
+
+	  // Placement new into the component pool.
+	  Pool<C> *pool = accomodate_component<C>();
+	  ::new(pool->get(id.index())) C();
+
+	  // Set the bit for this component.
+	  entity_component_mask_[id.index()].set(family);
+
+	  // Create and return handle.
+	  ComponentHandle<C> component(this, id);
+	  event_manager_.emit<ComponentAddedEvent<C>>(Entity(this, id), component);
+	  return component;
+  }
   /**
    * Assign a Component to an Entity::Id, passing through Component constructor arguments.
    *

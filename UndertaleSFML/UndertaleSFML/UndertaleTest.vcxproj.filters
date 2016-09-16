@@ -87,6 +87,9 @@
     <ClCompile Include="..\console\curses.cpp">
       <Filter>console</Filter>
     </ClCompile>
+    <ClCompile Include="..\console\vt100.cpp">
+      <Filter>console</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">
@@ -129,6 +132,27 @@
       <Filter>console</Filter>
     </ClInclude>
     <ClInclude Include="conmanip.h">
+      <Filter>console</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\include\entityx\config.h">
+      <Filter>enityx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\include\entityx\Entity.h">
+      <Filter>enityx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\include\entityx\entityx.h">
+      <Filter>enityx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\include\entityx\Event.h">
+      <Filter>enityx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\include\entityx\quick.h">
+      <Filter>enityx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\include\entityx\System.h">
+      <Filter>enityx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\console\vt100.h">
       <Filter>console</Filter>
     </ClInclude>
   </ItemGroup>

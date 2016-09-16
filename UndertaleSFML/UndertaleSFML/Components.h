@@ -135,6 +135,7 @@ class ValueMonitor {
 	T _value;
 	mutable   bool _changed;
 public:
+	explicit ValueMonitor() : _value(T{}), _changed(true) {}
 	explicit ValueMonitor(T value) : _value(value), _changed(true) {}
 	ValueMonitor& operator=(const T& value) { if (!EQUAL(_value, value)) { _changed = true; _value = value; } return *this; }
 	operator T&() { return _value; }
@@ -143,12 +144,6 @@ public:
 	void reset() const { _changed = false; }
 };
 
-using kBounds = kult::component<'bond', sf::FloatRect>;
-using kPosition = kult::component<'pos', ValueMonitor<sf::Vector2f>>;
-using kVelocity = kult::component<'velc', sf::Vector2f>;
-using kDepth = kult::component<'dept', ValueMonitor<int>>;
-using kBody = kult::component<'body', Body>;
-using kSprite = kult::component<'sprt', UndertaleSprite>;
 enum class  Direction : char {
 	Down = 0, Right = 1, Up = 2, Left = 3
 };
@@ -170,7 +165,9 @@ struct PlayerControl {
 struct SpriteFacing {
 	std::array<UndertaleSprite, 4> facing_sprites;
 	Direction direction = Direction::Down;
-	explicit SpriteFacing(size_t down, size_t right, size_t up, size_t left) :
+	explicit SpriteFacing() {}
+	explicit SpriteFacing(int down, int right, int up, int left) :
+	//explicit SpriteFacing(size_t down, size_t right, size_t up, size_t left) :
 		facing_sprites{ UndertaleSprite(down), UndertaleSprite(right), UndertaleSprite(up), UndertaleSprite(left) } {}
 	UndertaleSprite getCurrentFace(Direction direction) { return facing_sprites[(char)direction]; }
 };
@@ -180,7 +177,8 @@ struct SpriteFacing {
 struct UndertaleObject {
 	UndertaleLib::Object obj;
 	std::set<UndertaleLib::Object> parents;
-	explicit UndertaleObject(UndertaleLib::Object obj) : obj(obj) {
+	UndertaleObject() : obj() {}
+	UndertaleObject(UndertaleLib::Object obj) : obj(obj) {
 		UndertaleLib::Object parent = Global::LookupObject(obj.parent_index());
 		while (parent.valid()) {
 			parents.emplace(parent);
@@ -189,8 +187,22 @@ struct UndertaleObject {
 	}
 };
 
+namespace kc {
+	using bounds =kult::component<'bond', sf::FloatRect> ;
+	using body =kult::component<'body', Body> ;
+	using velocity =kult::component<'velc', sf::Vector2f> ;
+	using depth =kult::component<'dept', ValueMonitor<int>> ;
+	using sprite =kult::component<'sprt', UndertaleSprite> ;
+	using object =kult::component<'uobj', UndertaleObject> ;
+	using player_control =kult::component<'pctl', PlayerControl> ;
+	using sprite_facing =kult::component<'sfac', SpriteFacing> ;
+	using sprite_animation =kult::component<'sanm', SpriteAnimation> ;
+	
+	
+};
 
-class Application : public ex::EntityX {
+
+class Application  : public ex::EntityX {
 	sf::Clock _clock;
 	sf::Clock _debugUpdate;
 	sf::RenderWindow& _window;
@@ -204,18 +216,21 @@ class Application : public ex::EntityX {
 	typedef std::unordered_map<const sf::Texture*, RawVertices> t_dumb_batch;
 	typedef std::vector<sf::FloatRect> t_debug_boxes;
 	std::map<int, t_dumb_batch> sortedVerts;
-	std::unordered_multimap<size_t, ex::Entity::Id> _roomObjects;
-	std::vector<ex::Entity::Id> _static_entitys;
-	std::vector<ex::Entity::Id> _dynamic_enitys;
-	std::vector< ex::Entity> _roomEntitys;
+	std::unordered_multimap<size_t, ex::Entity> _roomObjects;
+	std::vector<ex::Entity> _static_entitys;
+	std::vector<ex::Entity> _dynamic_enitys;
+	std::vector<ex::Entity> _roomEntitys;
 	UndertaleRoom::type _room;
+	RawVertices temp_verts; // used in the rendering system
 public:
 	explicit Application(sf::RenderWindow &window);
+	std::set<ex::Entity> findOjbects(size_t index);
+	ex::Entity findSingleObject(size_t index);
 	void LoadRoom(size_t index);
 	size_t getRoomIndex() const { return _room ? _room->index() : 0; }
 	void init(ex::EntityX& app); 
 	void draw();
-	void update_verts(ex::TimeDelta dt, ex::EntityManager& es);
+	void update_verts(ex::TimeDelta dt);
 	static constexpr size_t room_fps = (1000/ 60);
 	void update(ex::TimeDelta dt);
 };

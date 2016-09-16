@@ -151,6 +151,7 @@
   <ItemGroup>
     <ClCompile Include="..\console\console.cpp" />
     <ClCompile Include="..\console\curses.cpp" />
+    <ClCompile Include="..\console\vt100.cpp" />
     <ClCompile Include="..\ext\include\entityx\Entity.cc" />
     <ClCompile Include="..\ext\include\entityx\Event.cc" />
     <ClCompile Include="..\ext\include\entityx\help\Pool.cc" />
@@ -173,6 +174,13 @@
   <ItemGroup>
     <ClInclude Include="..\console\console.h" />
     <ClInclude Include="..\console\curses.h" />
+    <ClInclude Include="..\console\vt100.h" />
+    <ClInclude Include="..\ext\include\entityx\config.h" />
+    <ClInclude Include="..\ext\include\entityx\Entity.h" />
+    <ClInclude Include="..\ext\include\entityx\entityx.h" />
+    <ClInclude Include="..\ext\include\entityx\Event.h" />
+    <ClInclude Include="..\ext\include\entityx\quick.h" />
+    <ClInclude Include="..\ext\include\entityx\System.h" />
     <ClInclude Include="BatchSprite.h" />
     <ClInclude Include="Components.h" />
     <ClInclude Include="conmanip.h" />

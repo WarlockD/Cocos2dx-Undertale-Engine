@@ -197,9 +197,24 @@ void Application::init(ex::EntityX& app) {
 //	systems.system<PlayerOverWorldSystem>()->init(app);
 	
 }
+std::set<ex::Entity> Application::findOjbects(size_t index) {
+	std::set<ex::Entity> enity;
+	auto it_pair = _roomObjects.equal_range(index);
+	if (it_pair.first != it_pair.second) {
+		for (auto it = it_pair.first; it != it_pair.second; it++)
+			enity.emplace(it->second);
+	}
+	return enity;
+}
+
+ex::Entity Application::findSingleObject(size_t index) {
+	auto it = _roomObjects.find(index);
+	if (it != _roomObjects.end()) return it->second;
+	else return ex::Entity();
+}
+
 void Application::LoadRoom(size_t index) {
-	ex::EntityManager &es = global::getEntities();
-	for (auto& e : _roomEntitys) e.destroy();
+	for (auto& e : _roomEntitys)  e.destroy();
 	_roomEntitys.clear();
 	sortedVerts.clear();
 	_roomObjects.clear();
@@ -210,7 +225,7 @@ void Application::LoadRoom(size_t index) {
 	if (_room) {
 		if (_room->objects().size() > 0) {
 			for (auto& o : _room->objects()) {
-				ex::Entity e = es.create();
+				ex::Entity e = entities.create();
 				auto obj = e.assign<UndertaleObject>(o.obj);
 				auto body = e.assign<Body>(o.body);
 				e.assign<Layer>(o.obj.depth());
@@ -218,21 +233,18 @@ void Application::LoadRoom(size_t index) {
 					e.assign<UndertaleSprite>(o.obj.sprite_index());
 				}
 				_roomEntitys.emplace_back(e);
-				_roomObjects.emplace(std::make_pair(o.obj.index(), e.id()));
-				for(auto p : obj->parents) _roomObjects.emplace(std::make_pair(p.index(), e.id()));
-
-				if (o.obj.index() == 1570) { // main char
-					e.assign<PlayerControl>(30.0f); // we can move it
-					auto facing = e.assign<SpriteFacing>(1043, 1045, 1044, 1046);
-					e.assign<SpriteAnimation>(0.2f, facing->facing_sprites[0].image_count());
-				}
-
+				_roomObjects.emplace(std::make_pair(o.obj.index(), e));
+				for (auto p : obj->parents) _roomObjects.emplace(std::make_pair(p.index(), e));
 			}
-			auto static_it = _roomObjects.equal_range(820);
-			if (static_it.first != _roomObjects.end()) {
-				for (auto it = static_it.first; it != static_it.second; it++) {
-					_static_entitys.push_back(it->second);
-				}
+			auto& player = findSingleObject(1570);// find player
+			if (player.valid()) {
+				player.assign<PlayerControl>(30.0f); // we can move it
+				auto facing = player.assign<SpriteFacing>(1043, 1045, 1044, 1046);
+				player.assign<SpriteAnimation>(0.2f, facing->facing_sprites[0].image_count());
+			}
+			auto static_it = findOjbects(820); // find all static objects
+			if (static_it.size() > 0) {
+				_static_entitys.assign(static_it.begin(), static_it.end());
 			}
 		}
 	}
@@ -242,10 +254,12 @@ struct Candidate {
 	float radius;
 	ex::Entity entity;
 };
-static console::Window info_window(50, 20);
 
-void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
-	RawVertices temp_verts;
+static size_t frame_count = 0;
+
+void Application::update_verts(ex::TimeDelta dt) {
+	
+	
 	sortedVerts.clear();
 	if (_room) {
 		if (_room->backgrounds().size() > 0) {
@@ -266,7 +280,8 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 			}
 		}
 	}
-	es.each<SpriteFacing, UndertaleSprite, Body, PlayerControl, SpriteAnimation>([this, dt](ex::Entity entity, SpriteFacing& spritefacing, UndertaleSprite& sprite, Body& body, PlayerControl &control, SpriteAnimation& animation) {
+
+	entities.each<SpriteFacing, UndertaleSprite, Body, PlayerControl, SpriteAnimation>([this, dt](ex::Entity entity, SpriteFacing& spritefacing, UndertaleSprite& sprite, Body& body, PlayerControl &control, SpriteAnimation& animation) {
 		if (PlayerControl::isMoving()) {
 			body.move(control.getMovement()*dt);
 			if (control.facing != spritefacing.direction) {
@@ -285,7 +300,9 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 	});
 
 	static bool last_state = false;
-	es.each<UndertaleSprite, SpriteAnimation>([this, dt](ex::Entity entity, UndertaleSprite& sprite, SpriteAnimation &animation) {
+
+	
+	entities.each<UndertaleSprite, SpriteAnimation>([dt](ex::Entity entity, UndertaleSprite& sprite, SpriteAnimation &animation) {
 		bool pressed = sf::Keyboard::isKeyPressed(sf::Keyboard::N);
 		if (pressed) {
 			if (!last_state) {
@@ -298,16 +315,17 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 			sprite.image_index(animation.current_frame());
 		}
 	});
-	
-	es.each<Body, UndertaleSprite>([this, &temp_verts](ex::Entity entity, Body& body, UndertaleSprite &sprite) {
+
+	entities.each<Body, UndertaleSprite>([this](ex::Entity entity, Body& body, UndertaleSprite &sprite) {
 		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
 		auto& verts = (sortedVerts[layer])[sprite.texture()];
 		temp_verts.assign(sprite.ptr(), sprite.ptr() + 6);
 		temp_verts.transform(body.getTransform());
+		body.fixBounds(sprite.frame_size());
 		verts += temp_verts;
 	});
-	Candidate canadates;
+//	Candidate canadates;
 
 	if (_room && _room->backgrounds().size() > 0) {
 		for (auto& t : _room->backgrounds()) {
@@ -319,29 +337,8 @@ void Application::update_verts(ex::TimeDelta dt, ex::EntityManager& es) {
 			verts += temp_verts;
 		}
 	}
-	// object debug
-	auto mouse_pos = sf::Mouse::getPosition(_window);
-	info_window.clear();
-	info_window.cursor(0, 0);
-	info_window.print("mouse (%2.2i,%2.2i)     \r\n", mouse_pos.x, mouse_pos.y);
+
 	
-	es.each<Body, UndertaleObject, UndertaleSprite>([this, mouse_pos](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
-		sf::FloatRect bounds = body.getTransform().transformRect(sprite.bounds()); // (body.getPosition(), body.getSize(sprite.frame_size()));
-		if (bounds.contains(sf::Vector2f(mouse_pos))) {
-			auto& verts = (sortedVerts[100])[nullptr];
-			draw_box(verts, bounds);
-			auto& o = obj.obj;
-			if (o.valid()) {
-				info_window.print("Object(%i, %s)\r\nBox(%2.2f, %2.2f, %2.2f, 2.2f)\r\n", o.index(),o.name().c_str(), bounds.left,bounds.top,bounds.width,bounds.height);
-				if (obj.parents.size() > 0) {
-					for(auto& p : obj.parents)
-						info_window.print("->(%i, %s)   \r\n", p.index(), p.name().c_str());
-				}
-			}
-			else info_window.print("invalid obj");
-		}
-		
-	});
 //	info_window.refresh(10, 5);
 }
 void Application::draw() {
@@ -365,7 +362,9 @@ void Application::draw() {
 	_window.display();
 }
 
+static console::Window info_window(80, 50);
 void Application::update(ex::TimeDelta dt) {
+	sf::Vector2i mouse_old;
 	sf::Time current = _clock.getElapsedTime();
 	if (current.asMilliseconds() > room_fps) {
 		update_count++;
@@ -375,10 +374,46 @@ void Application::update(ex::TimeDelta dt) {
 		//	systems.system<VelocitySystem>()->update(entities, events, delta);
 		//	systems.system<AnimationSystem>()->update(entities, events, delta);
 		//systems.system<RenderSystem>()->update(entities, events, delta);
-		update_verts(delta, entities);
+		update_verts(delta);
 	}
+	sf::Vector2i mouse_current = sf::Mouse::getPosition(_window);
+	if (mouse_current != mouse_old) {
+		info_window.clearline(2);
+		info_window.cursor(0,2);
+		info_window.print("mouse (%2.2i,%2.2i)", mouse_current.x, mouse_current.y);
+		// object debug
+		entities.each<Body, UndertaleObject, UndertaleSprite>([this, mouse_current](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
+			sf::FloatRect bounds = body.getBounds();
+			if (bounds.contains(sf::Vector2f(mouse_current))) {
+				auto& verts = (sortedVerts[100])[nullptr];
+				draw_box(verts, bounds);
+				auto& o = obj.obj;
+				size_t line = 3;
+				if (o.valid()) {
+					info_window.cursor(0, line);
+					info_window.clearline(line++);
+					info_window.print("Object(%i, %s)\r\nBox(%2.2f, %2.2f, %2.2f, 2.2f)", o.index(), o.name().c_str(), bounds.left, bounds.top, bounds.width, bounds.height);
+					if (obj.parents.size() > 0) {
+						for (auto& p : obj.parents) {
+							info_window.cursor(0, line);
+							info_window.clearline(line++);
+							info_window.print("->(%i, %s)   \r\n", p.index(), p.name().c_str());
+						}
+					}
+				}
+				else info_window.print("invalid obj");
+			}
+		});
+	}
+
 	if (_debugUpdate.getElapsedTime().asSeconds() >= 0.1) {
 		float last_update = _debugUpdate.restart().asSeconds();
+		info_window.clearline(0);
+		info_window.cursor(0, 0);
+		info_window.print("FPS(%2.2f) Update(%2.2f) Objects(%i)", (float)((float)frame_count / last_update), (float)((float)update_count / last_update, entities.size()));
+		info_window.refresh(5, 5);
+		/*
+		
 		info_window.refresh(10, 10);
 		std::ostringstream out;
 		const float fps = frame_count / last_update;
@@ -389,6 +424,8 @@ void Application::update(ex::TimeDelta dt) {
 		out << ")" << std::endl;
 		out << "Objects(" << entities.size() << ") DrawCount(" << draw_count << ")" << std::endl;
 		_text.setString(out.str());
+		*/
+		
 		draw_count = 0;
 		update_count = 0;
 		frame_count = 0;

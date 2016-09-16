@@ -3,7 +3,7 @@
 #include "UndertaleLoader.h"
 #include "obj_dialoger.h"
 #include "UndertaleLabel.h"
-
+#include  <vt100.h>
 #include <cassert>
 #include <iostream>
 #include <functional>
@@ -175,7 +175,7 @@ console::window winerr(console::Point(0, 15), console::Point(50, 10));
 namespace ex = entityx;
 void gameLoop() {
 	sf::RenderWindow& window = global::getWindow();
-	auto& systems = global::getSystems();
+	//auto& systems = global::getSystems();
 	auto& events = global::getEventManager();
 	sf::Clock clock;
 	bool isPlaying = false;
@@ -240,7 +240,41 @@ void gameLoop() {
 		//	window.display();
 	}
 }
+const char* test_files[] = { "colors.vt", "decdemo.vt","torture.vt", "xmas.vt" } ;
+#include <chrono>
+#include <fstream>
+
+class QuickTimer {
+	std::chrono::time_point<std::chrono::system_clock> _start;
+public:
+	QuickTimer() : _start(std::chrono::system_clock::now()) {}
+	void restart() { _start = std::chrono::system_clock::now(); }
+	double elapsed() const { return std::chrono::duration<double>(std::chrono::system_clock::now() - _start).count(); }
+};
+void test_vt() {
+	QuickTimer timer;
+
+	std::ifstream file(test_files[3]);
+	int line = 1;
+	int pos = 0;
+	while (!file.eof()) {
+		assert(file.good() && !file.eof());
+		if (timer.elapsed() > 0.001) {
+			timer.restart();
+			int c = file.get();
+			if (c == '\n') {
+				line++; pos = 0;
+			}
+			else pos++;
+			vt100::print(c);
+		}
+	}
+	while (true) {} // loop
+
+}
 int main(int argc, const char* argv[]) {
+	console::init();
+	test_vt();
 	//array_helpers::example_sum();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
 	
@@ -250,8 +284,8 @@ int main(int argc, const char* argv[]) {
 	// Create the window of the application
 	s_window.reset(new sf::RenderWindow(sf::VideoMode(800, 600, 32), "SFML Pong", sf::Style::Titlebar | sf::Style::Close));
 	s_app.reset(new Application(*s_window));
-	s_app->init(*s_app.get());
-	console::init();
+//	s_app->init(*s_app.get());
+	
 	gameLoop();
 	// we got to run this to delete all the loaded textures we have or visual studio blows a fit
 	s_window->close();
