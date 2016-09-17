@@ -7,6 +7,8 @@
 #include <cassert>
 #include <queue>
 #include <algorithm>
+#include <set>
+
 #include <Windows.h>
 # define A(x) ((wchar_t)x)
 static const wchar_t acs_map[128] =
@@ -121,36 +123,62 @@ protected:
 		dcs_entry,
 		exit
 	};
-	std::string _escape_parms;
+	std::wstring  _escape_text;
+	std::wstring  _ground_text;
 	State _state = State::ground;
 	std::array<int,16> _parms;
 	int _current_parm = 0;
-	virtual void csi_dispatch(char c, const std::array<int, 16>& parms, const std::string& text)  {}
-	virtual void flush() = 0;
-	virtual void pushch(int c) = 0;
-	virtual void escape_dispatch(char c, const std::array<int, 16>& parms, const std::string& text) {}
+	virtual size_t raw_console_write(const std::wstring& text) {
+		DWORD written;
+		::WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), text.size(), &written, NULL);
+		return written;
+	}
+	virtual void csi_dispatch(wchar_t c, const std::array<int, 16>& parms,  std::wstring& text)  {
+		if (text.size() > 0) {
+			DWORD written;
+			::WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), text.size(), &written, NULL);
+		}
+	}
+	virtual void flush() {
+		if (_ground_text.size() > 0) {
+			DWORD written;
+			::WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), _ground_text.data(), _ground_text.size(), &written, NULL);
+			_ground_text.clear();
+		}
+	}
+	virtual void pushch(int c) {
+		_ground_text.push_back(c);
+
+	}
+	virtual void escape_dispatch(wchar_t c, const std::array<int, 16>& parms,  std::wstring& text) {
+		if (text.size() > 0) {
+			DWORD written;
+			::WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), text.size(), &written, NULL);
+		}
+	}
 	void clear() {
-		_escape_parms.clear();
 		flush();
 		_parms.fill(0);// 30 - 39) and the semicolon(code 3B
 		_current_parm = 0;
+		_escape_text.clear();
 	}
-	void escape_dispatch(char c) {
+	void escape_dispatch(wchar_t c) {
 		flush();
-		escape_dispatch(c, _parms,_escape_parms);
+		escape_dispatch(c, _parms, _escape_text);
+		_escape_text.clear();
 		clear();
 	}
-	void csi_dispatch(char c) {
+	void csi_dispatch(wchar_t c) {
 		flush();
-		csi_dispatch(c, _parms, _escape_parms);
+		csi_dispatch(c, _parms, _escape_text);
+		_escape_text.clear();
 		clear();
 	}
 	inline bool is_csi_state() const { return _state >= State::csi_entry && _state <= State::count_csi; }
 	const int& current_parm() const { return _parms[_current_parm]; }
 	int& current_parm() { return _parms[_current_parm]; }
-	bool parm(char c) {
+	bool parm(wchar_t c) {
 		if (c >= 0x30 && c <= 0x39 || c == 0x3B) {
-			_escape_parms.push_back(c);
 			if (c == 0x3B)
 				_current_parm++;
 			else
@@ -159,27 +187,32 @@ protected:
 		}
 		return false;
 	}
-	void collect(char c) { _escape_parms.push_back(c); _parms[_current_parm++] = c; }
-	bool execute(char c) {
+	void collect(wchar_t c) {  _parms[_current_parm++] = c; }
+	bool execute(wchar_t c) {
 		if ((c >= 0x00 && c <= 0x17) || c == 0x19 || (c >= 0x1C && c <= 0x1F)) return true; // execute, happens in any state
 		return false;
 	}
-	
-	
 public:
-	void putch(char c) {
+	void putch(wchar_t c) {
+		
 		if (_state == State::csi_ignore) {
-			if (!execute(c) && c != 0x7f && !(c >= 0x40 && c <= 0x7e))_state = State::ground;
+			if (!execute(c) && c != 0x7f && !(c >= 0x40 && c <= 0x7e)) _state = State::ground;
 			else return;
 		}
 		switch (c) {
-		case 0x1B: _state = State::escape; 
-			clear(); return;// escape
-														   //	case 0x9D: _state = State::osc_string; return;// escape
+		case 0x1B: 
+			clear();
+			_state = State::escape; 
+			_escape_text.push_back(c);
+			return;// escape
 		}
+		if (_state != State::ground && _state != State::csi_ignore) 
+			_escape_text.push_back(c);
 		if (is_csi_state()) {
 			if (c == 0x7f || execute(c)) return;
-			if (c >= 0x40 && c <= 0x7e) _state = State::csi_dispatch;
+			if (c >= 0x40 && c <= 0x7e) {
+				_state = State::csi_dispatch;
+			}
 		}
 		while (true) {
 			switch (_state) {
@@ -207,7 +240,7 @@ public:
 				break;
 			case State::escape:
 				switch (c) {
-				case 0x5B: _state = State::csi_entry; break;
+				case '[': _state = State::csi_entry; break;
 				default:
 					if (c >= 0x20 && c <= 0x2F) {
 						_state = State::escape_intermediate;
@@ -220,7 +253,6 @@ public:
 				}
 				break;
 			case State::csi_entry:
-				clear();
 				if (c >= 0x20 && c <= 0x2F) {
 					_state = State::csi_intermediate;
 					continue;
@@ -258,7 +290,7 @@ public:
 				}
 				break;
 			}
-			break;
+			break; // while break
 		}
 	}
 };
@@ -269,6 +301,10 @@ protected:
 	bool underline = false;
 	bool rvideo = false;
 	bool concealed = false;
+	bool return_on_linefeed = false;
+	bool auto_wraparound = false;
+	std::set<short> _tabs;
+
 	HANDLE _conOut;
 	WORD foreground = FOREGROUND_WHITE;
 	WORD background = BACKGROUND_BLACK;
@@ -278,14 +314,35 @@ protected:
 	CONSOLE_SCREEN_BUFFER_INFO _original;
 	CONSOLE_SCREEN_BUFFER_INFO Info;
 	std::vector<wchar_t> _buffer;
+	int graphic_set = 0;
+
 	virtual void flush() override {
 		if (_buffer.size() > 0) {
 			DWORD nWritten;
-			::WriteConsoleW(_conOut, _buffer.data(), _buffer.size(), &nWritten, NULL);
+			if (short(_buffer.size() + Info.dwCursorPosition.X) >= Info.dwSize.X) {
+				short size = Info.dwSize.X - Info.dwCursorPosition.X;
+				if (size > 0) {
+					Info.dwCursorPosition.X += size;
+					::WriteConsoleW(_conOut, _buffer.data(), size, &nWritten, NULL);
+					if (auto_wraparound) {
+						Info.dwCursorPosition.X = 0;
+						Info.dwCursorPosition.Y++;
+						if (Info.dwCursorPosition.Y >= Info.dwSize.Y) {
+							ScrollConsole({ 0,1,Info.dwSize.X - 1,Info.dwSize.Y - 1 }, ZCOORD);
+							Info.dwCursorPosition.Y = Info.dwSize.Y - 1;
+						}
+						cursor(Info.dwCursorPosition);
+						if (_buffer.size() - size > 0) {
+							::WriteConsoleW(_conOut, _buffer.data() + size, _buffer.size() - size, &nWritten, NULL);
+							Info.dwCursorPosition.X += short(_buffer.size() - size);
+						}
+					}
+				}
+			}
 			_buffer.clear();
 		}
 	}
-	int graphic_set = 0;
+
 
 	virtual void pushch(int c) override {
 		switch (c) {
@@ -293,14 +350,28 @@ protected:
 		case 0x05: assert(false); break; // enquery
 		case 0x07: break; // bell, works in console
 		case 0x08: break; // backspace, works in console
-		case 0x09: break; // tab, humm have to fix
-		case 0x0A: break; // line feed, works in console
-		case 0x0B: c = 0x10; break; // VT, prossed as lf
-		case 0x0C:  
+		case 0x09:
+		{
+			flush();
+			// flush the buffer first as we will be modifying the cursor
+			auto it = std::find_if(_tabs.begin(), _tabs.end(), [this](short v) { return v >= Info.dwCursorPosition.X; });
+			if (it == _tabs.end())
+				Info.dwCursorPosition.X = Info.dwSize.X - 1; // if no tabs, then set ot end of screen
+			else
+				Info.dwCursorPosition.X += *it - Info.dwCursorPosition.X;
+		}
+		break;
+		case 0x0A: // line feed
+			linefeed();
+			break;
+		case 0x0B: // VT, prossed as lf
+			linefeed();
+			break;
+		case 0x0C:
 			clear_from_pos(ZCOORD, Info.dwSize.X*Info.dwSize.Y);
 			home_cursor(); // FF clear screen?
 			// c = 0x10; 
-			return; // FF, prossed as lf
+			break; // FF, prossed as lf
 		case 0x0D: break; // should work? moves to left margin
 		case 0x0E: graphic_set = 1; return; // shift out? change charater set to GL  G1 is sect SCS
 		case 0x0F: graphic_set = 0; return; // shift in? change charater set to GL, G0 is SCS
@@ -310,9 +381,13 @@ protected:
 		case 0x1A: assert(false); break; // 	If received during escape or control sequence, terminates and cancels the sequence. Causes a reverse question mark to be displayed. If received during a device control sequence, the DCS is terminated and reverse question mark is displayed.
 		case 0x1B: assert(false); break; // ESC, should never get here
 		case 0x7F: break; // we ignore these should never get in
+		default:
+			if (graphic_set == 1) c = acs_map[c];
+			Info.dwCursorPosition.X++;
+			_buffer.push_back(c); // next line here
+			if (Info.dwCursorPosition.X >= Info.dwSize.X) flush();
+			break;
 		}
-		if (graphic_set == 1) c = acs_map[c];
-		_buffer.push_back(c);
 	}
 
 	const CHAR_INFO blank_char() const { return{ (USHORT)' ', Info.wAttributes }; }
@@ -324,10 +399,34 @@ protected:
 		::SetConsoleCursorPosition(_conOut, pos);
 		Info.dwCursorPosition = pos;
 	}
-	void home_cursor() {
-		::SetConsoleCursorPosition(_conOut, ZCOORD);
-		Info.dwCursorPosition = ZCOORD;
+	void home_cursor() { cursor(ZCOORD); }
+
+	void ScrollConsole(const SMALL_RECT& rect, const COORD& pos) {
+		CHAR_INFO blank = { (USHORT)' ', Info.wAttributes };
+		::ScrollConsoleScreenBuffer(_conOut, &rect, NULL, pos, &blank);
 	}
+	void scroll_lines(int lineno, int count = 1) {
+		if (count == 0) return;
+		else if (count > 0) {
+			ScrollConsole({ 0, short(count), Info.dwSize.X - short(1), short(lineno) }, { 0, 0 });
+			clear_from_pos({ 0, short(count) }, short(lineno) -  Info.dwSize.X*count);
+		}
+		else {
+
+		}
+	}
+	void linefeed(short count=1) {
+		flush();
+		Info.dwCursorPosition.Y += count;
+		if (Info.dwCursorPosition.Y < Info.dwSize.Y) 
+			cursor({ return_on_linefeed ? 0 : Info.dwCursorPosition.X, Info.dwCursorPosition.Y + count });
+		else {
+			ScrollConsole({ 0,count,Info.dwSize.X - 1,Info.dwSize.Y - 1 }, ZCOORD);
+			cursor({ return_on_linefeed ? 0 : Info.dwCursorPosition.X, Info.dwSize.Y - 1 });
+		}
+	}
+
+
 	void reset_attributes() {
 		foreground = foreground_default;
 		background = background_default;
@@ -355,11 +454,7 @@ protected:
 			break;
 		}
 	}
-	
-	void ScrollConsole(const SMALL_RECT& rect, const COORD& pos) {
-		CHAR_INFO blank = { (USHORT)' ', Info.wAttributes };
-		::ScrollConsoleScreenBuffer(_conOut, &rect, NULL, pos, &blank);
-	}
+
 	/*
 
 	void insert_line(int lineno,int count) {
@@ -374,7 +469,7 @@ protected:
 		clear_from_pos({ 0, lineno -count }, Info.dwSize.X*count);
 	}
 	*/
-	virtual void csi_dispatch(char c, const std::array<int, 16>& parms, const std::string& text)  override {
+	virtual void csi_dispatch(wchar_t c, const std::array<int, 16>& parms,  std::wstring& text)  override {
 		WORD attribut;
 		::GetConsoleScreenBufferInfo(_conOut, &Info);
 		static const char* modes[] = {
@@ -401,9 +496,15 @@ protected:
 			//	Autorepeat      On              ESC[? 8h        Off             ESC[? 8l
 			//	Interface       On              ESC[? 9h        Off             ESC[? 9l
 		case 'l': // resset mode
-			if (parms[0] == 0x20)
+			if (parms[0] == 0x20) {
+				return_on_linefeed = false;
 				std::cerr << "Mode Reset : " << modes[0] << std::endl;
-			else if(parms[0] =='?') {
+			} else if(parms[0] =='?') {
+				switch (parms[1]) {
+				case 7:
+					auto_wraparound = false;
+					break;
+				}
 				std::cerr << "Mode Reset : " << modes[parms[1]] << std::endl;
 			}
 			else {
@@ -411,9 +512,15 @@ protected:
 			}
 			break;
 		case 'h': // set mode
-			if (parms[0] == 0x20)
+			if (parms[0] == 0x20) {
+				return_on_linefeed = true;
 				std::cerr << "Mode Set : " << modes[0] << std::endl;
-			else if (parms[0] == '?') {
+			} else if (parms[0] == '?') {
+				switch (parms[1]) {
+				case 7:
+					auto_wraparound = true;
+					break;
+				}
 				std::cerr << "Mode Set : " << modes[parms[1]] << std::endl;
 			}
 			else {
@@ -477,9 +584,9 @@ protected:
 				break;
 			}
 			break;
-		case 'L':  // ESC[L == ESC[1L
+		case 'L': // ESC[#L Insert # blank lines. 
 		{
-			short count = parms[0];
+			short count = parms[0];// ESC[L == ESC[1L
 			if (count == 0) count = 1;
 			ScrollConsole({ 0, Info.dwCursorPosition.Y, Info.dwSize.X -short(1), Info.dwSize.Y - short(1) }, { 0, Info.dwCursorPosition.Y + count });
 			clear_from_pos({ 0, Info.dwCursorPosition.Y }, Info.dwSize.X*count);
@@ -587,7 +694,7 @@ protected:
 	}
 
 	bool _dec52Mode = false;
-	bool dec52(char c, const std::array<int, 16>& parms) {
+	bool dec52(wchar_t c, const std::array<int, 16>& parms) {
 		switch (c) {
 		case 'A':  cursor({ Info.dwCursorPosition.X, Info.dwCursorPosition.Y - 1 }); break;
 		case 'B':  cursor({ Info.dwCursorPosition.X, Info.dwCursorPosition.Y + 1 }); break;
@@ -618,7 +725,7 @@ protected:
 		return true;
 	}
 
-	virtual void escape_dispatch(char c, const std::array<int, 16>& parms, const std::string& text)  override {
+	virtual void escape_dispatch(wchar_t c, const std::array<int, 16>& parms, std::wstring& text)  override {
 		switch (c) {
 		case '<': std::cerr << "DEC52 mode" << std::endl; _dec52Mode = true; break;
 
@@ -653,21 +760,187 @@ protected:
 		
 	}
 public:
-	VT100() : _conOut(GetStdHandle(STD_OUTPUT_HANDLE)) { ::GetConsoleScreenBufferInfo(_conOut, &_original); home_cursor(); }
+	VT100() : _conOut(GetStdHandle(STD_OUTPUT_HANDLE)) { 
+		::GetConsoleScreenBufferInfo(_conOut, &_original); 
+		Info = _original;
+		home_cursor(); 
+	}
+	void set_tab(short pos) { _tabs.emplace(pos); }
+	void reset_tab(short pos) { _tabs.erase(pos); }
+	const std::set<short>& tabs() const { return _tabs; }
 };
 
 
 
 
 
-
+// wow... windows 10 FINALY has a vt100 processor...huh..
+// its very bear bones though.  Because of this we will
+// have to make sure we check some of ther terminal codes
+// to see if we are switching graphics stuff
+class VT100_Windows10 : public Terminal {
+	bool _screen_reverse = false;
+	bool return_on_linefeed = false;
+	bool auto_wraparound = false;
+	std::set<short> _tabs;
+	int _graphic_set = 0;
+protected:
+	HANDLE _hOut;
+	virtual void pushch(int c) override {
+		switch (c) {
+		case 0x0E: _graphic_set = 1; break; // shift out? change charater set to GL  G1 is sect SCS
+		case 0x0F: _graphic_set = 0; break; // shift in? change charater set to GL, G0 is SCS
+			default:
+			if (_graphic_set == 1) c=acs_map[c];
+			Terminal::pushch(c);
+			break;
+		}
+		
+	}
+	void error_out(const char* message, const std::wstring& text) {
+		std::cerr << message << ":";  
+		for (auto& c : text) {
+			switch (c) {
+			case 0x1B: std::cerr << "ESC "; break;
+			default:
+				std::cerr << (char)c;
+				break;
+			}
+		}
+		std::cerr << std::endl;
+	}
+	virtual void csi_dispatch(wchar_t c, const std::array<int, 16>& parms, std::wstring& text)  override {
+		switch (c) {
+		case 'A':
+		case 'B':
+		case 'C':
+		case 'D':
+		case 'E':
+		case 'F':
+		case 'G':
+		case 'd':
+		case 'H':
+		case 'S':
+		case 'T':
+		case '@':
+		case 'P':
+		case 'J':
+		case 'K':
+		case 'm':
+			Terminal::csi_dispatch(c, parms, text);
+			break;
+		case 'r': // Top and bottom margins
+		{
+			CONSOLE_SCREEN_BUFFER_INFO info;
+			::GetConsoleScreenBufferInfo(_hOut, &info);
+			SMALL_RECT rect = { 0, parms[0], info.dwSize.X - 1,parms[1] };
+			::SetConsoleWindowInfo(_hOut, FALSE, &rect);
+		}
+		
+			break;
+		case 'l': // resset mode
+			if (parms[0] == '?') {
+				switch (parms[1]) {
+				case 25:
+					Terminal::csi_dispatch(c, parms, text);
+					break;
+				}
+			} else error_out("unsupported l", text);
+			break;
+		case 'h': // set mode
+			if (parms[0] == '?') {
+				switch (parms[1]) {
+				case 25:
+					Terminal::csi_dispatch(c, parms, text);
+					break;
+				}
+			} else error_out("unsupported h", text);
+			break;
+		default:
+			error_out("unsupported csi", text);
+			break;
+		}
+	}
+	void vt100_dispatch(wchar_t c, const std::array<int, 16>& parms, std::wstring& text) {
+		WORD attribut;
+		
+		switch (c) {
+		case 'D': // Index, moves down one line same column regardless of NL
+		{
+			raw_console_write(L"\x1b[B");
+			CONSOLE_SCREEN_BUFFER_INFO info;
+			::GetConsoleScreenBufferInfo(_hOut, &info);
+			if (info.dwCursorPosition.Y == info.dwSize.Y-1) {
+				raw_console_write(L"\x1b[T");
+			}
+			else {
+				raw_console_write(L"\x1bB");
+			}
+		}
+		break;
+		case 'M': // Reverse Index, go up one line, reverse scroll if necessary
+		{
+			raw_console_write(L"\x1b[B");
+			CONSOLE_SCREEN_BUFFER_INFO info;
+			::GetConsoleScreenBufferInfo(_hOut, &info);
+			if (info.dwCursorPosition.Y == 0) {
+				raw_console_write(L"\x1b[T");
+			}
+			else {
+				raw_console_write(L"\x1bA");
+			}
+		}
+		break;
+		default:
+			error_out("escape dispatch not supported", text);
+			break;
+		}
+	}
+	virtual void escape_dispatch(wchar_t c, const std::array<int, 16>& parms, std::wstring& text) {
+		switch (c) {
+		case 'A':
+		case 'B':
+		case 'C':
+		case 'D':
+		case '7':
+		case '8':
+			Terminal::escape_dispatch(c, parms, text);
+			break;
+		default:
+			vt100_dispatch(c,  parms,  text);
+			break;
+		}
+	}
+public:
+	VT100_Windows10() : Terminal(), _hOut(GetStdHandle(STD_OUTPUT_HANDLE)) {
+		DWORD dwMode = 0;
+		GetConsoleMode(_hOut, &dwMode);
+		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+		SetConsoleMode(_hOut, dwMode);
+	}
+};
 
 
 
 namespace vt100 {
-	VT100 test;
-	void print(char ch) { test.putch(ch); }
+	VT100_Windows10 test;
+	bool test_init = false;
+	void init() {
+		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+		DWORD dwMode = 0;
+		GetConsoleMode(hOut, &dwMode);
+		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+		SetConsoleMode(hOut, dwMode);
+	}
+	void print(wchar_t ch) { 
+		//putchar(ch);
+		test.putch(ch); 
+	}
 	void print(const char* message) {
-		while (*message) test.putch(*message++);
+		while (*message) vt100::print(*message++);
+	}
+	void print(const wchar_t* message) {
+		while (*message) vt100::print(*message++);
 	}
 };

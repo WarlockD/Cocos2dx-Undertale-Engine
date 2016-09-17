@@ -5,7 +5,9 @@
 
 
 namespace vt100 {
-	void print(char ch);
+	void init();
+	void print(wchar_t ch);
+	inline void print(char ch) { print((wchar_t)ch); }
 	void print(const char* message);
 	
 };

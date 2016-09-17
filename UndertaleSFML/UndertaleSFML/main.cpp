@@ -253,10 +253,15 @@ public:
 };
 void test_vt() {
 	QuickTimer timer;
-
+	static constexpr int debug_line = 645; // champain glass
 	std::ifstream file(test_files[3]);
 	int line = 1;
 	int pos = 0;
+	vt100::init();
+	while (line < debug_line && !file.eof()) {
+		int c = file.get();
+		if (c == '\n') line++;
+	}
 	while (!file.eof()) {
 		assert(file.good() && !file.eof());
 		if (timer.elapsed() > 0.001) {
@@ -266,7 +271,7 @@ void test_vt() {
 				line++; pos = 0;
 			}
 			else pos++;
-			vt100::print(c);
+			vt100::print((char)c);
 		}
 	}
 	while (true) {} // loop
