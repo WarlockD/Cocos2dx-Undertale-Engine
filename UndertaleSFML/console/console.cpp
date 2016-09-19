@@ -170,8 +170,12 @@ namespace console {
 
 	void init() {
 		if (hConsole) return;
-
+		// enable the fancy windows 10 virtual console
 	    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+		DWORD dwMode = 0;
+		GetConsoleMode(hConsole, &dwMode);
+		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+		SetConsoleMode(hConsole, dwMode);
 		init_cerr();
 		init_cout();
 		//	PERR(hConsole, "GetStdHandle");

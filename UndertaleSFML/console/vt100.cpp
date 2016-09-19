@@ -10,6 +10,8 @@
 #include <set>
 
 #include <Windows.h>
+#undef max
+#undef min
 # define A(x) ((wchar_t)x)
 static const wchar_t acs_map[128] =
 {
@@ -770,32 +772,229 @@ public:
 	const std::set<short>& tabs() const { return _tabs; }
 };
 
+struct SizePoint {
+	size_t X;
+	size_t Y;
+	constexpr SizePoint() : X(0), Y(0) {}
+	static const SizePoint Zero;
+	template<typename XT, typename YT>
+	constexpr SizePoint(XT x, YT y) : X(static_cast<size_t>(x)), Y(static_cast<size_t>(y)) {}
+	inline SizePoint& operator+=(const COORD& r) { X += r.X; Y += r.Y; return *this; }
+	inline SizePoint& operator-=(const COORD& r) { X -= r.X; Y -= r.Y; return *this; }
+};
+const SizePoint SizePoint::Zero;
 
+inline SizePoint operator+(const SizePoint& l, const SizePoint& r) { return SizePoint(l.X + r.X, l.Y + l.Y); }
+inline SizePoint operator-(const SizePoint& l, const SizePoint& r) { return SizePoint(l.X - r.X, l.Y - l.Y); }
 
-
+inline bool operator==(const CHAR_INFO& l, const CHAR_INFO& r) { return l.Attributes == r.Attributes && l.Char.UnicodeChar == r.Char.UnicodeChar; }
+inline bool operator!=(const CHAR_INFO& l, const CHAR_INFO& r) { return !(l == r); }
+inline COORD& operator+=(COORD& l, const COORD& r) { l.X += r.X; l.Y += r.Y; return l; }
+inline COORD& operator-=(COORD& l, const COORD& r) { l.X -= r.X; l.Y -= r.Y; return l; }
+inline COORD operator+(const COORD& l, const COORD& r) { return (COORD(l) += r);  }
+inline COORD operator-(const COORD& l, const COORD& r) { return (COORD(l) -= r); }
 
 // wow... windows 10 FINALY has a vt100 processor...huh..
 // its very bear bones though.  Because of this we will
 // have to make sure we check some of ther terminal codes
 // to see if we are switching graphics stuff
+template<typename T, typename E>
+constexpr inline void set_flag(T& v, E e) { v |= static_cast<V>(e); }
+template<typename T, typename E>
+constexpr inline void reset_flag(T& v, E e) { v &= ~static_cast<V>(e); }
+template<typename T, typename E>
+constexpr inline bool test_flag(T v, E e) { return v & static_cast<V>(e) != 0; }
+
+
+
 class VT100_Windows10 : public Terminal {
+	struct SizePoint { size_t X; size_t Y; };
+	typedef std::vector<CHAR_INFO> screen_type;
+	typedef std::vector<CHAR_INFO>::iterator screen_iterator;
+	typedef std::vector<CHAR_INFO>::const_iterator screen_const_iterator;
+	
 	bool _screen_reverse = false;
 	bool return_on_linefeed = false;
 	bool auto_wraparound = false;
+	std::vector<CHAR_INFO> _screen;
+	COORD _size;
+	COORD _cursor;
+	CHAR_INFO& at(size_t y, size_t x) { return _screen.at(y * _size.X + x); }
+	CHAR_INFO& at() { return at(_cursor.Y, _cursor.X); }
+	const CHAR_INFO&  at(size_t y, size_t x) const { return _screen.at(y * _size.X + x); }
+	const CHAR_INFO& at() const { return at(_cursor.Y, _cursor.X); }
+
+
+	screen_iterator begin(size_t y = 0) { return _screen.begin() + (y * _size.X); }
+	screen_iterator end(size_t y = 0) { return _screen.begin() + ((y+1) * _size.X); }
+	screen_const_iterator begin(size_t y = 0) const { return _screen.begin() + (y * _size.X); }
+	screen_const_iterator end(size_t y = 0) const { return _screen.begin() + ((y + 1) * _size.X); }
+	class Line {
+		static constexpr int NO_CHANGE = -1;
+		int _first;
+		int _last;
+		bool _double_width;
+		bool _double_height;
+		screen_iterator _begin;
+		screen_iterator _end;
+		CHAR_INFO&  at(size_t x)  { return *(_begin + x); }
+	public:
+		bool double_width() const { return _double_width; }
+		bool double_height() const{ return _double_height; }
+		void double_width(bool v) { if (_double_width != v) { _double_width = v; touchline(); } }
+		void double_height(bool v) { if (_double_height != v) { _double_height = v; touchline(); } }
+		explicit Line(VT100_Windows10& window, size_t lineno) : _begin(window.begin(lineno)), _end(window.end(lineno)), _first(-1), _last(-1), _double_width(false), _double_height(false) {}
+		screen_iterator begin() { return _begin; }
+		screen_iterator end() { return _end; }
+		screen_const_iterator begin() const { return _begin; }
+		screen_const_iterator end() const { return _end; }
+		void clear(const CHAR_INFO& fill) { std::fill(_begin, _end, fill); }
+		const CHAR_INFO&  at(size_t x) const { return *(_begin + x); }
+		void set(size_t x, const CHAR_INFO& n) {
+			auto& c = at(x);
+			int pos = static_cast<int>(x);
+			if (c != n) {
+				if (_first == NO_CHANGE)
+					_first = _last = pos;
+				else if (pos < _first)
+					_first = pos;
+				else if (pos > _last)
+					_last = pos;
+			}
+			c = n;
+		}
+		void set(size_t x, wchar_t n) {
+			CHAR_INFO c = at(x);
+			c.Char.UnicodeChar = n;
+			set(x, c);
+		}
+		int first() const { return _first; }
+		int last() const { return _last; }
+		void first(int first)  {  _first= first; }
+		void last(int last)  {  _last= last; }
+		void touchline() { _first = 0; _last = static_cast<int>(std::distance(_begin, _end)-1); }
+		void untouchline() { _first = _first = NO_CHANGE; }
+		bool touched() const { return _first != NO_CHANGE; }
+	};
+	typedef std::vector<Line> line_vector;
+	typedef std::vector<Line>::iterator line_iterator;
+	typedef std::vector<Line>::const_iterator line_const_iterator;
+	std::vector<Line> _lines;
 	std::set<short> _tabs;
+	CHAR_INFO _currentAttributes; // default 
 	int _graphic_set = 0;
+	static constexpr CHAR_INFO ZERO_CHAR_INFO = { (wchar_t)0, 0 };
+	static constexpr CHAR_INFO DEFAULT_CHAR_INFO = { (wchar_t)' ', 0x7 };
+	bool bold = false;
+	bool underline = false;
+	bool rvideo = false;
+	bool concealed = false;
+	bool return_on_linefeed = false;
+	bool auto_wraparound = false;
+	std::set<short> _tabs;
+	SMALL_RECT _margins;
+	HANDLE _conOut;
+	WORD foreground = FOREGROUND_WHITE;
+	WORD background = BACKGROUND_BLACK;
+	WORD foreground_default = FOREGROUND_WHITE;
+	WORD background_default = BACKGROUND_BLACK;
+	COORD SavePos;
+	Line& line() { return _lines.at(_cursor.Y); }
+	const Line& line() const { return _lines.at(_cursor.Y); }
+	CHAR_INFO make_info(char c) { return{ c, _currentAttributes.Attributes }; }
+	CHAR_INFO make_info(wchar_t c) { return{ c, _currentAttributes.Attributes }; }
+	void setchar(wchar_t ch) { line().set(_cursor.X, make_info(ch)); }
 protected:
-	HANDLE _hOut;
-	virtual void pushch(int c) override {
-		switch (c) {
-		case 0x0E: _graphic_set = 1; break; // shift out? change charater set to GL  G1 is sect SCS
-		case 0x0F: _graphic_set = 0; break; // shift in? change charater set to GL, G0 is SCS
-			default:
-			if (_graphic_set == 1) c=acs_map[c];
-			Terminal::pushch(c);
-			break;
+	
+	void touch(line_iterator b , line_iterator e) { std::for_each(b, e, [](Line& l) { l.touched(); }); }
+	void touchall() { touch(_lines.begin(), _lines.end()); }
+	const CHAR_INFO& blank() const { return _currentAttributes; }
+	
+	const COORD& cursor() const { return _cursor; }
+	void cursor(const COORD& pos) {
+		_cursor.X = std::clamp(pos.X, short(0), short(_size.X - 1));
+		_cursor.Y = std::clamp(pos.Y, short(0), short(_size.Y - 1));
+	}
+	template<typename T>
+	void cursor(T x, T y) {
+		_cursor.X = std::clamp(static_cast<short>(x), short(_margins.Left), short(_margins.Right));
+		_cursor.Y = std::clamp(static_cast<short>(y), short(_margins.Top), short(_margins.Bottom));
+	}
+	void move_cursor(const COORD& pos) { cursor(_cursor + pos); }
+	template<typename T, typename = typename std::enable_if<!std::is_unsigned<T>::value>::type>
+	void move_cursor(T x, T y) { move_cursor((COORD){ static_cast<short>(x), static_cast<short>(y)}); }
+	void home_cursor() { cursor({ 0,0 }); }
+	void clear_screen() { for (auto& l : _lines) l.clear(blank()); }
+	void scroll(int n = 1) {
+		if (n = 0) return; // sanity check
+		line_iterator start, end;
+		bool dir = n > 0;
+		n = std::abs(n);
+		while (n-- !=0) {
+			if (dir) {
+				start = _lines.begin() + _margins.Top;
+				end = _lines.begin() + _margins.Bottom;
+			}
+			else
+			{
+				start = _lines.begin() + _margins.Bottom;
+				end = _lines.begin() + _margins.Top;
+			}
+			start->clear(blank());
+			_lines.insert(end, *start);
+			_lines.erase(start);
 		}
 		
+	}
+	void linefeed() {
+		_cursor.Y++;
+		if (_cursor.Y >= _size.Y) {
+			scroll(1);
+			_cursor.Y = _size.Y - 1;
+		}
+		if (return_on_linefeed)_cursor.X = _margins.Left;
+	}
+	virtual void pushch(int c) override {
+		switch (c) {
+		case 0x00: return;// ignore
+		case 0x05: assert(false); break; // enquery
+		case 0x07: break; // bell, works in console
+		case 0x08: move_cursor(0, -1); line().set(_cursor.X, ' '); break; // backspace
+		case 0x09: // tab
+		{
+			auto it = std::find_if(_tabs.begin(), _tabs.end(), [this](short v) { return v >= _cursor.X; });
+			if (it == _tabs.end())
+				_cursor.X = _size.X - 1; // if no tabs, then set ot end of screen
+			else
+				_cursor.X += *it - _cursor.X;
+		}
+		break;
+		case 0x0A: linefeed(); break;// line feed
+		case 0x0B:  linefeed(); break;// VT, prossed as lf
+		case 0x0C:  clear_screen(); break;// form feed, clear screen?
+			break; // FF, prossed as lf
+		case 0x0D: _cursor.X = _margins.Left; break; // should work? moves to left margin
+		case 0x0E: _graphic_set = 1; return; // shift out? change charater set to GL  G1 is sect SCS
+		case 0x0F: _graphic_set = 0; return; // shift in? change charater set to GL, G0 is SCS
+		case 0x10: assert(false); break; // Also referred to as XON. If XOFF support is enabled, DC1 clears DC3 (XOFF), causing the terminal to continue transmitting characters (keyboard unlocks) unless KAM mode is currently set.
+		case 0x13: assert(false); break; // Also referred to as XOFF. If XOFF support is enabled, DC3 causes the terminal to stop transmitting characters until a DC1 control character is received.
+		case 0x18: assert(false); break; // If received during an escape or control sequence, terminates and cancels the sequence. No error character is displayed. If received during a device control string, the DCS is terminated and no error character is displayed.
+		case 0x1A: assert(false); break; // If received during escape or control sequence, terminates and cancels the sequence. Causes a reverse question mark to be displayed. If received during a device control sequence, the DCS is terminated and reverse question mark is displayed.
+		case 0x1B: assert(false); break; // ESC, should never get here
+		case 0x7F: break; // we ignore these should never get in
+		default:
+			if (_graphic_set == 1) c = acs_map[c];
+			setchar((wchar_t)c);
+			_cursor.X++;
+			if (_cursor.X >= _size.X) {
+				if (auto_wraparound) {
+					linefeed();
+					_size.X = _margins.Left;
+				} else 
+					_cursor.X = _size.X - 1; 
+			}
+			break;
+		}
 	}
 	void error_out(const char* message, const std::wstring& text) {
 		std::cerr << message << ":";  
@@ -810,56 +1009,242 @@ protected:
 		std::cerr << std::endl;
 	}
 	virtual void csi_dispatch(wchar_t c, const std::array<int, 16>& parms, std::wstring& text)  override {
+		CHAR_INFO b = _currentAttributes;
+		static const char* modes[] = {
+			"Cursor key ",
+			"ANSI // VT52 ",
+			"Column mode",
+			"Scrolling",
+			"Screen mode",
+			"Origin mode",
+			"Wraparound",
+			"Autorepeat",
+			"Interface"
+		};
+		// http://umich.edu/~archive/apple2/misc/programmers/vt100.codes.txt helpful
 		switch (c) {
-		case 'A':
-		case 'B':
-		case 'C':
-		case 'D':
-		case 'E':
-		case 'F':
-		case 'G':
-		case 'd':
-		case 'H':
-		case 'S':
-		case 'T':
-		case '@':
-		case 'P':
-		case 'J':
-		case 'K':
-		case 'm':
-			Terminal::csi_dispatch(c, parms, text);
-			break;
-		case 'r': // Top and bottom margins
-		{
-			CONSOLE_SCREEN_BUFFER_INFO info;
-			::GetConsoleScreenBufferInfo(_hOut, &info);
-			SMALL_RECT rect = { 0, parms[0], info.dwSize.X - 1,parms[1] };
-			::SetConsoleWindowInfo(_hOut, FALSE, &rect);
-		}
-		
-			break;
+			//Line feed / new   New line        ESC[20h        Line feed       ESC[20l
+			//	Cursor key      Application     ESC[? 1h        Cursor          ESC[? 1l
+			//	ANSI / VT52       ANSI            n / a             VT52            ESC[? 2l
+			//	Column mode     132 col         ESC[? 3h        80 col          ESC[? 3l
+			//	Scrolling       Smooth          ESC[? 4h        Jump            ESC[? 4l
+			//	Screen mode     Reverse         ESC[? 5h        Normal          ESC[? 5l
+			//	Origin mode     Relative        ESC[? 6h        Absolute        ESC[? 6l
+			//	Wraparound      On              ESC[? 7h        Off             ESC[? 7l
+			//	Autorepeat      On              ESC[? 8h        Off             ESC[? 8l
+			//	Interface       On              ESC[? 9h        Off             ESC[? 9l
 		case 'l': // resset mode
-			if (parms[0] == '?') {
+			if (parms[0] == 0x20) {
+				return_on_linefeed = false;
+				std::cerr << "Mode Reset : " << modes[0] << std::endl;
+			}
+			else if (parms[0] == '?') {
 				switch (parms[1]) {
-				case 25:
-					Terminal::csi_dispatch(c, parms, text);
+				case 7:
+					auto_wraparound = false;
 					break;
 				}
-			} else error_out("unsupported l", text);
+				std::cerr << "Mode Reset : " << modes[parms[1]] << std::endl;
+			}
+			else {
+				assert(false);
+			}
 			break;
 		case 'h': // set mode
-			if (parms[0] == '?') {
+			if (parms[0] == 0x20) {
+				return_on_linefeed = true;
+				std::cerr << "Mode Set : " << modes[0] << std::endl;
+			}
+			else if (parms[0] == '?') {
 				switch (parms[1]) {
-				case 25:
-					Terminal::csi_dispatch(c, parms, text);
+				case 7:
+					auto_wraparound = true;
 					break;
 				}
-			} else error_out("unsupported h", text);
+				std::cerr << "Mode Set : " << modes[parms[1]] << std::endl;
+			}
+			else {
+				assert(false);
+			}
 			break;
+		case 'm':
+			if (parms[0] == 0) _currentAttributes.Attributes = 0x7;
+			else {
+				for (int i = 0; parms[i] != 0; i++) {
+					short value = parms[i];
+					switch (value) {
+					case 0:_currentAttributes.Attributes = 0x7; break;
+					case 1: set_flag(_currentAttributes.Attributes, FOREGROUND_INTENSITY); break;
+					case 21: reset_flag(_currentAttributes.Attributes, FOREGROUND_INTENSITY); break;
+					case 4:  set_flag(_currentAttributes.Attributes, COMMON_LVB_UNDERSCORE); break;
+					case 24: reset_flag(_currentAttributes.Attributes, COMMON_LVB_UNDERSCORE); break;
+					case 7: set_flag(_currentAttributes.Attributes, COMMON_LVB_REVERSE_VIDEO); break;
+					case 27: reset_flag(_currentAttributes.Attributes, COMMON_LVB_REVERSE_VIDEO); break;
+					case 8: concealed = true; break;
+					case 28: concealed = false; break;
+					default:
+						if (value >= 30 && value <= 37) _currentAttributes.Attributes &= 0xFFF0 | foregroundcolor[parms[i] - 30];
+						else if (value >= 40 && value <= 47) _currentAttributes.Attributes &= 0xFF0F | backgroundcolor[parms[i] - 40];
+						break;
+					}
+				}
+			}
+			break;
+		case 'J':
+			switch (parms[0]) {
+			case 0: // ESC[J || ESC[0J erase from cursor to end of display
+				std::for_each(line().begin() + _cursor.X, line().end(), [b](CHAR_INFO& c) { c = b; });
+				std::for_each(_lines.begin() + _cursor.Y + 1, _lines.end(), [b](Line& l) { l.clear(b); });
+				break;
+			case 1: // ESC[1J erase from start to cursor.
+				std::for_each(_lines.begin(), _lines.begin() + _cursor.Y, [b](Line& l) { l.clear(b); });
+				std::for_each(line().begin(), line().begin() + _cursor.X, [b](CHAR_INFO& c) { c = b; });
+				break;
+			case 2: //ESC[2J Clear screen and home cursor
+				std::for_each(_lines.begin(), _lines.end(), [b](Line& l) { l.clear(b); });
+				home_cursor();
+				break;
+			}
+			touchall();
+			break;
+		case 'K':
+			switch (parms[0]) {
+			case 0: //  ESC[K || ESC[0K Clear to end of line
+				std::for_each(line().begin() + _cursor.X, line().end(), [b](CHAR_INFO& c) { c = b; });
+				break;
+			case 1: // ESC[1K Clear from start of line to cursor
+				std::for_each(line().begin(), line().begin() + _cursor.X, [b](CHAR_INFO& c) { c = b; });
+				break;
+			case 2: // ESC[2K Clear whole line.
+				line().clear(b);
+				break;
+			}
+			touchall();
+			break;
+		case 'L': // ESC[#L Insert # blank lines. 
+		{
+			short count = parms[0];// ESC[L == ESC[1L
+			if (count == 0) count = 1;
+			while (count-- > 0) {
+				auto end = _lines.end()-1;
+				end->clear(b);
+				end->touched();
+				_lines.insert(_lines.begin() + _cursor.Y, *end);
+				_lines.erase(end);
+				touch(_lines.begin() + _cursor.Y + 1, _lines.end());
+			}
+		}
+		break;
+		case 'M':// ESC[L == ESC[1L
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;
+			if (count > (Info.dwSize.Y - Info.dwCursorPosition.Y)) count = Info.dwSize.Y - Info.dwCursorPosition.Y;
+			short count = parms[0];// ESC[L == ESC[1L
+			if (count == 0) count = 1;
+			while (count-- > 0) {
+				auto end = _lines.end() - 1;
+				end->clear(b);
+				end->touched();
+				_lines.insert(_lines.begin() + _cursor.Y, *end);
+				_lines.erase(end);
+				touch(_lines.begin() + _cursor.Y + 1, _lines.end());
+			}
+			ScrollConsole({ 0, count, Info.dwSize.X - 1, Info.dwSize.Y - 1 }, { 0, Info.dwCursorPosition.Y });
+			clear_from_pos({ 0,  Info.dwSize.Y - count }, Info.dwSize.X*count);
+		}
+		break;
+		case 'P': // ESC[#P Delete # characters.
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;// ESC[P == ESC[1P
+			if ((Info.dwCursorPosition.X + count) > (Info.dwSize.X - 1)) count = Info.dwSize.X - Info.dwCursorPosition.X;
+			ScrollConsole({ Info.dwCursorPosition.X + count, Info.dwCursorPosition.Y, Info.dwSize.X - 1, Info.dwCursorPosition.Y }, Info.dwCursorPosition);
+			clear_from_pos({ Info.dwSize.X - count,Info.dwCursorPosition.Y }, count, true);
+		}
+		break;
+		case '@': // ESC[#@ Insert # blank characters.
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;   // ESC[@ == ESC[1@
+			if (Info.dwCursorPosition.X + count > Info.dwSize.X - 1) count = Info.dwSize.X - Info.dwCursorPosition.X;
+			ScrollConsole({ Info.dwCursorPosition.X, Info.dwCursorPosition.Y, Info.dwSize.X - 1 - count, Info.dwCursorPosition.Y }, { Info.dwCursorPosition.X + count, Info.dwCursorPosition.Y });
+			clear_from_pos(Info.dwCursorPosition, count);
+		}
+		break;
+		case 'A':  // ESC[#A Moves cursor up # lines
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;    // ESC[A == ESC[1A
+			cursor({ Info.dwCursorPosition.X, Info.dwCursorPosition.Y - count });
+		}
+		break;
+		case 'B':  // ESC[#B Moves cursor down # lines
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;    // ESC[B == ESC[1B
+			cursor({ Info.dwCursorPosition.X, Info.dwCursorPosition.Y + count });
+		}
+		break;
+		case 'C':   // ESC[#C Moves cursor forward # spaces
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;    // ESC[C == ESC[1C
+			cursor({ Info.dwCursorPosition.X + count, Info.dwCursorPosition.Y });
+		}
+		break;
+		case 'D':    // ESC[#D Moves cursor back # spaces
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;    // ESC[D == ESC[1D
+			cursor({ Info.dwCursorPosition.X - count, Info.dwCursorPosition.Y });
+		}
+		break;
+		case 'E':    // ESC[#E Moves cursor down # lines, column 1.
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;     // ESC[E == ESC[1E
+			cursor({ 0,  Info.dwCursorPosition.Y + count });
+		}
+		break;
+		case 'F':    // ESC[#F Moves cursor up # lines, column 1.
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;     // ESC[F == ESC[1F
+			cursor({ 0,  Info.dwCursorPosition.Y - count });
+		}
+		break;
+		case 'G':    // ESC[#G Moves cursor column # in current row.
+		{
+			short count = parms[0];
+			if (count == 0) count = 1;     // ESC[G == ESC[1G
+			cursor({ count - 1,  Info.dwCursorPosition.Y });
+		}
+		break;
+		case 'q': // leds on or off
+			if (parms[0])
+				std::cerr << "DECLL L1 on";
+			else
+				std::cerr << "DECLL L1 off";
+			break;
+		case 'f':
+		case 'H':                               // ESC[#;#H or ESC[#;#f Moves cursor to line #, column #
+		{
+			cursor({ short(parms[1] == 0 ? 0 : parms[1] - 1) ,  short(parms[0] == 0 ? 0 : parms[0] - 1) });
+		}
+		break;
+		case 's':                               // ESC[s Saves cursor position for recall later
+			SavePos = Info.dwCursorPosition;
+			break;
+		case 'u':                               // ESC[u Return to saved cursor position
+			cursor(SavePos);
+			return;
 		default:
-			error_out("unsupported csi", text);
+			std::cerr << "Unknown ESC command " << c << std::endl;
+			assert(false);
 			break;
 		}
+	}
 	}
 	void vt100_dispatch(wchar_t c, const std::array<int, 16>& parms, std::wstring& text) {
 		WORD attribut;
@@ -911,13 +1296,35 @@ protected:
 			break;
 		}
 	}
-public:
-	VT100_Windows10() : Terminal(), _hOut(GetStdHandle(STD_OUTPUT_HANDLE)) {
-		DWORD dwMode = 0;
-		GetConsoleMode(_hOut, &dwMode);
-		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-		SetConsoleMode(_hOut, dwMode);
+	static constexpr COORD DefaultSize = { 80,25 };
+	void _fixLines(size_t line_count) {
+		if (line_count > _lines.size()) {
+			for (size_t i = _lines.size(); i < line_count; i++)
+				_lines.emplace_back(*this, i);
+		}
+		else if (line_count < _lines.size()) {
+			_lines.resize(line_count);
+		}
 	}
+	void _resize(size_t x, size_t y) {
+		_fixLines(y);
+		//_size.X = short(x);
+		//_size.Y = short(y);
+		screen_type new_screen(x*y, blank());
+		size_t copy_size = std::min(x, size_t(_size.X));
+		
+		if(y < _lines.size()) _lines.resize(y);
+		for (size_t i = 0; i < y; i++) {
+			auto& line = _lines.at(i);
+			std::copy(line.begin(), line.end(), new_screen.begin() + y * copy_size);
+		}
+		if (y > _lines.size()) {
+			for (size_t i = _lines.size(); i < y; i++)
+				_lines.emplace_back(*this, i);
+		}
+	}
+public:
+	VT100_Windows10() : Terminal(), _currentAttributes(DEFAULT_CHAR_INFO), _size(DefaultSize), _cursor({ 0.0 }), _screen(_size.X * _size.Y, _currentAttributes), _margins { 0, 0, _size.X-1, _size.Y-1 } {}
 };
 
 

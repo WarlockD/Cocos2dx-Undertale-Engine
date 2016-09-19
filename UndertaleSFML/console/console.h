@@ -443,11 +443,118 @@ namespace console {
 };
 
 namespace con {
+	static constexpr char ESC = '\x1b'; // escape
+	static constexpr char CSI = '['; // escape
 	// stream manipulators
-	struct cls {
-		explicit cls() {}
+	struct save_cursor {};
+	struct restor_cursor {};
+	enum class  CursorDirection : char {
+		Up=0,
+		Down,
+		Forward,
+		Backward,
 	};
-	
+	struct no_parm_command {
+		const char c;
+		constexpr explicit no_parm_command(char c) : c(c) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const no_parm_command& c) { os << ESC << c.c;  return os; }
+	struct no_parm_csi_command : public no_parm_command {
+		constexpr explicit no_parm_csi_command(char c) : no_parm_command(c) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const no_parm_csi_command& c) { os << ESC << CSI << c.c;  return os; }
+	struct one_parm_csi_command : public no_parm_csi_command {
+		const int parm;
+		constexpr explicit one_parm_csi_command(char c, int parm) : parm(parm), no_parm_csi_command(c)  {}
+	}; 
+	template<typename...Args>
+	struct parm_csi_command : public no_parm_csi_command, public std::tuple<Args...> {
+		//template<typename...Vals>
+		parm_csi_command(char c, Args&&... args) : no_parm_csi_command(c), std::tuple<Args...>(args...) {}
+	};
+	namespace aux {
+		template<std::size_t...> struct seq {};
+
+		template<std::size_t N, std::size_t... Is>
+		struct gen_seq : gen_seq<N - 1, N - 1, Is...> {};
+
+		template<std::size_t... Is>
+		struct gen_seq<0, Is...> : seq<Is...> {};
+
+		template<class Ch, class Tr, class parm_csi_command, std::size_t... Is>
+		void print_tuple(std::basic_ostream<Ch, Tr>& os, parm_csi_command const& t, seq<Is...>) {
+			using swallow = int[];
+			(void)swallow {
+				0, (void(os << (Is == 0 ? "" : ";") << std::get<Is>(t)), 0)...
+			};
+		}
+	} // aux::
+
+	template<class Ch, class Tr, typename...Args>
+	auto operator<<(std::basic_ostream<Ch, Tr>& os, parm_csi_command<Args...> const& t) -> std::basic_ostream<Ch, Tr>&
+	{
+		using swallow = int[];
+		os << ESC << CSI;
+		aux::print_tuple(os, t, aux::gen_seq<sizeof...(Args)>());
+		os << t.c;
+		return os;
+	}
+
+	inline std::ostream& operator<<(std::ostream& os, const one_parm_csi_command& c) { os << ESC << CSI << c.parm << c.c;  return os; }
+	struct two_parm_csi_command : public one_parm_csi_command {
+		const int parm2;
+		constexpr explicit two_parm_csi_command(char c, int parm1, int parm2) : parm2(parm2), one_parm_csi_command(c, parm1) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const two_parm_csi_command& c) { os << ESC << CSI << c.parm << ';' << c.parm << c.c;  return os; }
+	struct move_cursor {
+		const char dir;
+		const size_t count;
+		move_cursor(CursorDirection d, size_t count=1) :dir('A' + static_cast<char>(d)), count(count) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const move_cursor& c) {
+		os << ESC;
+		if (c.count > 1) os << CSI << c.count;
+		os << c.dir;
+		return os; 
+	}
+	struct cursor_up : public move_cursor { cursor_up(size_t count = 1) : move_cursor(CursorDirection::Up, count) {} };
+	struct cursor_down : public move_cursor { cursor_down(size_t count = 1) : move_cursor(CursorDirection::Down, count) {} };
+	struct cursor_left : public move_cursor { cursor_left(size_t count = 1) : move_cursor(CursorDirection::Forward, count) {} };
+	struct cursor_right : public move_cursor { cursor_right(size_t count = 1) : move_cursor(CursorDirection::Backward, count) {} };
+	struct cursory {
+		const size_t y;
+		cursory(size_t y = 1) : y(y) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const cursory& c) { os << ESC << CSI << c.y << 'd';  return os;  }
+	struct cursorx {
+		const size_t x;
+		cursorx(size_t x = 1) : x(x) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const cursorx& c) { os << ESC << CSI << c.x << 'G';  return os; }
+	struct cursor {
+		const size_t x;
+		const size_t y;
+		cursor(size_t x, size_t y) : x(x), y(y) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const cursor& c) { os << ESC << CSI << c.y << ';' << c.x << 'H';  return os; }
+	struct show_cursor {};
+	struct hide_cursor {};
+	inline std::ostream& operator<<(std::ostream& os, const show_cursor& c) { os << "\x1b[?25h";  return os; }
+	inline std::ostream& operator<<(std::ostream& os, const hide_cursor& c) { os << "\x1b[?25l";  return os; }
+	struct next_line {
+		const size_t v;
+		next_line(size_t v = 1) : v(v) {}
+	};
+	struct prev_line {
+		const size_t v;
+		prev_line(size_t v = 1) : v(v) {}
+	};
+	inline std::ostream& operator<<(std::ostream& os, const next_line& c) { os << ESC << CSI << c.v <<  'E';   return os; }
+	inline std::ostream& operator<<(std::ostream& os, const prev_line& c) { os << ESC << CSI << c.v <<  'F';   return os; }
+
+	struct cls { }; // form feed is clear?
+	inline std::ostream& operator<<(std::ostream& os, const cls& l) { os << '\f'; return os; }
+
 	struct background {
 		console::Color c;
 		explicit background(console::Color c) : c(c) {}
@@ -478,7 +585,7 @@ namespace con {
 		int y;
 		explicit gotoy(int y) : y(y) {}
 	};
-	inline std::ostream& operator<<(std::ostream& os, const cls& l) { console::cls(); return os; }
+
 	inline std::ostream& operator<<(std::ostream& os, const background& l) { console::background(l.c); return os; }
 	inline std::ostream& operator<<(std::ostream& os, const foreground& l) { console::foreground(l.c); return os; }
 	inline std::ostream& operator<<(std::ostream& os, const mode& l) { console::mode(l.m); return os; }

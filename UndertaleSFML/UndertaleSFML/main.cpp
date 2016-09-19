@@ -257,7 +257,10 @@ void test_vt() {
 	std::ifstream file(test_files[3]);
 	int line = 1;
 	int pos = 0;
-	vt100::init();
+	con::parm_csi_command<int,int> tt('m', 31, 42);
+	std::cout << tt << "This is a happy test" << std::endl;
+
+	//vt100::init();
 	while (line < debug_line && !file.eof()) {
 		int c = file.get();
 		if (c == '\n') line++;
@@ -271,7 +274,7 @@ void test_vt() {
 				line++; pos = 0;
 			}
 			else pos++;
-			vt100::print((char)c);
+		//	vt100::print((char)c);
 		}
 	}
 	while (true) {} // loop
