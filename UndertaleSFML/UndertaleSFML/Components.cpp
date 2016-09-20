@@ -362,8 +362,10 @@ void Application::draw() {
 	_window.display();
 }
 
-static console::Window info_window(80, 50);
+static console::VT00Window info_window(0, 0, 80, 50);
+
 void Application::update(ex::TimeDelta dt) {
+	std::ostream& debug = info_window;
 	sf::Vector2i mouse_old;
 	sf::Time current = _clock.getElapsedTime();
 	if (current.asMilliseconds() > room_fps) {
@@ -378,11 +380,9 @@ void Application::update(ex::TimeDelta dt) {
 	}
 	sf::Vector2i mouse_current = sf::Mouse::getPosition(_window);
 	if (mouse_current != mouse_old) {
-		info_window.clearline(2);
-		info_window.cursor(0,2);
-		info_window.print("mouse (%2.2i,%2.2i)", mouse_current.x, mouse_current.y);
+		debug << con::gotoxy(0, 2) << con::print("mouse (%2.2i,%2.2i)", mouse_current.x, mouse_current.y) << con::clear_line_from_cursor;
 		// object debug
-		entities.each<Body, UndertaleObject, UndertaleSprite>([this, mouse_current](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
+		entities.each<Body, UndertaleObject, UndertaleSprite>([this, &debug,mouse_current](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
 			sf::FloatRect bounds = body.getBounds();
 			if (bounds.contains(sf::Vector2f(mouse_current))) {
 				auto& verts = (sortedVerts[100])[nullptr];
@@ -390,28 +390,28 @@ void Application::update(ex::TimeDelta dt) {
 				auto& o = obj.obj;
 				size_t line = 3;
 				if (o.valid()) {
-					info_window.cursor(0, line);
-					info_window.clearline(line++);
-					info_window.print("Object(%i, %s)\r\nBox(%2.2f, %2.2f, %2.2f, 2.2f)", o.index(), o.name().c_str(), bounds.left, bounds.top, bounds.width, bounds.height);
+					debug << con::gotoxy(0, line++) 
+						<< con::print("Object(%i, %s)\r\nBox(%2.2f, %2.2f, %2.2f, 2.2f)", o.index(), o.name().c_str(), bounds.left, bounds.top, bounds.width, bounds.height) 
+						<< con::clear_line_from_cursor;
 					if (obj.parents.size() > 0) {
 						for (auto& p : obj.parents) {
-							info_window.cursor(0, line);
-							info_window.clearline(line++);
-							info_window.print("->(%i, %s)   \r\n", p.index(), p.name().c_str());
+							debug << con::gotoxy(0, line++)
+								<< con::print("->(%i, %s)   \r\n", p.index(), p.name().c_str())
+								<< con::clear_line_from_cursor;
 						}
 					}
 				}
-				else info_window.print("invalid obj");
+				else debug << "invalid obj";
 			}
 		});
 	}
 
 	if (_debugUpdate.getElapsedTime().asSeconds() >= 0.1) {
 		float last_update = _debugUpdate.restart().asSeconds();
-		info_window.clearline(0);
-		info_window.cursor(0, 0);
-		info_window.print("FPS(%2.2f) Update(%2.2f) Objects(%i)", (float)((float)frame_count / last_update), (float)((float)update_count / last_update, entities.size()));
-		info_window.refresh(5, 5);
+		debug << con::gotoxy(0, 0)
+			<< con::print("FPS(%2.2f) Update(%2.2f) Objects(%i)", (float)((float)frame_count / last_update), (float)((float)update_count / last_update, entities.size()))
+			<< con::clear_line_from_cursor;
+		info_window.paint();
 		/*
 		
 		info_window.refresh(10, 10);

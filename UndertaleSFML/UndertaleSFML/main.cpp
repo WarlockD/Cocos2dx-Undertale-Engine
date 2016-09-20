@@ -170,7 +170,8 @@ namespace global {
 	ex::SystemManager& getSystems() { return s_app->systems; }
 };
 
-console::window winerr(console::Point(0, 15), console::Point(50, 10));
+
+console::VT00Window winerr(0, 15, 50, 10);
 
 namespace ex = entityx;
 void gameLoop() {
@@ -205,22 +206,22 @@ void gameLoop() {
 				}
 				switch (event.key.code) {
 				case sf::Keyboard::Y:
-					winerr << "Testing" << std::endl;
+					(std::ostream&)winerr << "Testing" << std::endl;
 					break;
 				case sf::Keyboard::Down:
-					console::test_vt("\33[B");
+					//console::test_vt("\33[B");
 					break;
 				case sf::Keyboard::Up:
-					console::test_vt("\33[A");
+				//	console::test_vt("\33[A");
 					break;
 				case sf::Keyboard::Left:
-					console::test_vt("\33[D");
+				//	console::test_vt("\33[D");
 					break;
 				case sf::Keyboard::Right:
-					console::test_vt("\33[C");
+				//	console::test_vt("\33[C");
 					break;
 				case sf::Keyboard::Return:
-					console::test_vt("Testing");
+				//	console::test_vt("Testing");
 					break;
 				case sf::Keyboard::Num9:
 					
@@ -252,14 +253,20 @@ public:
 	double elapsed() const { return std::chrono::duration<double>(std::chrono::system_clock::now() - _start).count(); }
 };
 void test_vt() {
+	
 	QuickTimer timer;
-	static constexpr int debug_line = 645; // champain glass
-	std::ifstream file(test_files[3]);
+	static constexpr int debug_line = 0;// 645; // champain glass
+	std::ifstream file(test_files[0]);
 	int line = 1;
 	int pos = 0;
 	con::parm_csi_command<int,int> tt('m', 31, 42);
-	std::cout << tt << "This is a happy test" << std::endl;
-
+//	std::cout << tt << "This is a happy test" << std::endl;
+	console::VT00Window window(10, 10, 50, 50);
+	window.scroll(false);
+	std::ostream& stream = window;
+	stream << "This is a test" << std::endl;
+	stream << "this is also a test" << std::endl;
+	window.paint();
 	//vt100::init();
 	while (line < debug_line && !file.eof()) {
 		int c = file.get();
@@ -274,15 +281,18 @@ void test_vt() {
 				line++; pos = 0;
 			}
 			else pos++;
-		//	vt100::print((char)c);
+			stream << (char)c;
+		//	std::cout << (char)c;
+			window.paint();
 		}
 	}
 	while (true) {} // loop
 
 }
 int main(int argc, const char* argv[]) {
+	
 	console::init();
-	test_vt();
+	//test_vt();
 	//array_helpers::example_sum();
 	if (argc != 2 || !Global::LoadUndertaleDataWin(argv[1])) return -1;
 	

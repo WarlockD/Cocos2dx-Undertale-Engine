@@ -84,9 +84,6 @@
     <ClCompile Include="..\console\console.cpp">
       <Filter>console</Filter>
     </ClCompile>
-    <ClCompile Include="..\console\curses.cpp">
-      <Filter>console</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">
@@ -123,12 +120,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\console\console.h">
-      <Filter>console</Filter>
-    </ClInclude>
-    <ClInclude Include="..\console\curses.h">
-      <Filter>console</Filter>
-    </ClInclude>
-    <ClInclude Include="conmanip.h">
       <Filter>console</Filter>
     </ClInclude>
     <ClInclude Include="..\ext\include\entityx\config.h">
