@@ -313,10 +313,10 @@ public:
 		sf::Vector2f vmax;
 		for (auto& it : _verts) {
 			auto& v = it.position;
-			vmin.x = std::min(vmin.x, v.x);
-			vmin.y = std::min(vmin.y, v.y);
-			vmax.x = std::max(vmin.x, v.x);
-			vmax.y = std::max(vmin.y, v.y);
+			if (v.x > vmin.x) vmin.x = v.x;
+			if (v.y > vmin.y) vmin.y = v.y;
+			if (v.x < vmax.x) vmax.x = v.x;
+			if (v.y < vmax.y) vmax.y = v.y;
 		}
 		return sf::FloatRect(vmin, vmax - vmin);
 	}

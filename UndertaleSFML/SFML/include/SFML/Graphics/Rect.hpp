@@ -104,30 +104,26 @@ public:
 		height(static_cast<T>(rectangle.height))
 	{
 	}
-    ////////////////////////////////////////////////////////////
-    /// \brief Check if a point is inside the rectangle's area
-    ///
-    /// \param x X coordinate of the point to test
-    /// \param y Y coordinate of the point to test
-    ///
-    /// \return True if the point is inside, false otherwise
-    ///
-    /// \see intersects
-    ///
-    ////////////////////////////////////////////////////////////
-    bool contains(T x, T y) const;
+	////////////////////////////////////////////////////////////
+	template <typename R>
+	inline bool contains(R x, R y) const
+	{
+		// Rectangles with negative dimensions are allowed, so we must handle them correctly
 
-    ////////////////////////////////////////////////////////////
-    /// \brief Check if a point is inside the rectangle's area
-    ///
-    /// \param point Point to test
-    ///
-    /// \return True if the point is inside, false otherwise
-    ///
-    /// \see intersects
-    ///
-    ////////////////////////////////////////////////////////////
-    bool contains(const Vector2<T>& point) const;
+		// Compute the real min and max of the rectangle on both axes
+		T minX = std::min(left, static_cast<T>(left + width));
+		T maxX = std::max(left, static_cast<T>(left + width));
+		T minY = std::min(top, static_cast<T>(top + height));
+		T maxY = std::max(top, static_cast<T>(top + height));
+
+		return (x >= minX) && (x < maxX) && (y >= minY) && (y < maxY);
+	}
+	////////////////////////////////////////////////////////////
+	template <typename R>
+	bool contains(const Vector2<R>& point) const
+	{
+		return contains(point.x, point.y);
+	}
 
     ////////////////////////////////////////////////////////////
     /// \brief Check the intersection between two rectangles

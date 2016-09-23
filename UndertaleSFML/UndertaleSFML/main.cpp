@@ -253,25 +253,16 @@ public:
 	double elapsed() const { return std::chrono::duration<double>(std::chrono::system_clock::now() - _start).count(); }
 };
 void test_vt() {
-	
+	std::cout << "\xb1[?1049h";
 	QuickTimer timer;
-	static constexpr int debug_line = 0;// 645; // champain glass
-	std::ifstream file(test_files[0]);
+	static constexpr int debug_line = 645; // champain glass
+	std::ifstream file(test_files[3]);
 	int line = 1;
 	int pos = 0;
-	con::parm_csi_command<int,int> tt('m', 31, 42);
-//	std::cout << tt << "This is a happy test" << std::endl;
-	console::VT00Window window(10, 10, 50, 50);
-	window.scroll(false);
-	std::ostream& stream = window;
-	stream << "This is a test" << std::endl;
-	stream << "this is also a test" << std::endl;
-	window.paint();
-	//vt100::init();
-	while (line < debug_line && !file.eof()) {
-		int c = file.get();
-		if (c == '\n') line++;
-	}
+//	auto window = con::newwin(10, 10, 50, 50);
+//	window->move(1, 1);
+//	window->addstr("this is a test");
+//	window->update();
 	while (!file.eof()) {
 		assert(file.good() && !file.eof());
 		if (timer.elapsed() > 0.001) {
@@ -281,13 +272,14 @@ void test_vt() {
 				line++; pos = 0;
 			}
 			else pos++;
-			stream << (char)c;
+			std::cout << (char)c;
+		//	stream << (char)c;
 		//	std::cout << (char)c;
-			window.paint();
+		//	window.paint();
 		}
 	}
 	while (true) {} // loop
-
+	std::cout << "\xb1[?1049l";
 }
 int main(int argc, const char* argv[]) {
 	

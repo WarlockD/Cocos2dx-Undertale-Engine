@@ -26,28 +26,7 @@
 ////////////////////////////////////////////////////////////
 
 
-////////////////////////////////////////////////////////////
-template <typename T>
-bool Rect<T>::contains(T x, T y) const
-{
-    // Rectangles with negative dimensions are allowed, so we must handle them correctly
 
-    // Compute the real min and max of the rectangle on both axes
-    T minX = std::min(left, static_cast<T>(left + width));
-    T maxX = std::max(left, static_cast<T>(left + width));
-    T minY = std::min(top, static_cast<T>(top + height));
-    T maxY = std::max(top, static_cast<T>(top + height));
-
-    return (x >= minX) && (x < maxX) && (y >= minY) && (y < maxY);
-}
-
-
-////////////////////////////////////////////////////////////
-template <typename T>
-bool Rect<T>::contains(const Vector2<T>& point) const
-{
-    return contains(point.x, point.y);
-}
 
 
 ////////////////////////////////////////////////////////////

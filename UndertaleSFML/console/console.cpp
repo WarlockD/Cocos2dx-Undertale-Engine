@@ -22,9 +22,90 @@ namespace {
 };
 namespace console {
 	void init() {
+		DWORD dwMode = 0;
+		GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &dwMode);
+		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
+	//	if (_scroll) dwMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
+		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), dwMode);
 		init_cerr();
-		init_cout();
+	//	init_cout();
 	}
+	enum class State {
+		Ground,
+		Escape,
+		Csi,
+		Parm,
+		Ignore,
+		Execute,
+		Dispatch,
+	};
+	struct escape_decode {
+		bool csi;
+		wchar_t postfix;
+		std::array<int, 16> parms;
+		int parm_count;
+		std::wstring inside;
+		State state;
+		void clear() {
+			csi = false;
+			state = State::Ground;
+			postfix = '\0';
+			parms.fill(0);
+			inside.clear();
+			parm_count = 0;
+		}
+		escape_decode() { clear(); }
+		State putch(wchar_t ch) { // does NOT try to detect invalid sequences
+			if ((ch >= 0x00 && ch <= 0x17) || ch == 0x19 || (ch >= 0x1C && ch <= 0x1F) || ch == 0x7F)
+				return state; // ignore control stuff
+			switch (ch) {
+			case '\x1b':
+				clear();
+				state = State::Escape;
+				return state; // we always reset
+			}
+			if (state == State::Ground) return state;// short
+			while (true) {
+				switch (state) {
+				case State::Escape:
+					if (ch == '[') {
+						csi = true;
+						state = State::Csi;
+					}
+					else if (ch >= 0x20 && ch <= 0x2F) {
+						inside.push_back(ch);
+					}
+					else if (ch >= 0x30 && ch <= 0x7E) {
+						postfix = ch;
+						state = State::Dispatch;
+						continue;
+					}
+					break;
+				case State::Parm:
+					if (ch >= 0x30 && ch <= 0x39)
+						parms[parm_count] = (parms[parm_count] * 10) + ch - '0x30';
+					else if (ch == ';') parm_count++;
+					else {
+						state = State::Csi;
+						continue; // not really true, but we let csi handle eveything else
+					}
+					break;
+				case State::Csi:
+					if (ch >= 0x30 && ch <= 0x39) {
+						state = State::Parm;
+						continue;
+					} if ((ch >= 0x40 && ch <= 0x7E)) {
+						postfix = ch;
+						state = State::Dispatch;
+						continue;
+					}
+					else inside.push_back(ch);
+					break;
+				}
+				return state;
+			}
+		}
+	};
 	// we want the stream using wchar_t so we can access the graphic charaters of
 	// unicode that windows has on the console
 	class VT00WindowBuffer : public std::streambuf {
@@ -36,7 +117,35 @@ namespace console {
 		bool _scroll;
 		int _x, _y, _width, _height;
 		mutable std::vector<CHAR_INFO> _screen_buffer; 
+		std::vector<wchar_t> _buffer;
+		escape_decode _esc;
+		inline wchar_t tryIndex(size_t i) const  { return _buffer.size() < i ? _buffer[i] : 0; }
 	protected:
+		void reset_esc() {
+			_buffer.clear();
+		}
+		void output_buffer() {
+			if (_buffer.size() > 0) {
+				DWORD written;
+				::WriteConsoleW(_handle, _buffer.data(), _buffer.size(), &written, NULL);
+				_buffer.clear();
+			}
+			
+		}
+		void handle_esc() {
+		
+			
+		}
+		void push(wchar_t ch) {
+			auto state = _esc.putch(ch);
+			if (state == State::Ground) {
+				_buffer.push_back(ch);
+			} else {
+				if (state == State::Escape) output_buffer(); // flush first
+				_buffer.push_back(ch);
+				if (state == State::Dispatch) handle_esc();
+			}
+		}
 		int sync() override {
 			std::ptrdiff_t n = pptr() - pbase();
 			int real_n = ::MultiByteToWideChar(CP_UTF8, 0, pbase(), n, 0, 0);
@@ -57,7 +166,7 @@ namespace console {
 			dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
 			if (_scroll) dwMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
 			SetConsoleMode(_handle, dwMode);
-			SMALL_RECT rect = { 0,0, _width - 1,_height - 1 };
+			SMALL_RECT rect = { 0,0, short(_width - 1),short(_height - 1) };
 			SetConsoleWindowInfo(_handle, TRUE,&rect);
 			GetConsoleScreenBufferInfo(_handle, &info);
 			_screen_buffer.resize(_width*_height);
@@ -96,12 +205,13 @@ namespace console {
 			update_handle();
 			return *this;
 		}
-		void paint()   {
+		
+		void refresh()   {
 			sync();
 			// refresh window
-			COORD size = { _width,_height };
+			COORD size = { short(_width),short(_height) };
 			COORD pos = { 0,0 };
-			SMALL_RECT rect = { 0, 0, _width - 1, _height - 1 };
+			SMALL_RECT rect = { 0, 0, short(_width - 1), short(_height - 1) };
 			ReadConsoleOutputA(_handle, _screen_buffer.data(), size, pos, &rect);
 			rect.Left = _x;
 			rect.Right = _x + _width;
@@ -123,7 +233,7 @@ namespace console {
 		}
 	}
 	void VT00Window::paint() {
-		_buffer->paint();
+		//_buffer->paint();
 	}
 	bool VT00Window::scroll() const { return _buffer->scroll(); }
 	void VT00Window::scroll(bool v) { _buffer->scroll(v); }

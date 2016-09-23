@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <chrono>
 #include <list>
+#include <stack>
 
 #ifndef CONSOLE_SCREEN_BUFFER_INFO
 struct _CONSOLE_SCREEN_BUFFER_INFOEX;
@@ -27,9 +28,7 @@ struct _CONSOLE_SCREEN_BUFFER_INFOEX;
 #undef min
 //#define min(a,b)            (((a) < (b)) ? (a) : (b))
 #endif
-
-namespace console {
-	void init();
+namespace enum_priv {
 	// helpers for enum operations
 	// http://stackoverflow.com/questions/8357240/how-to-automatically-convert-strongly-typed-enum-into-int
 	template <typename E>
@@ -41,7 +40,7 @@ namespace console {
 		to_enum(T value) noexcept { return static_cast<E>(value); }
 
 	template<typename E>
-	inline constexpr typename std::enable_if< std::is_enum<E>::value,bool>::type test_flag(E l, E r) {
+	inline constexpr typename std::enable_if< std::is_enum<E>::value, bool>::type test_flag(E l, E r) {
 		return (to_underlying(l)  & to_underlying(r)) != 0;
 	}
 	template<typename E>
@@ -54,13 +53,20 @@ namespace console {
 		l = to_enum<E>(to_underlying(l) & ~to_underlying(r));
 		return l;
 	}
-	// use % to test if the flag is inside the other
 #define ENUM_OPERATIONS(T) \
-	inline constexpr T operator|(T l, T r) { return to_enum<T>(to_underlying(l) | to_underlying(r)); } \
-	inline constexpr T operator&(T l, T r) { return to_enum<T>(to_underlying(l) & to_underlying(r));  } \
+	inline constexpr T operator|(T l, T r) { return enum_priv::to_enum<T>(enum_priv::to_underlying(l) | enum_priv::to_underlying(r)); } \
+	inline constexpr T operator&(T l, T r) { return enum_priv::to_enum<T>(enum_priv::to_underlying(l) & enum_priv::to_underlying(r));  } \
 	inline T& operator|=(T& l, T r) { l = l | r; return l; } \
 	inline T& operator&=(T& l, T r) { l = l & r; return l; } \
-	inline constexpr bool operator%(T l, T r) { return (to_underlying(l) & to_underlying(r)) != 0; } 
+	inline constexpr bool operator%(T l, T r) { return (enum_priv::to_underlying(l) & enum_priv::to_underlying(r)) != 0; }\
+	inline constexpr T operator~(T r) { return enum_priv::to_enum<T>(~enum_priv::to_underlying(r)); }
+
+};
+namespace console {
+	void init();
+	
+	// use % to test if the flag is inside the other
+ 
 	
 	/// math stuff
 	template<class T> inline const T& max(const T& a, const T& b) { return (a < b) ? b : a; }
@@ -194,14 +200,14 @@ namespace console {
 		inline Rect& operator-=(const Point &r) { top -= r.y; bottom -= r.y; right -= r.x; left -= r.x; return *this; }
 		inline Rect operator-() const { return Rect(-top, -left, -bottom, -right); }
 		bool contains(int16_t x, int16_t y) const { return (x >= left) && (y <= right) && (y >= top) && (y <= bottom); }
-		bool contains(const Point& p) const { return contains(p.x, p.y); }
-		bool intersects(const Rect& rect, Rect& overlap) const {
-			overlap = Rect(console::max(left, rect.left), console::max(top, rect.top),
-				console::min(right, rect.right), console::min(bottom, rect.bottom));
+	//	bool contains(const Point& p) const { return contains(p.x, p.y); }
+	//	//bool intersects(const Rect& rect, Rect& overlap) const {
+	//		overlap = Rect(console::max(left, rect.left), console::max(top, rect.top),
+		//		console::min(right, rect.right), console::min(bottom, rect.bottom));
 			// If overlapping rect is valid, then there is intersection
-			return ((overlap.left < overlap.right) && (overlap.top < overlap.bottom));
-		}
-		bool intersects(const Rect& rect) const { Rect overlap; return intersects(rect, overlap); }
+	//		return ((overlap.left < overlap.right) && (overlap.top < overlap.bottom));
+	//	}
+	//	bool intersects(const Rect& rect) const { Rect overlap; return intersects(rect, overlap); }
 	};
 	inline bool operator==(const Rect &l, const Rect &r) { return l.top == r.top && l.left == r.left && l.right == r.right&& l.bottom == r.bottom; }
 	inline bool operator!=(const Rect &l, const Rect &r) { return !(l == r); }
@@ -214,7 +220,6 @@ namespace console {
 
 	class VT00WindowBuffer;
 	class VT00Window {
-		
 		VT00WindowBuffer* _buffer;
 		std::iostream _stream;
 	public:
@@ -244,7 +249,71 @@ namespace console {
 
 };
 
+
 namespace con {
+	class VWindow {
+		size_t _begx, _begy;
+		size_t _curx, _cury;
+		size_t _maxx, _maxy;
+		std::stringstream _buffer;
+		size_t _attrib;
+		bool _need_refresh;
+		void _refresh();
+	public:
+		VWindow(size_t width, size_t height);
+		VWindow(size_t x, size_t y, size_t width, size_t height);
+		void background(console::Color color);
+		void forground(console::Color color);
+		void refresh(bool clearall=false);
+		void scroll(int i);
+		void linefeed();
+		void move(size_t x, size_t y);
+		void putc(char ch);
+		void erase_to_eol();
+		void erase_to_bot();
+		void erase() { move(0, 0); erase_to_bot(); }
+		void puts(const char* str) { while (*str) putc(*str++); }
+		void print(const char* fmt, ...);
+	};
+	class Window {
+	public:
+		/*
+		* psuedo functions for standard screen
+		*/
+		virtual void addch(int ch) = 0;
+		virtual void inch(int ch) = 0;
+		virtual void clrtoeol() = 0;
+	//	virtual char getch() = 0;
+		virtual void clrtobot() = 0;
+	//	virtual void clearok() = 0;
+		virtual void addstr(const std::string& str) { for (auto& c : str) addch(c); }
+		//virtual void getstr(std::string& str) = 0;
+		virtual void move(size_t y, size_t x) = 0;
+		virtual void syncup() =0;   // causes a touchwin() of all of the window's parents.
+		inline void mvaddch(size_t y, size_t x, int ch) { move(y, x); addch(ch); }
+		inline void mvinsch(size_t y, size_t x, int ch) { move(y, x); inch(ch); }
+		
+		virtual inline void erase() { move(0, 0); clrtobot(); }
+		//virtual void clear() { clearok(); erase(); }
+		virtual void syncok(bool bf) = 0;
+		virtual void cursyncup() = 0;
+		virtual void syncdown() = 0;
+		virtual void insertln() = 0;
+		virtual void deleteln() = 0;
+		virtual void refresh() = 0;
+		virtual void update(bool clearall = false) = 0;
+		virtual void scroll(int n=1) = 0;
+		virtual void touchline(int,int, bool) = 0;
+		virtual void touchwin() = 0;
+		virtual size_t lines() const = 0;
+		virtual size_t cols() const = 0;
+		virtual std::shared_ptr<Window> subwin(size_t x, size_t y, size_t width, size_t height)=0;
+		virtual ~Window() {}
+	};
+	int LINES();
+	int COLS();
+	std::shared_ptr<Window> newwin(size_t x, size_t y, size_t width, size_t height);
+
 	static constexpr char ESC = '\x1b'; // escape
 	static constexpr char CSI = '['; // escape
 	// stream manipulators
@@ -305,7 +374,7 @@ namespace con {
 		return os;
 	}
 	struct gotoxy : public parm_csi_command<int, int> {
-		gotoxy(int x, int y) : parm_csi_command('H', x,y) {}
+		gotoxy(int x, int y) : parm_csi_command('H', y,x) {}
 	};
 	struct gotoy : public parm_csi_command<int> {
 		gotoy(int y) : parm_csi_command('d', y) {}

@@ -84,6 +84,9 @@
     <ClCompile Include="..\console\console.cpp">
       <Filter>console</Filter>
     </ClCompile>
+    <ClCompile Include="..\console\curses.cpp">
+      <Filter>console</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UndertaleLib.h">

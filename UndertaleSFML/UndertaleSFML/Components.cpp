@@ -256,6 +256,7 @@ struct Candidate {
 };
 
 static size_t frame_count = 0;
+con::VWindow dwindow(10,10,50, 50);
 
 void Application::update_verts(ex::TimeDelta dt) {
 	
@@ -299,6 +300,9 @@ void Application::update_verts(ex::TimeDelta dt) {
 		}
 	});
 
+
+
+
 	static bool last_state = false;
 
 	
@@ -322,11 +326,47 @@ void Application::update_verts(ex::TimeDelta dt) {
 		auto& verts = (sortedVerts[layer])[sprite.texture()];
 		temp_verts.assign(sprite.ptr(), sprite.ptr() + 6);
 		temp_verts.transform(body.getTransform());
+		auto temp = temp_verts.bounds();
 		body.fixBounds(sprite.frame_size());
 		verts += temp_verts;
 	});
-//	Candidate canadates;
 
+	sf::Vector2i mouse_current = sf::Mouse::getPosition(_window);
+	sf::Vector2f coord_pos = _window.mapPixelToCoords(mouse_current);
+	if (coord_pos.x >= 0.0f && coord_pos.y >= 0.0f && _window.getSize().x >coord_pos.x&& _window.getSize().y > coord_pos.y) {
+		//dwindow.move(0, 0);
+		//dwindow.print("mouse (%2.2f,%2.2f)", coord_pos.x, coord_pos.y);
+		//dwindow.erase_to_eol();
+		std::cout << con::gotoxy(0, 0) << std::setw(20) << std::setfill(' ') << con::print("mouse (%2.2f,%2.2f) ", coord_pos.x, coord_pos.y);
+		// object debug
+		entities.each<Body, UndertaleObject, UndertaleSprite>([this, coord_pos](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
+			sf::FloatRect bounds = body.getBounds();
+			if (bounds.contains(coord_pos)) {
+				auto& verts = (sortedVerts[100])[nullptr];
+				draw_box(verts, bounds);
+				auto& o = obj.obj;
+				size_t line = 3;
+				if (o.valid()) {
+					std::cout << con::gotoxy(5, 5) << std::setw(20) << std::setfill(' ') <<  con::print("Object(%i, %s)", o.index(), o.name().c_str());
+					std::cout << con::gotoxy(5, 6) << std::setw(20) << std::setfill(' ') << con::print("Box(%2.2f, %2.2f, %2.2f, %2.2f)\n", bounds.left, bounds.top, bounds.width, bounds.height);
+					if (obj.parents.size() > 0) {
+						for (auto& p : obj.parents) {
+							std::cout << "\x1b[1B\x1b[5G"; // next line at 5
+							std::cout << std::setw(20) << std::setfill(' ') << con::print("->(%i, %s)", p.index(), p.name().c_str());
+						}
+					}
+					else {
+						std::cout << '\x1b' << "B\x1b[5G\x1b[1K"; // next line at 5
+						std::cout << '\x1b' << "B\x1b[5G\x1b[1K"; // next line at 5
+						std::cout << '\x1b' << "B\x1b[5G\x1b[1K"; // next line at 5
+						std::cout << '\x1b' << "B\x1b[5G\x1b[1K"; // next line at 5
+					}
+					std::cout << "\x1b[u"; // restore the cursor
+				}
+				else std::cout << "invalid obj" << con::clear_line_from_cursor;
+			}
+		});
+	}
 	if (_room && _room->backgrounds().size() > 0) {
 		for (auto& t : _room->backgrounds()) {
 			if (!t.forground) continue;
@@ -362,10 +402,10 @@ void Application::draw() {
 	_window.display();
 }
 
-static console::VT00Window info_window(0, 0, 80, 50);
+
 
 void Application::update(ex::TimeDelta dt) {
-	std::ostream& debug = info_window;
+
 	sf::Vector2i mouse_old;
 	sf::Time current = _clock.getElapsedTime();
 	if (current.asMilliseconds() > room_fps) {
@@ -377,41 +417,17 @@ void Application::update(ex::TimeDelta dt) {
 		//	systems.system<AnimationSystem>()->update(entities, events, delta);
 		//systems.system<RenderSystem>()->update(entities, events, delta);
 		update_verts(delta);
+		dwindow.refresh();
 	}
-	sf::Vector2i mouse_current = sf::Mouse::getPosition(_window);
-	if (mouse_current != mouse_old) {
-		debug << con::gotoxy(0, 2) << con::print("mouse (%2.2i,%2.2i)", mouse_current.x, mouse_current.y) << con::clear_line_from_cursor;
-		// object debug
-		entities.each<Body, UndertaleObject, UndertaleSprite>([this, &debug,mouse_current](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
-			sf::FloatRect bounds = body.getBounds();
-			if (bounds.contains(sf::Vector2f(mouse_current))) {
-				auto& verts = (sortedVerts[100])[nullptr];
-				draw_box(verts, bounds);
-				auto& o = obj.obj;
-				size_t line = 3;
-				if (o.valid()) {
-					debug << con::gotoxy(0, line++) 
-						<< con::print("Object(%i, %s)\r\nBox(%2.2f, %2.2f, %2.2f, 2.2f)", o.index(), o.name().c_str(), bounds.left, bounds.top, bounds.width, bounds.height) 
-						<< con::clear_line_from_cursor;
-					if (obj.parents.size() > 0) {
-						for (auto& p : obj.parents) {
-							debug << con::gotoxy(0, line++)
-								<< con::print("->(%i, %s)   \r\n", p.index(), p.name().c_str())
-								<< con::clear_line_from_cursor;
-						}
-					}
-				}
-				else debug << "invalid obj";
-			}
-		});
-	}
+
 
 	if (_debugUpdate.getElapsedTime().asSeconds() >= 0.1) {
 		float last_update = _debugUpdate.restart().asSeconds();
-		debug << con::gotoxy(0, 0)
-			<< con::print("FPS(%2.2f) Update(%2.2f) Objects(%i)", (float)((float)frame_count / last_update), (float)((float)update_count / last_update, entities.size()))
-			<< con::clear_line_from_cursor;
-		info_window.paint();
+	//	debug << con::gotoxy(0, 0)
+	//		<< con::print("FPS(%2.2f) Update(%2.2f) Objects(%i)", (float)((float)frame_count / last_update), (float)((float)update_count / last_update, entities.size()))
+	//		<< con::clear_line_from_cursor;
+	//	dwindow.refresh();
+		//info_window.paint();
 		/*
 		
 		info_window.refresh(10, 10);

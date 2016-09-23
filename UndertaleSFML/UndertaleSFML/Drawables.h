@@ -289,7 +289,7 @@ public:
 	void fixBounds(const sf::FloatRect& rect) { _bounds = rect; }
 	template<typename U>
 	void fixBounds(const sf::Vector2<U>& size)  { 
-		setBounds(getTransform().transformRect(sf::FloatRect(0,0,size.x,size.y)));
+		_bounds= getTransform().transformRect(sf::FloatRect(sf::Vector2f(),size));
 	}
 	float getRotation() const { return _rotation; }
 	const sf::Transform& getTransform() const;
