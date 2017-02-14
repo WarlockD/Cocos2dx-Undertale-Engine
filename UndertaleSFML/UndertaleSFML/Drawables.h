@@ -8,11 +8,60 @@ namespace global {
 	void insert_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float w, sf::Color color);
 	void insert_hair_line(RawVertices& verts, sf::Vector2f v1, sf::Vector2f v2, float width, sf::Color color);
 
-	void InsertFrame(sf::Vertex* verts, const sf::FloatRect& bounds, const sf::IntRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
-	void InsertFrame(sf::Vertex* verts, const sf::FloatRect& bounds, const sf::FloatRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
-
-	void InsertFrame(std::vector<sf::Vertex>& verts, const sf::FloatRect& bounds, const sf::IntRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
-	void InsertFrame(std::vector<sf::Vertex>& verts, const sf::FloatRect& bounds, const sf::FloatRect& texRect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
+	template<typename T1, typename T2> 
+	//sf::Vertex* InsertFrame(sf::Vertex* verts, sf::Rect<T1> const & bounds, sf::Rect<T2> const & texRect, sf::Color fill_color, sf::PrimitiveType type) {
+	sf::Vertex* InsertFrame(sf::Vertex* verts, const sf::Rect<T1>  & bounds, const sf::Rect<T2>  & texRect, sf::Color fill_color, sf::PrimitiveType type) {
+		const float left = static_cast<float>(bounds.left);
+		const float top = static_cast<float>(bounds.top);
+		const float right = static_cast<float>(bounds.left + bounds.width);
+		const float bottom = static_cast<float>(bounds.top + bounds.height);
+		const float u1 = static_cast<float>(texRect.left);
+		const float v1 = static_cast<float>(texRect.top);
+		const float u2 = static_cast<float>(texRect.left + texRect.width);
+		const float v2 = static_cast<float>(texRect.top + texRect.height);
+		// Add a quad for the current character
+		if (type == sf::PrimitiveType::Triangles) {
+			*verts++ = (sf::Vertex(sf::Vector2f(left, top), fill_color, sf::Vector2f(u1, v1)));
+			*verts++ = (sf::Vertex(sf::Vector2f(right, top), fill_color, sf::Vector2f(u2, v1)));
+			*verts++ = (sf::Vertex(sf::Vector2f(left, bottom), fill_color, sf::Vector2f(u1, v2)));
+			*verts++ = (sf::Vertex(sf::Vector2f(left, bottom), fill_color, sf::Vector2f(u1, v2)));
+			*verts++ = (sf::Vertex(sf::Vector2f(right, top), fill_color, sf::Vector2f(u2, v1)));
+			*verts++ = (sf::Vertex(sf::Vector2f(right, bottom), fill_color, sf::Vector2f(u2, v2)));
+		}
+		else {
+			*verts++ = (sf::Vertex(sf::Vector2f(left, top), fill_color, sf::Vector2f(u1, v1)));
+			*verts++ = (sf::Vertex(sf::Vector2f(right, top), fill_color, sf::Vector2f(u2, v1)));
+			*verts++ = (sf::Vertex(sf::Vector2f(right, bottom), fill_color, sf::Vector2f(u2, v2)));
+			*verts++ = (sf::Vertex(sf::Vector2f(left, bottom), fill_color, sf::Vector2f(u1, v2)));
+		}
+		return verts;
+	}
+	template<typename T1, typename T2>
+	inline sf::Vertex* InsertFrame(std::vector<sf::Vertex>& verts, const sf::Rect<T1> & bounds, const sf::Rect<T2>& texRect, sf::Color fill_color, sf::PrimitiveType type) {
+			size_t pos = verts.size();
+			verts.resize(pos + (type != sf::PrimitiveType::Triangles ? 4 : 6));
+			return InsertFrame(verts.data() + pos, bounds, texRect, fill_color, type);
+	}
+	template<typename V, typename T1, typename T2>
+	auto inline InsertFrame(V verts, const sf::Rect<T1> & bounds, const sf::Rect<T2>& texRect, sf::Color fill_color)
+		->decltype(InsertFrame(verts, bounds, texRect, fill_color, sf::PrimitiveType::Triangles)) {
+		return InsertFrame(verts, bounds, texRect, fill_color, sf::PrimitiveType::Triangles);
+	}
+	template<typename V, typename T1, typename T2>
+	auto inline InsertFrame(V verts, const sf::Rect<T1> & bounds, const sf::Rect<T2>& texRect, sf::PrimitiveType type)
+		->decltype(InsertFrame(verts, bounds, texRect, sf::Color::White, type)) {
+		return InsertFrame(verts, bounds, texRect, sf::Color::White, type);
+	}
+	template<typename V, typename T1, typename T2>
+	auto inline InsertFrame(V verts, const sf::Rect<T1> & bounds, const sf::Rect<T2>& texRect)
+		->decltype(InsertFrame(verts, bounds, texRect, sf::Color::White, sf::PrimitiveType::Triangles)) {
+		return InsertFrame(verts, bounds, texRect, sf::Color::White, sf::PrimitiveType::Triangles);
+	}
+	//template<typename T1, typename T2>
+	//sf::Vertex* InsertFrame(sf::Vertex* verts, sf::Rect<T1> const & bounds, sf::Rect<T2> const & texRect, sf::Color fill_color, sf::PrimitiveType type) {
+	//sf::Vertex* InsertFrame(sf::Vertex* verts, sf::Rect<T1>&& bounds, sf::Rect<T2>&& texRect, sf::Color fill_color, sf::PrimitiveType type) {
+	//	return InsertFrameImpl(verts, bounds, textRect, color, type);
+	//}
 
 	std::array<sf::Vertex, 6> CreateRectangle(const sf::FloatRect& rect, sf::Color fill_color);
 	void InsertRectangle(sf::Vertex  * verts, const sf::FloatRect& rect, sf::Color fill_color, sf::PrimitiveType type = sf::PrimitiveType::Triangles);
@@ -22,69 +71,6 @@ namespace global {
 
 
 
-struct Renderable  {
-	bool debug_draw_box = false;
-	// starting to get the hang of templates
-	// traites and other good bits
-	typedef sf::Vertex element_type;
-	typedef size_t size_type;
-	typedef ptrdiff_t difference_type;
-	typedef element_type* element_pointer;
-	typedef element_type& element_reference;
-	typedef const element_type* const_element_pointer;
-	typedef const element_type& const_element_reference;
-	typedef generic_iterator<Renderable, sf::Vertex> iterator;
-	typedef generic_iterator<const Renderable, const sf::Vertex> const_iterator;
-private:
-	int _depth = 0;
-protected: // protected interface
-	
-	
-											// sent by the engine in an atempt to optimize draw calls by recreating the texture
-											// not sure if I will use
-	virtual bool changeTexture(const sf::Texture& texture, const sf::IntRect& textRect) { return false; }
-	virtual iterator begin()  { return iterator(*this, 0); }
-	virtual iterator end()  { return iterator(*this, (int)size()); }
-	// Interface
-public:
-	int depth() const { return _depth; } // used for depth sorting
-	int& depth() { return _depth; }
-	void depth(size_t depth) { _depth = depth; }
-	virtual const sf::Texture* texture() const = 0;
-	virtual size_t size() const = 0;
-	virtual const sf::Vertex& at(size_t index) const = 0;
-	// end interface, the rest is just optimiztion
-	const sf::Vertex& operator[](size_t index)  const { return at(index); }
-	virtual const_iterator begin() const { return const_iterator(*this,0); }
-	virtual const_iterator end() const { return const_iterator(*this, (int)size());}
-
-	// Extra stuff with some defaults, override for preformance
-	virtual sf::FloatRect bounds() const {
-		sf::Vector2f vmin;
-		sf::Vector2f vmax;
-		for (auto& it : *this) {
-			auto& v = it.position;
-			vmin.x = std::min(vmin.x, v.x);
-			vmin.y = std::min(vmin.y, v.y);
-			vmax.x = std::max(vmin.x, v.x);
-			vmax.y = std::max(vmin.y, v.y);
-		}
-		return sf::FloatRect(vmin, vmax - vmin);
-	}
-	virtual sf::FloatRect bounds(const sf::Transform&t) const { return t.transformRect(bounds()); }
-	virtual void copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { verts.insert(at, begin(), end()); }
-	virtual void copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t) const { for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); }
-	virtual void copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace(at, t * v.position, color, v.texCoords); }
-	virtual void copy(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
-	virtual void copy(std::vector<sf::Vertex>& verts, const sf::Transform& t) const {
-		for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords);
-	}
-	virtual void copy(std::vector<sf::Vertex>& verts, const sf::Transform& t, const sf::Color& color) const { for (auto& v : *this) verts.emplace_back(t * v.position, color, v.texCoords); }
-	virtual ~Renderable() {}
-	std::reference_wrapper<Renderable> ref() { return std::ref(*this); }
-	std::reference_wrapper<const Renderable> ref() const { return std::ref(*this); }
-};
-
 // use this template class for a Renderable object to test drawing direct to sfml
 template<class C> class SFMLDrawable : public sf::Transformable, public sf::Drawable {
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
@@ -92,167 +78,6 @@ template<class C> class SFMLDrawable : public sf::Transformable, public sf::Draw
 		states.transform *= getTransform();
 		target.draw(data(), size(), sf::PrimitiveType::Triangles, states);
 	}
-};
-
-typedef std::reference_wrapper<Renderable> RenderableRef;
-
-// sprite frames and mesh have continusious illterators, passed by pointer
-class SpriteFrameBase : public Renderable ,public sf::Drawable , public ChangedCass {
-public:
-	const sf::Vertex& at(size_t i) const override final { return ptr()[i]; }
-	size_t size() const override final { return 6; }
-	const sf::Vector2f frame_size() const { return at(5).position; }
-	virtual sf::FloatRect bounds() const override  { return sf::FloatRect(sf::Vector2f(), frame_size());  }
-	sf::IntRect texRect() const { return sf::IntRect(sf::FloatRect(at(0).texCoords, at(5).texCoords - at(0).texCoords));}
-	const sf::Vector2f texture_offset() const { return at(0).texCoords; } // offset of the start of texture, useful for tiles
-	sf::Color color() const { return ptr()[0].color; }
-	std::reference_wrapper<SpriteFrameBase> ref() { return std::ref(*this); }
-	std::reference_wrapper<const SpriteFrameBase> ref() const { return std::ref(*this); }
-	virtual const sf::Vertex* ptr() const = 0;
-	virtual ~SpriteFrameBase() {}
-	// return false if no more frames
-	virtual bool next_frame() { return false; }; // This interface just tells the sprite to do next frame
-	virtual bool prev_frame() { return false; }; // This interface just tells the sprite to do prev frame
-	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
-		states.texture = texture();
-		//states.transform *= getTransform();
-		target.draw(ptr(), size(), sf::PrimitiveType::Triangles, states);
-	}
-};
-// simple ref to data, used for extra stuff
-// assumes the _ptr is valid.
-
-class SpriteFrameRef : public SpriteFrameBase {
-	const sf::Vertex* _ptr;
-	const sf::Texture* _texture;
-public:
-	explicit SpriteFrameRef(const SpriteFrameBase& base) : _ptr(base.ptr()), _texture(base.texture()) {}
-	SpriteFrameRef& operator=(const SpriteFrameBase& other) { _ptr = other.ptr(); _texture = other.texture(); return *this; }
-	explicit SpriteFrameRef(const sf::Vertex* ptr, const sf::Texture* texture=nullptr) : _ptr(ptr), _texture(texture) {}
-	explicit SpriteFrameRef(const sf::Vertex* ptr, const sf::Texture& texture) : SpriteFrameRef(ptr, &texture) {}
-	void ptr(const sf::Vertex* ptr) { _ptr = ptr; }
-	void texture(const sf::Texture* texture) { _texture = texture; }
-	const sf::Texture* texture() const override final { return _texture; }
-	const sf::Vertex* ptr() const override final { return _ptr; }
-};
-
-
-class Mesh : public Renderable {
-	RawVertices _verts;
-	const sf::Texture* _texture;
-	typedef std::vector<sf::Vertex>::const_iterator vector_const_iterator;
-	typedef std::vector<sf::Vertex>::iterator vector_iterator;
-public:
-	RawVertices& verts() { return _verts; }
-	const RawVertices& verts() const { return _verts; }
-	virtual const sf::Vertex& at(size_t index) const { return _verts[index]; }
-	sf::Vertex& at(size_t index) { return _verts[index]; }
-	sf::Vertex& operator[](size_t index) { return at(index); }
-	iterator begin() { return iterator(*this, 0); }
-	iterator end() { return iterator(*this, (int)size()); }
-
-	virtual const sf::Texture* texture() const override { return _texture; }
-	void texture(const sf::Texture* texture) { _texture = texture; }
-	virtual size_t size() const override { return _verts.size(); } // we only return the current frame
-	void clear() { _verts.clear(); }
-	void resize(size_t t) { _verts.resize(t); }
-	void reserve(size_t t) { _verts.reserve(t); }
-
-	// end interface, the rest is just optimiztion
-
-	Mesh() : _texture(nullptr) {}
-	Mesh(const sf::Texture* texture, const std::vector<sf::Vertex>& verts) : _texture(texture), _verts(verts) {}
-	Mesh(const sf::Texture* texture, std::vector<sf::Vertex>&& verts) : _texture(texture), _verts(std::move(verts)) {}
-	Mesh(const std::vector<sf::Vertex>& verts) : _texture(nullptr), _verts(verts) {}
-	Mesh(const std::vector<sf::Vertex>&& verts) : _texture(nullptr), _verts(std::move(verts)) {}
-	template<typename... Targs>
-	void emplace_back(Targs&&... Fargs) { _verts.emplace_back(Fargs...); }
-	void push_back(sf::Vertex&&v) { _verts.push_back(std::move(v)); }
-	void push_back(const sf::Vertex&v) { _verts.push_back(v); }
-	// faster to use the ptr offsets for frames as Renderable has added costs
-	void push_back(const SpriteFrameBase& frame) { assert(frame.texture() == _texture);  _verts.insert(_verts.end(), frame.ptr(), frame.ptr() + frame.size()); }
-	void push_back(const Mesh& mesh) { assert(mesh.texture() == _texture);  _verts.insert(_verts.end(), mesh._verts.begin(),mesh._verts.end()); }
-	///void push_back(const Renderable& r) { assert(r.texture() == _texture);  _verts.emplace(_verts.end(), r.begin(),r.end()); }
-	void push_back(const sf::FloatRect& bounds, const sf::FloatRect& texRect, const sf::Color& color = sf::Color::White);
-	void push_back(const sf::FloatRect& bounds, const sf::IntRect& texRect, const sf::Color& color = sf::Color::White);
-	iterator insert(const_iterator where, sf::Vertex&&v) { _verts.insert(_verts.begin() + where.pos(), std::move(v)); }
-	iterator insert(const_iterator where, const sf::Vertex&v) { _verts.insert(_verts.begin() + where.pos(), v); }
-	template<typename... Targs>
-	iterator emplace(const_iterator where, Targs&&... Fargs) { return _verts.emplace(_verts.begin() + where.pos(), Fargs...); }
-
-};
-
-class SpriteFrame : public SpriteFrameBase {
-	std::array<sf::Vertex, 6> _verts;
-	const sf::Texture* _texture;
-public:
-	const sf::Texture* texture() const override final { return _texture; }
-	const sf::Vertex* ptr() const override final { return _verts.data(); }
-	SpriteFrame() : _texture(nullptr) {}
-	explicit SpriteFrame(const sf::Texture* texture, const sf::Vertex* vert) : _texture(texture) { std::copy(vert, vert + 6, _verts.begin()); }
-	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Color& color = sf::Color::White); // if you just want a box, you can use this to get the verts
-	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::Color& color = sf::Color::White);
-	explicit SpriteFrame(const sf::FloatRect& bounds, const sf::Texture* texture, const sf::IntRect& textureRect, const sf::Color& color = sf::Color::White);
-	
-};
-
-class TileMap : public Renderable {
-	sf::IntRect _textureRect;
-	const sf::Texture* _texture;
-	std::vector<SpriteFrameRef> _tiles;
-	RawVertices _verts;
-public:
-	TileMap() : _texture(nullptr), _textureRect() {}
-	explicit TileMap(const sf::Texture* texture, const sf::IntRect& textureRect) : _texture(texture), _textureRect(textureRect) {}
-	const sf::Vertex& at(size_t i) const override final { return _verts[i]; }
-	size_t size() const override final { return _verts.size(); }
-	virtual sf::FloatRect bounds() const override { return sf::FloatRect(_textureRect); }
-	const sf::Vertex* ptr() const { return _verts.data(); }
-	const sf::Texture* texture() const override final { return _texture; }
-	void texture(const sf::Texture* texture) { _texture = texture; }
-	
-	size_t tile_count() const { return _tiles.size(); }
-	SpriteFrameRef tile_at(size_t index) const { return _tiles.at(index); }
-	SpriteFrameRef tile_create(const sf::Vector2f& pos, const sf::IntRect& rect);
-	RawVertices& verts() { return _verts; }
-	const RawVertices& verts() const { return _verts; }
-};
-
-class SpriteFrameCollection : public SpriteFrameBase  {
-private:
-	std::vector<SpriteFrame> _frames;
-	size_t _image_index;
-	sf::Vector2f _size;
-public:
-	explicit SpriteFrameCollection() : _frames(), _image_index(0), _size(0, 0) {}
-	explicit SpriteFrameCollection(const std::vector<SpriteFrame>& frames, sf::Vector2f& size) : _frames(frames), _image_index(0), _size(size) {}
-	explicit SpriteFrameCollection(const std::vector<SpriteFrame>& frames) : _frames(frames), _image_index(0) {
-		auto bounds = SpriteFrameBase::bounds();
-		_size = sf::Vector2f(bounds.width, bounds.height);
-	}
-	explicit SpriteFrameCollection(std::vector<SpriteFrame>&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _image_index(0), _size(size) {}
-	explicit SpriteFrameCollection(std::vector<SpriteFrame>&& frames) : _frames(std::move(frames)), _image_index(0) {
-		auto bounds = SpriteFrameBase::bounds();
-		_size = sf::Vector2f(bounds.width, bounds.height);
-	}
-	// interface
-	const sf::Texture* texture() const override final { return _frames[_image_index].texture(); }
-	const sf::Vertex*  ptr() const override final { return _frames[_image_index].ptr(); }
-	sf::FloatRect bounds() const override final { return sf::FloatRect(sf::Vector2f(), _size); }
-	// custom stuff
-	size_t image_index() const { return _image_index; }
-	void image_index(size_t index) { _image_index = index % _frames.size(); }
-	bool next_frame() override final { image_index(image_index() + 1); changed(true);  return true; }
-	bool prev_frame() override final { image_index(image_index() - 1); changed(true); return true; }
-	void push_back(const SpriteFrame& frame) { _frames.push_back(frame); }
-	SpriteFrameCollection& operator+=(const SpriteFrame& frame){_frames.push_back(frame); return *this; }
-	SpriteFrameCollection& operator=(const std::vector<SpriteFrame>& frames) { _frames = frames; return *this; }
-	SpriteFrameCollection& operator=(std::vector<SpriteFrame>&& frames) { _frames = std::move(frames); return *this; }
-	void clear() { _frames.clear(); }
-	void bounds(sf::Vector2f size) { _size = size; }
-	// cheat and use the iliterator from an array
-	const SpriteFrame& current_frame() const { return _frames[_image_index]; }
-	size_t total_frames() const { return _frames.size(); }
 };
 
 
@@ -288,8 +113,8 @@ public:
 	void setBounds(const sf::FloatRect& rect) { _bounds = rect; }
 	void fixBounds(const sf::FloatRect& rect) { _bounds = rect; }
 	template<typename U>
-	void fixBounds(const sf::Vector2<U>& size)  { 
-		_bounds= getTransform().transformRect(sf::FloatRect(sf::Vector2f(),size));
+	void fixBounds(const sf::Vector2<U>& size) {
+		_bounds = getTransform().transformRect(sf::FloatRect(sf::Vector2f(), size));
 	}
 	float getRotation() const { return _rotation; }
 	const sf::Transform& getTransform() const;
@@ -298,6 +123,163 @@ inline std::ostream& operator<<(std::ostream& os, const Body& body) {
 	os << "Position" << body.getPosition() << " ,Origin" << body.getOrigin() << " ,Scale" << body.getScale() << ", Rotation(" << body.getRotation() << ")";
 	return os;
 }
+
+// sprite frames and mesh have continusious illterators, passed by pointer
+class SpriteFrameRef : public sf::Drawable , public Body {
+public:
+	class trasform_const_iterator {
+		const SpriteFrameRef& _ref;
+		size_t _pos;
+	public:
+		using difference_type = size_t;
+		using size_type = size_t;
+		using value_type = sf::Vertex;
+		using pointer = const sf::Vertex*;
+		using reference = const sf::Vertex&;
+		using iterator_category = std::bidirectional_iterator_tag;
+		trasform_const_iterator(const SpriteFrameRef& ref, size_t pos) : _ref(ref), _pos(pos) {}
+		trasform_const_iterator& operator++() { _pos++; return *this; }
+		trasform_const_iterator operator++(int) { return trasform_const_iterator(_ref, _pos++); }
+		trasform_const_iterator& operator--() { _pos--; return *this; }
+		trasform_const_iterator operator--(int) { return trasform_const_iterator(_ref, _pos--); }
+		value_type operator[](int pos) const { return _ref.at(_pos+pos) * _ref.getTransform(); }
+		value_type operator*() const { return _ref.at(_pos) * _ref.getTransform(); }
+		bool operator==(const trasform_const_iterator& r) { return _pos == r._pos; }
+		bool operator!=(const trasform_const_iterator& r) { return _pos != r._pos; }
+		bool operator<(const trasform_const_iterator& r) { return _pos < r._pos; }
+		bool operator>(const trasform_const_iterator& r) { return _pos > r._pos; }
+	};
+	typedef sf::Vertex element_type;
+	typedef size_t size_type;
+	typedef ptrdiff_t difference_type;
+	typedef element_type* element_pointer;
+	typedef element_type& element_reference;
+	typedef const element_type* const_element_pointer;
+	typedef const element_type& const_element_reference;
+	typedef sf::Vertex* iterator;
+	typedef const sf::Vertex* const_iterator;
+protected:
+	sf::Vertex* _verts;
+	const sf::Texture* _texture;
+	void  data(sf::Vertex* verts) {  _verts=verts; }
+public:
+	const sf::Vertex* data() const { return _verts; }
+	sf::Vertex* data() { return _verts; }
+	const sf::Texture* texture() const { return _texture; }
+	void texture(const sf::Texture* texture)  {  _texture= texture; }
+
+	virtual size_t size() const { return data() ? 6 : 0; }
+
+	void assign(const sf::Vertex* verts) { std::memcpy(_verts, data(), sizeof(sf::Vertex) * 6); }
+	void assign(const SpriteFrameRef& ref) { _verts = ref._verts; _texture = ref._texture; }
+	void assign(const Body& ref) { Body::operator=(ref);  }
+	void addOffset(const sf::Vector2f& offset) { for (auto& v : *this) v.position += offset; }
+	virtual const_iterator begin() const { return data() ? data() : nullptr; }
+	virtual const_iterator end() const { return data() ? data() + size() : nullptr; }
+	trasform_const_iterator tbegin() const { return trasform_const_iterator(*this, 0); }
+	trasform_const_iterator tend() const { return trasform_const_iterator(*this, size()); }
+	virtual iterator begin() { return data() ? _verts : nullptr; }
+	virtual iterator end() { return data() ? _verts + size() : nullptr; }
+	SpriteFrameRef() : _verts(nullptr), _texture(nullptr) {}
+	SpriteFrameRef(sf::Vertex* verts, const sf::Texture* texture) : _verts(verts), _texture(texture) {}
+	// the old pointers are nulified on moves fyi
+	SpriteFrameRef(SpriteFrameRef&& move) : _verts(move._verts), _texture(move._texture) { move._verts = nullptr; move._texture = nullptr; }
+	SpriteFrameRef(const SpriteFrameRef& copy) : _verts(copy._verts), _texture(copy._texture) { }
+	SpriteFrameRef& operator=(SpriteFrameRef rhs) { using std::swap; swap(_verts, rhs._verts); swap(_texture, rhs._texture); return *this; }
+
+	// return state from a body
+	SpriteFrameRef& operator=(const Body&body) { Body::operator=(body); return *this; }
+	virtual ~SpriteFrameRef() {}
+	
+
+	
+	const sf::Vertex& at(size_t i) const { return _verts[i]; }
+	virtual sf::Vector2f sprite_size() const { return _verts[5].position- _verts[0].position; }
+	virtual sf::FloatRect bounds_local() const  { return sf::FloatRect(0.0f, 0.0f, sprite_size().x, sprite_size().y); }
+	virtual sf::FloatRect bounds_global() const { return getTransform().transformRect(bounds_local()); }
+	sf::IntRect texRect() const { return sf::IntRect(sf::FloatRect(at(0).texCoords, at(5).texCoords - at(0).texCoords));}
+	const sf::Vector2f texture_offset() const { return at(0).texCoords; } // offset of the start of texture, useful for tiles
+	const sf::Color& color() const { return _verts[0].color; }
+	void color(const sf::Color& c) { for (auto& v : *this) v.color = c; }
+	// return false if at the end or could not advance
+	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
+		if (data()) {
+			states.texture = texture();
+			states.transform *= getTransform();
+			target.draw(data(), size(), sf::PrimitiveType::Triangles, states);
+		}
+	}
+	virtual void copy(std::vector<sf::Vertex>::iterator at, std::vector<sf::Vertex>& verts) const { verts.insert(at, begin(), end()); }
+	virtual void copy(std::vector<sf::Vertex>& verts) const { verts.insert(verts.end(), begin(), end()); }
+	virtual void transform_copy(std::vector<sf::Vertex>& verts, std::vector<sf::Vertex>::iterator at) const { 
+		const sf::Transform& t = getTransform(); 
+		for (auto& v : *this) verts.emplace(at, t * v.position, v.color, v.texCoords); 
+	}
+	virtual void transform_copy(std::vector<sf::Vertex>& verts) const {
+		const sf::Transform& t = getTransform();
+		for (auto& v : *this) verts.emplace_back(t * v.position, v.color, v.texCoords);
+	}
+};
+
+
+
+class SpriteFrame : public SpriteFrameRef {
+public:
+	SpriteFrame() : SpriteFrameRef(new sf::Vertex[6], nullptr) {  }
+	SpriteFrame(const sf::Texture* texture) : SpriteFrameRef(new sf::Vertex[6], texture) {  }
+	SpriteFrame(const sf::Vertex* verts, const sf::Texture* texture) : SpriteFrameRef(new sf::Vertex[6], texture) { assign(verts);}
+	SpriteFrame(SpriteFrame&& move) : SpriteFrameRef(move) { move._verts = nullptr; move._texture = nullptr; }
+	SpriteFrame(const SpriteFrame& copy) : SpriteFrame(copy._verts,copy._texture) {  }
+	SpriteFrame& operator=(SpriteFrame move) { using std::swap; swap(move._verts, _verts); swap(move._texture,_texture); return *this; }
+	virtual ~SpriteFrame() { if (_verts) { delete _verts; _verts = nullptr; } }
+	static SpriteFrame create(const sf::Vector2f& size, const sf::Color& color); // if you just want a colored box
+	static SpriteFrame create(const sf::Texture* texture, const sf::IntRect& textureRect, const sf::Vector2f& offset=sf::Vector2f()); // standard sprite
+	SpriteFrameRef ref() { return SpriteFrameRef(_verts, _texture); } // we make a refrence
+};
+
+class TileMap : public SpriteFrameRef {
+	sf::IntRect _textureRect;
+	sf::Vector2f _size;
+	RawVertices _tile_verts;
+public:
+	TileMap() : SpriteFrameRef(), _textureRect() {}
+	explicit TileMap(const sf::Texture* texture, const sf::IntRect& textureRect) : SpriteFrameRef(nullptr,texture), _textureRect(textureRect) {}
+	size_t size() const override final { return _tile_verts.size(); }
+	virtual sf::Vector2f sprite_size() const { return _size; }
+	size_t tile_count() const { return _tile_verts.size()/6; }
+	SpriteFrameRef tile_at(size_t index) { return SpriteFrameRef(_tile_verts.data() + (index * 6), _texture); }
+	SpriteFrameRef tile_create(const sf::Vector2f& pos, const sf::IntRect& rect);
+	RawVertices& tile_verts() { return _tile_verts; }
+	const RawVertices& tile_verts() const { return _tile_verts; }
+};
+
+class SpriteFrameCollection : public SpriteFrameRef  {
+private:
+	std::vector<SpriteFrame> _frames;
+	size_t _image_index;
+	sf::Vector2f _size;
+public:
+	explicit SpriteFrameCollection() : _frames(), _image_index(0), _size(0, 0) {}
+	explicit SpriteFrameCollection(const std::vector<SpriteFrame>& frames, sf::Vector2f& size) : _frames(frames), _image_index(0), _size(size) {}
+	explicit SpriteFrameCollection(std::vector<SpriteFrame>&& frames, sf::Vector2f& size) : _frames(std::move(frames)), _image_index(0), _size(size) {}
+	virtual size_t image_count() const { return _frames.size(); } // we default to only having a single frame
+	virtual size_t image_index() const { return _image_index; } // always on frame zero
+	virtual void image_index(size_t image) {
+		if (_image_index != image) {
+			_image_index = image % _frames.size();
+			auto& frame = _frames.at(_image_index);
+			_verts = frame.data();
+			_texture = frame.texture();
+		}
+	} // dosn't do anything
+	void push_back(const SpriteFrame& frame) { _frames.push_back(frame); }
+	SpriteFrameCollection& operator+=(const SpriteFrame& frame){_frames.push_back(frame); return *this; }
+	SpriteFrameCollection& operator=(const std::vector<SpriteFrame>& frames) { _frames = frames; return *this; }
+	SpriteFrameCollection& operator=(std::vector<SpriteFrame>&& frames) { _frames = std::move(frames); return *this; }
+	void clear() { _frames.clear(); _verts = nullptr; _texture = nullptr; }
+};
+
+
 
 class  GameObject : public Body {
 	sf::Vector2f _size;

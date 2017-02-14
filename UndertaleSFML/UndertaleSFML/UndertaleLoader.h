@@ -24,7 +24,7 @@ public:
 
 
 
-class UndertaleSprite  : public SpriteFrameBase {
+class UndertaleSprite  : public SpriteFrameRef {
 public:
 	class UndertaleSpriteData : std::enable_shared_from_this<UndertaleSpriteData> {
 	protected:
@@ -45,13 +45,21 @@ public:
 	static std::unordered_map<size_t, UndertaleSpriteData::type> _cache; 
 	// we use this so if we change this sprite, we don't lose the old one in case we need to switch fast
 	size_t _image_index;
+	
 public:
 	UndertaleSprite() : _image_index(0), _sprite(nullptr) {}
-	explicit UndertaleSprite(size_t index) : _image_index(0), _sprite(UndertaleSpriteData::LoadSprite(index)) {}
+	explicit UndertaleSprite(size_t index) : _image_index(0) {
+		_sprite = UndertaleSpriteData::LoadSprite(index);
+		assign(_sprite->frame(_image_index = 0));
+	} 
+	UndertaleSprite(const UndertaleSprite& copy) : _image_index(0), _sprite(copy._sprite), SpriteFrameRef(_sprite->frame(0)) {}
+	UndertaleSprite& operator=(UndertaleSprite sprite) {
+		using std::swap;
+		swap(_sprite, sprite._sprite);
+		assign(_sprite->frame(_image_index=0));
+		return *this;
+	}
 	// interface
-	const sf::Texture* texture() const override final { return _sprite ? _sprite->frame(_image_index).texture(): nullptr; }
-	const sf::Vertex* ptr() const override final { return _sprite ? _sprite->frame(_image_index).ptr() : nullptr; }
-	sf::FloatRect bounds() const override final { return _sprite ? sf::FloatRect(sf::Vector2f(), _sprite->size()) : sf::FloatRect(); }
 	// sprite stuff
 	bool valid() const { return (bool)_sprite; }
 	size_t sprite_index() const { return _sprite ? _sprite->index() : 0; }
@@ -61,10 +69,12 @@ public:
 	size_t image_index() const { return _image_index; }
 	size_t image_count() const { return _sprite->frame_count(); }
 	void image_index(size_t index) {  
-		_image_index =       index % _sprite->frame_count();  
+		index %= image_count();
+		if (index != _image_index) {
+			_image_index = index;
+			assign(_sprite->frame(_image_index));
+		}
 	}
-	virtual bool next_frame() { _image_index = (_image_index + 1) % _sprite->frame_count(); return true; }; // This interface just tells the Renderable to do next frame
-	virtual bool prev_frame() { _image_index = (_image_index - 1) % _sprite->frame_count(); return true; }; // This interface just tells the Renderable to do prev frame
 };
 
 // font texture algorithm 

@@ -2,6 +2,7 @@
 #include "UndertaleLoader.h"
 #include <SFML/OpenGL.hpp>
 #include <map>
+#include <algorithm>
 
 using namespace sf;
 
@@ -220,17 +221,27 @@ void Application::LoadRoom(size_t index) {
 	_roomObjects.clear();
 	 _static_entitys.clear();
 	_dynamic_enitys.clear();
+	_foregrounds.clear();
+	 _backgrounds.clear();
 	_room.reset();
 	_room = UndertaleRoom::LoadRoom(index);
 	if (_room) {
+		if (_room->backgrounds().size() > 0) {
+			for (auto& t : _room->backgrounds()) {
+				auto& group = t.forground ? _foregrounds : _backgrounds;
+				group.emplace_back(t.frame, t.visible, t.depth, t.speed);
+				group.back().frame.setPosition(t.pos);
+			}
+		}
 		if (_room->objects().size() > 0) {
+			
 			for (auto& o : _room->objects()) {
 				ex::Entity e = entities.create();
 				auto obj = e.assign<UndertaleObject>(o.obj);
-				auto body = e.assign<Body>(o.body);
 				e.assign<Layer>(o.obj.depth());
 				if (o.obj.sprite_index() >= 0) {
-					e.assign<UndertaleSprite>(o.obj.sprite_index());
+					auto sprite = e.assign<UndertaleSprite>(o.obj.sprite_index());
+					sprite->assign(o.body);
 				}
 				_roomEntitys.emplace_back(e);
 				_roomObjects.emplace(std::make_pair(o.obj.index(), e));
@@ -262,29 +273,27 @@ void Application::update_verts(ex::TimeDelta dt) {
 	
 	
 	sortedVerts.clear();
-	if (_room) {
-		if (_room->backgrounds().size() > 0) {
-			for (auto& t : _room->backgrounds()) {
-				if (t.forground) continue;
-				int layer = t.depth;
-				auto& verts = (sortedVerts[layer])[t.frame.texture()];
-				temp_verts.assign(t.frame.ptr(), t.frame.ptr() + t.frame.size());
-				temp_verts.traslate(t.pos);
-				verts += temp_verts;
-			}
+	if(_foregrounds.size() > 0)
+		for (auto& f : _foregrounds) {
+		//	if (f.visiable) {
+				auto& verts = (sortedVerts[-10000])[f.frame.texture()];
+				verts.append(f.frame.tbegin(), f.frame.tend());
+		//	}
 		}
+	if (_room) {
+		
 		if (_room->tiles().size() > 0) {
 			for (auto& t : _room->tiles()) {
 				auto& verts = (sortedVerts[0])[t.first];
 				const auto& f = t.second;
-				verts.append(f.verts());
+				verts.append(t.second.tile_verts());
 			}
 		}
 	}
 
-	entities.each<SpriteFacing, UndertaleSprite, Body, PlayerControl, SpriteAnimation>([this, dt](ex::Entity entity, SpriteFacing& spritefacing, UndertaleSprite& sprite, Body& body, PlayerControl &control, SpriteAnimation& animation) {
+	entities.each<SpriteFacing, UndertaleSprite, PlayerControl, SpriteAnimation>([this, dt](ex::Entity entity, SpriteFacing& spritefacing, UndertaleSprite& sprite, PlayerControl &control, SpriteAnimation& animation) {
 		if (PlayerControl::isMoving()) {
-			body.move(control.getMovement()*dt);
+			sprite.move(control.getMovement()*dt);
 			if (control.facing != spritefacing.direction) {
 				sprite = spritefacing.getCurrentFace(control.facing);
 				spritefacing.direction = control.facing;
@@ -320,15 +329,11 @@ void Application::update_verts(ex::TimeDelta dt) {
 		}
 	});
 
-	entities.each<Body, UndertaleSprite>([this](ex::Entity entity, Body& body, UndertaleSprite &sprite) {
+	entities.each<UndertaleSprite>([this](ex::Entity entity, UndertaleSprite &sprite) {
 		constexpr bool draw_all_boxes = true;
 		int layer = entity.has_component<Layer>() ? entity.component<Layer>() : 0;
 		auto& verts = (sortedVerts[layer])[sprite.texture()];
-		temp_verts.assign(sprite.ptr(), sprite.ptr() + 6);
-		temp_verts.transform(body.getTransform());
-		auto temp = temp_verts.bounds();
-		body.fixBounds(sprite.frame_size());
-		verts += temp_verts;
+		verts.back_insert(sprite.tbegin(), sprite.tend());
 	});
 
 	sf::Vector2i mouse_current = sf::Mouse::getPosition(_window);
@@ -339,8 +344,8 @@ void Application::update_verts(ex::TimeDelta dt) {
 		//dwindow.erase_to_eol();
 		std::cout << con::gotoxy(0, 0) << std::setw(20) << std::setfill(' ') << con::print("mouse (%2.2f,%2.2f) ", coord_pos.x, coord_pos.y);
 		// object debug
-		entities.each<Body, UndertaleObject, UndertaleSprite>([this, coord_pos](ex::Entity entity, Body &body, UndertaleObject& obj, UndertaleSprite &sprite) {
-			sf::FloatRect bounds = body.getBounds();
+		entities.each<UndertaleObject, UndertaleSprite>([this, coord_pos](ex::Entity entity,  UndertaleObject& obj, UndertaleSprite &sprite) {
+			sf::FloatRect bounds = sprite.bounds_global();
 			if (bounds.contains(coord_pos)) {
 				auto& verts = (sortedVerts[100])[nullptr];
 				draw_box(verts, bounds);
@@ -367,14 +372,12 @@ void Application::update_verts(ex::TimeDelta dt) {
 			}
 		});
 	}
-	if (_room && _room->backgrounds().size() > 0) {
-		for (auto& t : _room->backgrounds()) {
-			if (!t.forground) continue;
-			int layer = t.depth;
-			auto& verts = (sortedVerts[layer])[t.frame.texture()];
-			temp_verts.assign(t.frame.ptr(), t.frame.ptr() + t.frame.size());
-			temp_verts.traslate(t.pos);
-			verts += temp_verts;
+	if (_backgrounds.size() > 0) {
+		for (auto& f : _backgrounds) {
+		//	if (f.visiable) {
+				auto& verts = (sortedVerts[-10000])[f.frame.texture()];
+				verts.append(f.frame.tbegin(), f.frame.tend());
+	//		}
 		}
 	}
 

@@ -129,13 +129,20 @@ namespace console {
 
 	typedef unsigned int chtype;
 	struct CharInfo {
-		static const CharInfo Blank; // default, space that is on a white forground with a black bachkground
-		union { chtype chattrib; struct { union { wchar_t wch; char ch; }; uint16_t attrib; };  };
-		CharInfo() : CharInfo(Blank) {}
-		// order is important
-		constexpr CharInfo(char ch, Color fg = Color::White, Color bg = Color::Black) : chattrib(0), wch(' '), attrib(static_cast<uint8_t>(fg) | (static_cast<uint8_t>(bg) << 4)) {}
-		operator chtype() const { return chattrib; }
-		operator chtype&() { return chattrib; }
+		union {
+			wchar_t unicode;
+			char anscii;
+		};
+		uint16_t attrib;
+		constexpr explicit CharInfo() : unicode(' '), attrib(0xFFFF) {}
+		constexpr explicit CharInfo(wchar_t ch) : unicode(ch), attrib(0xFFFF) {}
+		constexpr explicit CharInfo(wchar_t ch, uint16_t attrib) : unicode(ch), attrib(attrib) {}
+		constexpr bool default_attrib() const { return attrib == 0xFFFF; }
+		constexpr operator const wchar_t&() const { return unicode; }
+		constexpr operator const char&() const  { return anscii; }
+		operator wchar_t&() { return unicode; }
+		operator char&() { return anscii; }
+		CharInfo& operator=(wchar_t ch) { unicode = ch; return *this; }
 		//  with black background and white forground
 		Color fg() const { return static_cast<Color>(attrib & 0xF); }
 		Color bg() const { return static_cast<Color>((attrib >> 4) & 0xF); }
@@ -144,10 +151,10 @@ namespace console {
 	};
 	inline bool operator==(const CharInfo &l, const CharInfo &r) { return l.attrib == r.attrib; }
 	inline bool operator!=(const CharInfo &l, const CharInfo &r) { return l.attrib != r.attrib; }
-	inline bool operator==(const CharInfo &l, char r) { return l.ch == r; }
-	inline bool operator!=(const CharInfo &l, char r) { return l.ch != r; }
-	inline bool operator==(const CharInfo &l, wchar_t r) { return l.wch == r; }
-	inline bool operator!=(const CharInfo &l, wchar_t r) { return l.wch != r; }
+	inline bool operator==(const CharInfo &l, char r) { return l.anscii == r; }
+	inline bool operator!=(const CharInfo &l, char r) { return l.anscii != r; }
+	inline bool operator==(const CharInfo &l, wchar_t r) { return l.unicode == r; }
+	inline bool operator!=(const CharInfo &l, wchar_t r) { return l.unicode != r; }
 
 
 	struct Point {

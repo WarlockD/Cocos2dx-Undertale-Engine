@@ -68,10 +68,15 @@ public:
     /// \param rectHeight Height of the rectangle
     ///
     ////////////////////////////////////////////////////////////
-	template <typename T1,typename T2, typename T3, typename T4>
+	template<typename T1,typename T2, typename T3, typename T4>
 	Rect(T1 rectLeft, T2 rectTop, T3 rectWidth, T4 rectHeight) : left(static_cast<T>(rectLeft)),top(static_cast<T>(rectTop)),width(static_cast<T>(rectWidth)),height(static_cast<T>(rectHeight)){}
 
+	// just a sized rect with 0 top/left
+	template<typename T1, typename T2>
+	Rect(T1 rectWidth, T2 rectHeight) : left(T{}), top(T{}), width(static_cast<T>(rectWidth)), height(static_cast<T>(rectHeight)) {}
 
+	template<typename T1>
+	Rect(const Vector2<T1>& size) : left(T{}), top(T{}), width(static_cast<T>(size.x)), height(static_cast<T>(size.y)) {}
     ////////////////////////////////////////////////////////////
     /// \brief Construct the rectangle from position and size
     ///
@@ -156,6 +161,11 @@ public:
     ////////////////////////////////////////////////////////////
     // Member data
     ////////////////////////////////////////////////////////////
+	// bit hacky but hey it works
+	sf::Vector2<T>& position() { return *reinterpret_cast<sf::Vector2<T>*>(&width); }
+	sf::Vector2<T>& size() { return *reinterpret_cast<sf::Vector2<T>*>(&width); } // offset
+	const sf::Vector2<T>& position() const { return *reinterpret_cast<const sf::Vector2<T>*>(&left); }
+	const sf::Vector2<T>& size() const { return *reinterpret_cast<const sf::Vector2<T>*>(&width); } // offset
     T left;   ///< Left coordinate of the rectangle
     T top;    ///< Top coordinate of the rectangle
     T width;  ///< Width of the rectangle
@@ -195,8 +205,10 @@ bool operator !=(const Rect<T>& left, const Rect<T>& right);
 #include <SFML/Graphics/Rect.inl>
 
 // Create typedefs for the most common types
-typedef Rect<int>   IntRect;
-typedef Rect<float> FloatRect;
+//using IntRect = Rect<int>;
+//using FloatRect = Rect<float>;
+typedef typename Rect<int>   IntRect;
+typedef typename Rect<float> FloatRect;
 
 } // namespace sf
 

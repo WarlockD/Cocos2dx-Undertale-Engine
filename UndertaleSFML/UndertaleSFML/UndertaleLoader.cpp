@@ -92,7 +92,7 @@ UndertaleRoom::LoadRoom(size_t room_index) {
 			room->_index = room_index;
 			std::unordered_map<size_t, SpriteFrame> _backgroundCache;
 			for (auto& t : uroom.tiles()) {
-				auto& b = _backgroundCache[t.background_index];
+				SpriteFrame& b = _backgroundCache[t.background_index];
 				if (b.texture() == nullptr) b = Global::LookupBackground(t.background_index);
 				auto& tile_mesh = room->_tiles[b.texture()];
 				if (tile_mesh.texture() == nullptr) tile_mesh = TileMap(b.texture(),b.texRect());
@@ -139,7 +139,7 @@ namespace Global {
 		sf::FloatRect bounds(uf.offset_x, uf.offset_y, uf.width, uf.height);
 		sf::IntRect texRect(uf.x, uf.y, uf.width, uf.height);
 		const sf::Texture* texture = &Global::GetUndertaleTexture(uf.texture_index);
-		return SpriteFrame(bounds, texture, texRect);
+		return SpriteFrame::create(texture, texRect, sf::Vector2f(uf.offset_x, uf.offset_y));
 	}
 	SpriteFrame LookupBackground(size_t index) {
 		auto& b = file.LookupBackground(index);

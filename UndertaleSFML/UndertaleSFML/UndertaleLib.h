@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
@@ -18,6 +19,45 @@
 #endif
 
 namespace UndertaleLib {
+	class oto_binary_wraper
+	{
+		std::ostream& _stream;
+	public:
+		oto_binary_wraper(std::ostream& stream) : _stream(stream) {}
+		template<typename T, typename = std::enable_if<std::is_arithmetic<T>::value>::type>
+		friend to_binary_wraper const& operator<<(to_binary_wraper const& stream, const T& value)
+		{
+			stream._stream.write(dynamic_cast<const char*>(&value), sizeof(T));
+			return stream;
+		}
+	};
+	class ito_binary_wraper
+	{
+		std::istream& _stream;
+	public:
+		ito_binary_wraper(std::istream& stream) : _stream(stream) {}
+		template<typename T, typename = std::enable_if<std::is_arithmetic<T>::value>::type>
+		friend to_binary_wraper const& operator>>(to_binary_wraper const& stream, T& value)
+		{
+			stream._stream.read(dynamic_cast<const char*>(&value), sizeof(T));
+			return stream;
+		}
+	};
+	// A simple empty class to start the streaming of bits
+	// via the above wrapper class.
+	struct to_binary
+	{
+		template<typename T, typename = std::enable_if<std::is_arithmetic<T>::value>::type>
+		friend oto_binary_wraper operator<<(std::ostream& stream, T const&)
+		{
+			return oto_binary_wraper(stream);
+		}
+		template<typename T, typename = std::enable_if<std::is_arithmetic<T>::value>::type>
+		friend to_binary_wraper operator>>(std::istream& stream, T &)
+		{
+			return ito_binary_wraper(stream);
+		}
+	};
 
 	inline size_t simple_hash(const char *str)
 	{

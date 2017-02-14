@@ -3,7 +3,7 @@
 #include "UndertaleLoader.h"
 #include "UndertaleLib.h"
 
-class UndertaleLabel : public Renderable
+class UndertaleLabel 
 {
 protected:
 	std::shared_ptr<UFont> _font;
@@ -27,8 +27,8 @@ public:
 
 	const sf::Vector2f& getTextSize() const { return _textBounds; }
 	const sf::Vertex* data() const { return _textVerts.data(); }
-	size_t size() const override  { return _textVerts.size(); }
-	const sf::Texture* texture() const override { return &_font->getTexture(); }
+	size_t size() const { return _textVerts.size(); }
+	const sf::Texture* texture() const { return &_font->getTexture(); }
 };
 
 

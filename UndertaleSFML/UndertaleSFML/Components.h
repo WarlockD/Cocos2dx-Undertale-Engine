@@ -84,33 +84,6 @@ struct Layer {
 	int layer;
 };
 
-class RenderableCache :public ChangedCass {
-	const Renderable& _renderable;
-	const ChangedCass* _renderable_can_change;
-	mutable RawVertices _cache;
-public:
-	explicit RenderableCache(const Renderable& ref) : _renderable(ref), _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)) { _cache.assign(_renderable.begin(), _renderable.end()); }
-//	explicit RenderableCache(const Renderable* ref) : _renderable(&ref), _renderable_can_change(dynamic_cast<const ChangedCass*>(&ref)) { _cache.assign(_renderable.begin(), _renderable.end()); }
-
-	void update_cache() const {
-		if ((_renderable_can_change && _renderable_can_change->changed())) {
-			_cache.assign(_renderable.begin(), _renderable.end());
-		}
-	}
-	void update_cache(const Body& body) const {
-		if (body.changed() || (_renderable_can_change && _renderable_can_change->changed())) {
-			_cache.assign(_renderable.begin(), _renderable.end());
-			_cache.transform(body.getTransform());
-			body.changed(false);
-		}
-	}
-	// helper functions
-	const sf::Texture* texture() const { return _renderable.texture(); }
-	const RawVertices& cache() {
-		return _cache;
-	}
-	const Renderable& renderable() const { return _renderable; }
-};
 
 
 
@@ -216,6 +189,16 @@ class Application  : public ex::EntityX {
 	typedef std::unordered_map<const sf::Texture*, RawVertices> t_dumb_batch;
 	typedef std::vector<sf::FloatRect> t_debug_boxes;
 	std::map<int, t_dumb_batch> sortedVerts;
+	struct StaticFrames {
+		SpriteFrame frame;
+		bool visiable;
+		int depth;
+		sf::Vector2f speed;
+		explicit StaticFrames(SpriteFrame frame, bool visiable, int depth, sf::Vector2f speed) :
+			frame(frame), visiable(visiable), depth(depth), speed(speed) {}
+	};
+	std::vector<StaticFrames> _backgrounds;
+	std::vector<StaticFrames> _foregrounds;
 	std::unordered_multimap<size_t, ex::Entity> _roomObjects;
 	std::vector<ex::Entity> _static_entitys;
 	std::vector<ex::Entity> _dynamic_enitys;

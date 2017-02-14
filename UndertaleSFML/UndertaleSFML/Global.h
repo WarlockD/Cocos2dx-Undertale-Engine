@@ -21,7 +21,10 @@
 #include "console.h"
 
 namespace ex = entityx;
-
+// meh
+inline sf::Vertex& operator*=(sf::Vertex& v, const sf::Transform& t) { v.position = t.transformPoint(v.position); return v; }
+inline sf::Vertex operator*(const sf::Vertex& v, const sf::Transform& t) { sf::Vertex ret(v); ret *= t; return ret; }
+inline sf::Vertex operator*(const sf::Transform& t, const sf::Vertex& v) { sf::Vertex ret(v); ret *= t; return ret; }
 
 namespace global {
 	sf::RenderWindow& getWindow();
@@ -258,6 +261,11 @@ public:
 	template<class IT> 
 	typename std::enable_if<std::is_iterator<IT>::value, iterator>::type 
 		insert(const_iterator where, IT first, IT last) { return _verts.insert(where, first, last); }
+
+	template<class IT>
+	typename std::enable_if<std::is_iterator<IT>::value, iterator>::type
+		back_insert(IT first, IT last) { return _verts.insert(end(), first, last); }
+
 	template<class IT>
 	typename std::enable_if<std::is_iterator<IT>::value, void>::type 
 		assign(IT first, IT last) { _verts.assign(first, last); }
@@ -313,10 +321,10 @@ public:
 		sf::Vector2f vmax;
 		for (auto& it : _verts) {
 			auto& v = it.position;
-			if (v.x > vmin.x) vmin.x = v.x;
-			if (v.y > vmin.y) vmin.y = v.y;
-			if (v.x < vmax.x) vmax.x = v.x;
-			if (v.y < vmax.y) vmax.y = v.y;
+			if (v.x < vmin.x) vmin.x = v.x;
+			if (v.y < vmin.y) vmin.y = v.y;
+			if (v.x > vmax.x) vmax.x = v.x;
+			if (v.y > vmax.y) vmax.y = v.y;
 		}
 		return sf::FloatRect(vmin, vmax - vmin);
 	}
